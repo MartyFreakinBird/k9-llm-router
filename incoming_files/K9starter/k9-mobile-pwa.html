@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050810">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="K-9">
+<title>K-9 Mobile Command</title>
+<link rel="manifest" href="#" id="manifest-link">
+
+<!-- PWA manifest injected inline to avoid separate file dependency -->
+<script>
+const manifest = {
+  name: "K-9 Command Core",
+  short_name: "K-9",
+  description: "K-9 distributed AI agent mobile command interface",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#050810",
+  theme_color: "#050810",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23050810'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-family='monospace' font-size='110' font-weight='900' fill='%23f59e0b'>K9</text></svg>", sizes: "192x192", type: "image/svg+xml" },
+    { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23050810'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-family='monospace' font-size='290' font-weight='900' fill='%23f59e0b'>K9</text></svg>", sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@600;700;900&display=swap');
+
+:root {
+  --bg: #050810;
+  --bg2: #090d1a;
+  --bg3: #0d1424;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.14);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.15);
+  --amber-text: #fbbf24;
+  --green: #10b981;
+  --green-dim: rgba(16,185,129,0.12);
+  --cyan: #22d3ee;
+  --cyan-dim: rgba(34,211,238,0.1);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.12);
+  --text: #94a3b8;
+  --text-dim: #475569;
+  --text-bright: #f1f5f9;
+  --nav-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+/* ── APP SHELL ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: -webkit-fill-available;
+  padding-top: var(--safe-top);
+}
+
+/* ── HEADER ── */
+.header {
+  flex-shrink: 0;
+  padding: 12px 16px 10px;
+  background: var(--bg2);
+  border-bottom: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--amber);
+  letter-spacing: 4px;
+}
+.logo-sub {
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.online-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.header-time { font-size: 11px; color: var(--text-dim); }
+
+/* ── SCROLL AREA ── */
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 14px 14px calc(var(--nav-h) + var(--safe-bottom) + 16px);
+}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--bg2);
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-icon { font-size: 18px; line-height: 1; transition: transform 0.15s; }
+.nav-label { font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+.nav-btn.active .nav-icon { transform: translateY(-2px); }
+.nav-btn.active .nav-label { color: var(--amber); }
+.nav-btn:active .nav-icon { transform: scale(0.88); }
+
+/* ── PAGES ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── SECTION HEADER ── */
+.sec-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--amber);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── COMPONENT CHIPS ── */
+.comp-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+  scrollbar-width: none;
+}
+.comp-strip::-webkit-scrollbar { display: none; }
+.comp-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 10px;
+  color: var(--text);
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.comp-chip.active {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-dim);
+}
+.chip-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+/* ── PATTERN GRID ── */
+.pattern-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.pat-btn {
+  padding: 10px 4px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg3);
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.pat-btn .pico { font-size: 16px; display: block; margin-bottom: 3px; }
+.pat-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+/* ── INPUT CARD ── */
+.input-card {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.input-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--border);
+}
+.ctx-chips { display: flex; gap: 5px; }
+.ctx-chip {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 0.5px solid var(--border);
+  color: var(--text-dim);
+  background: none;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ctx-chip.on { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+.input-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-left: auto; }
+
+textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-bright);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  padding: 12px;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+  min-height: 100px;
+}
+textarea::placeholder { color: var(--text-dim); }
+
+/* ── ACTION ROW ── */
+.action-row {
+  display: flex; gap: 8px; margin-bottom: 14px; align-items: center;
+}
+.exec-btn {
+  flex: 1;
+  padding: 14px;
+  background: var(--amber);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.exec-btn:active { transform: scale(0.97); background: #fbbf24; }
+.exec-btn:disabled { background: rgba(245,158,11,0.25); color: rgba(0,0,0,0.4); }
+.clear-btn {
+  padding: 14px 16px;
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* ── RESPONSE CARD ── */
+.resp-card {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.resp-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--border);
+}
+.resp-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1.5px; flex: 1; }
+.copy-btn {
+  padding: 4px 10px;
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+}
+.copy-btn.flash { border-color: var(--green); color: var(--green); }
+.resp-body {
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.resp-body.loading { color: var(--amber); }
+
+/* ── STATUS PAGE ── */
+.status-grid { display: flex; flex-direction: column; gap: 10px; }
+.status-card {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.status-card-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--border);
+}
+.status-card-title { font-size: 10px; letter-spacing: 2px; color: var(--amber); text-transform: uppercase; flex: 1; }
+.status-rows { padding: 4px 0; }
+.status-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 0.5px solid var(--border);
+}
+.status-row:last-child { border-bottom: none; }
+.status-name { font-size: 12px; flex: 1; }
+.status-val { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+.val-ok { background: var(--green-dim); color: var(--green); }
+.val-warn { background: var(--amber-dim); color: var(--amber-text); }
+.val-off { color: var(--text-dim); }
+.s-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.s-dot.ok { background: var(--green); box-shadow: 0 0 5px var(--green); }
+.s-dot.warn { background: var(--amber); }
+.s-dot.off { background: var(--text-dim); }
+
+/* ── COMMANDS PAGE ── */
+.cmd-section { margin-bottom: 16px; }
+.cmd-section-title {
+  font-size: 9px; letter-spacing: 2.5px;
+  color: var(--text-dim); text-transform: uppercase;
+  margin-bottom: 8px; padding-left: 2px;
+}
+.cmd-list-card {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cmd-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cmd-row:last-child { border-bottom: none; }
+.cmd-row:active { background: rgba(255,255,255,0.04); }
+.cmd-code { font-size: 12px; color: var(--cyan); flex: 1; word-break: break-all; line-height: 1.4; }
+.cmd-hint { font-size: 10px; color: var(--text-dim); flex-shrink: 0; max-width: 70px; text-align: right; }
+.cmd-copy-icon { font-size: 14px; flex-shrink: 0; opacity: 0.4; }
+
+/* ── GIT PAGE ── */
+.git-steps { display: flex; flex-direction: column; gap: 10px; }
+.git-step {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.git-step-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--amber-dim); border: 0.5px solid var(--amber);
+  color: var(--amber); font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.step-title { font-size: 13px; color: var(--text-bright); font-weight: 500; }
+.step-cmd {
+  background: rgba(0,0,0,0.3);
+  border: 0.5px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--green);
+  cursor: pointer;
+  word-break: break-all;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+.step-cmd:active { background: rgba(16,185,129,0.06); }
+.step-note { font-size: 10px; color: var(--text-dim); margin-top: 6px; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--bg2);
+  border: 0.5px solid var(--green);
+  color: var(--green);
+  font-size: 11px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* ── SPINNER ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(245,158,11,0.2);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── SWARM PAGE ── */
+.swarm-phase {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.phase-badge {
+  font-size: 9px; padding: 3px 8px; border-radius: 20px;
+  background: var(--green-dim); color: var(--green);
+  border: 0.5px solid rgba(16,185,129,0.3);
+  letter-spacing: 1px; white-space: nowrap;
+}
+.phase-txt { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+.phase-txt strong { color: var(--amber); font-weight: 500; }
+
+.agent-card {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.agent-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 0.5px solid var(--border);
+}
+.agent-role-label { font-size: 12px; color: var(--text-bright); flex: 1; font-weight: 500; }
+.agent-id-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono',monospace; }
+.agent-status-pill {
+  font-size: 9px; padding: 3px 8px; border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+.pill-online { background: var(--green-dim); color: var(--green); border: 0.5px solid rgba(16,185,129,0.3); }
+.pill-idle   { background: var(--amber-dim); color: var(--amber-text); border: 0.5px solid rgba(245,158,11,0.3); }
+.pill-off    { background: rgba(255,255,255,0.04); color: var(--text-dim); border: 0.5px solid var(--border); }
+.agent-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.agent-meta-row {
+  display: flex; flex-direction: column;
+  padding: 8px 14px;
+  border-right: 0.5px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
+}
+.agent-meta-row:nth-child(2n) { border-right: none; }
+.agent-meta-row:nth-last-child(-n+2) { border-bottom: none; }
+.meta-key { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 2px; }
+.meta-val { font-size: 12px; color: var(--text); }
+.meta-val.ok { color: var(--green); }
+.meta-val.warn { color: var(--amber-text); }
+
+.sprint-progress {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.sprint-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sprint-title { font-size: 12px; color: var(--text-bright); font-weight: 500; }
+.sprint-num-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px;
+  background: var(--amber-dim); color: var(--amber-text);
+  border: 0.5px solid rgba(245,158,11,0.3);
+}
+.sprint-items { display: flex; flex-direction: column; gap: 7px; }
+.sprint-item { display: flex; align-items: flex-start; gap: 8px; }
+.sprint-check {
+  width: 16px; height: 16px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+}
+.check-done { background: var(--green-dim); color: var(--green); border: 0.5px solid rgba(16,185,129,0.4); }
+.check-active { background: var(--amber-dim); color: var(--amber-text); border: 0.5px solid rgba(245,158,11,0.4); }
+.check-todo { background: rgba(255,255,255,0.04); color: var(--text-dim); border: 0.5px solid var(--border); }
+.sprint-item-text { font-size: 12px; line-height: 1.4; }
+.sprint-item-text.done { color: var(--text-dim); text-decoration: line-through; }
+.sprint-item-text.active { color: var(--text-bright); }
+.sprint-item-text.todo { color: var(--text-dim); }
+
+.swarm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.swarm-action-btn {
+  padding: 12px 8px;
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.swarm-action-btn:active { background: rgba(255,255,255,0.06); }
+.swarm-action-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+.swarm-action-label { font-size: 10px; color: var(--text-dim); }
+.swarm-url {
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--cyan);
+  cursor: pointer;
+  margin-bottom: 6px;
+  word-break: break-all;
+  -webkit-tap-highlight-color: transparent;
+}
+.swarm-url:active { background: rgba(34,211,238,0.05); }
+.swarm-url-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; display: block; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="logo">K-9</div>
+      <div class="logo-sub">Mobile Command</div>
+    </div>
+    <div class="header-right">
+      <div class="online-dot"></div>
+      <div class="header-time" id="clock"></div>
+    </div>
+  </div>
+
+  <!-- SCROLL AREA -->
+  <div class="scroll-area" id="scroll-area">
+
+    <!-- ── PAGE: CLAUDE CODE ── -->
+    <div class="page active" id="page-ai">
+
+      <div class="sec-title">Claude Code</div>
+
+      <!-- Component selector -->
+      <div class="comp-strip" id="comp-strip">
+        <button class="comp-chip active" onclick="setComp(this,'k9-orchestrator')">
+          <span class="chip-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></span>k9-orchestrator
+        </button>
+        <button class="comp-chip" onclick="setComp(this,'k9-llm-router')">
+          <span class="chip-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></span>k9-llm-router
+        </button>
+        <button class="comp-chip" onclick="setComp(this,'k9-quant-engine')">
+          <span class="chip-dot" style="background:var(--amber)"></span>k9-quant-engine
+        </button>
+        <button class="comp-chip" onclick="setComp(this,'orbitron-diag')">
+          <span class="chip-dot" style="background:var(--amber)"></span>orbitron-diag
+        </button>
+        <button class="comp-chip" onclick="setComp(this,'k9-mcp-server')">
+          <span class="chip-dot" style="background:var(--text-dim)"></span>k9-mcp-server
+        </button>
+      </div>
+
+      <!-- Pattern -->
+      <div class="pattern-row">
+        <button class="pat-btn active" id="pat-generate" onclick="setPat(this,'generate')">
+          <span class="pico">⚡</span>Generate
+        </button>
+        <button class="pat-btn" id="pat-debug" onclick="setPat(this,'debug')">
+          <span class="pico">🔍</span>Debug
+        </button>
+        <button class="pat-btn" id="pat-test" onclick="setPat(this,'test')">
+          <span class="pico">🧪</span>Test
+        </button>
+        <button class="pat-btn" id="pat-review" onclick="setPat(this,'review')">
+          <span class="pico">📋</span>Review
+        </button>
+      </div>
+
+      <!-- Prompt -->
+      <div class="input-card">
+        <div class="input-toolbar">
+          <div class="ctx-chips">
+            <button class="ctx-chip on" id="ctx-comp" onclick="toggleCtx('comp')">comp</button>
+            <button class="ctx-chip" id="ctx-defi" onclick="toggleCtx('defi')">defi</button>
+            <button class="ctx-chip" id="ctx-mcp" onclick="toggleCtx('mcp')">mcp</button>
+            <button class="ctx-chip" id="ctx-vercel" onclick="toggleCtx('vercel')">vercel</button>
+          </div>
+          <div class="input-label">PROMPT</div>
+        </div>
+        <textarea id="prompt-input" rows="4" placeholder="Describe what to build, fix, or explain..."></textarea>
+      </div>
+
+      <div class="action-row">
+        <button class="exec-btn" id="exec-btn" onclick="runClaude()">▶ EXECUTE</button>
+        <button class="clear-btn" onclick="clearAll()">✕</button>
+      </div>
+
+      <!-- Response -->
+      <div class="resp-card">
+        <div class="resp-header">
+          <div class="resp-label">OUTPUT</div>
+          <button class="copy-btn" id="copy-btn" onclick="copyResp()">COPY</button>
+        </div>
+        <div class="resp-body" id="resp-body"><span style="color:var(--text-dim)">// Ready</span></div>
+      </div>
+    </div>
+
+    <!-- ── PAGE: STATUS ── -->
+    <div class="page" id="page-status">
+      <div class="sec-title">System Status</div>
+      <div class="status-grid">
+
+        <div class="status-card">
+          <div class="status-card-header">
+            <div class="status-card-title">K-9 Components</div>
+          </div>
+          <div class="status-rows">
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">k9-orchestrator</span><span class="status-val val-ok">● active</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">k9-llm-router</span><span class="status-val val-ok">● active</span></div>
+            <div class="status-row"><span class="s-dot warn"></span><span class="status-name">k9-quant-engine</span><span class="status-val val-warn">● idle</span></div>
+            <div class="status-row"><span class="s-dot warn"></span><span class="status-name">orbitron-diag</span><span class="status-val val-warn">● idle</span></div>
+            <div class="status-row"><span class="s-dot off"></span><span class="status-name">k9-mcp-server</span><span class="status-val val-off">○ off</span></div>
+            <div class="status-row"><span class="s-dot off"></span><span class="status-name">k9-device-hub</span><span class="status-val val-off">○ off</span></div>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <div class="status-card-header">
+            <div class="status-card-title">Network / Mesh</div>
+          </div>
+          <div class="status-rows">
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Tailscale mesh</span><span class="status-val val-ok">connected</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Headscale node</span><span class="status-val val-ok">WSL2</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Sunshine/Moonlight</span><span class="status-val val-ok">ready</span></div>
+            <div class="status-row"><span class="s-dot warn"></span><span class="status-name">DERP relay</span><span class="status-val val-warn">not yet built</span></div>
+            <div class="status-row"><span class="s-dot warn"></span><span class="status-name">code-server</span><span class="status-val val-warn">manual start</span></div>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <div class="status-card-header">
+            <div class="status-card-title">This Device</div>
+          </div>
+          <div class="status-rows">
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">PWA mode</span><span class="status-val val-ok" id="pwa-mode">checking...</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Offline cache</span><span class="status-val val-ok" id="sw-status">checking...</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Anthropic API</span><span class="status-val val-ok">reachable</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Screen</span><span class="status-val val-ok" id="screen-size">—</span></div>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <div class="status-card-header">
+            <div class="status-card-title">Tools</div>
+          </div>
+          <div class="status-rows">
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">VS Code</span><span class="status-val val-ok">installed</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Cursor</span><span class="status-val val-ok">installed</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">Claude Code CLI</span><span class="status-val val-ok">auth'd</span></div>
+            <div class="status-row"><span class="s-dot ok"></span><span class="status-name">GitHub CLI</span><span class="status-val val-ok">gh auth ok</span></div>
+            <div class="status-row"><span class="s-dot warn"></span><span class="status-name">Rhasspy</span><span class="status-val val-warn">config pending</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── PAGE: COMMANDS ── -->
+    <div class="page" id="page-cmds">
+      <div class="sec-title">Quick Commands</div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">Environment</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-orchestrator</span><span class="cmd-hint">activate</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-llm</span><span class="cmd-hint">llm router</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-quant</span><span class="cmd-hint">quant engine</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-orbitron</span><span class="cmd-hint">diagnostics</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-status</span><span class="cmd-hint">check active</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">deactivate</span><span class="cmd-hint">exit env</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">Services</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-start</span><span class="cmd-hint">all services</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">k9-stop</span><span class="cmd-hint">stop all</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">~/k9-workspace/check-status.sh</span><span class="cmd-hint">status</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">tail -f ~/k9-workspace/logs/orchestrator.log</span><span class="cmd-hint">logs</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">Claude Code patterns</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">claude "Create module for [feature]"</span><span class="cmd-hint">generate</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">claude "Debug: $(cat logs/err.log | tail -50)"</span><span class="cmd-hint">debug</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">claude "Generate pytest tests: $(cat src/module.py)"</span><span class="cmd-hint">test gen</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">Tailscale / remote</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">tailscale status</span><span class="cmd-hint">mesh</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">ssh tim@k9-dev-windows</span><span class="cmd-hint">from chromebook</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">wsl -d Fedora -- k9-status</span><span class="cmd-hint">from win PS</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">code-server --bind-addr 0.0.0.0:8443</span><span class="cmd-hint">remote IDE</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">Vercel deployment</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">npm install -g vercel</span><span class="cmd-hint">install CLI</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel login</span><span class="cmd-hint">authenticate</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel link</span><span class="cmd-hint">link project</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel build</span><span class="cmd-hint">local build check</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel --prod</span><span class="cmd-hint">deploy production</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel env pull .env.local</span><span class="cmd-hint">sync env vars</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel logs [deployment-url]</span><span class="cmd-hint">check logs</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">vercel api GET /v9/projects</span><span class="cmd-hint">API CLI</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+      <div class="cmd-section">
+        <div class="cmd-section-title">GitHub App + Claude Code</div>
+        <div class="cmd-list-card">
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">npm install -g @anthropic-ai/claude-code</span><span class="cmd-hint">install</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">claude</span><span class="cmd-hint">start session</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">gh auth login</span><span class="cmd-hint">authorize GitHub</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">/install-github-app</span><span class="cmd-hint">inside claude</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">/permissions</span><span class="cmd-hint">auto-approve safe cmds</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">tmux new -s k9-claude</span><span class="cmd-hint">persistent session</span><span class="cmd-copy-icon">⎘</span></div>
+          <div class="cmd-row" onclick="tapCmd(this)"><span class="cmd-code">tmux attach -t k9-claude</span><span class="cmd-hint">reattach</span><span class="cmd-copy-icon">⎘</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── PAGE: GIT ── -->
+    <div class="page" id="page-git">
+      <div class="sec-title">Git Workflow</div>
+      <div class="git-steps">
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">1</div>
+            <div class="step-title">Activate component + open editor</div>
+          </div>
+          <div class="step-cmd" id="git-step1" onclick="tapStep(this)">k9-orchestrator && code .</div>
+          <div class="step-note">Tap to copy · change component via the AI tab</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">2</div>
+            <div class="step-title">Create feature branch</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">git checkout -b feature/your-feature-name</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">3</div>
+            <div class="step-title">Use Claude Code to build</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">claude "implement [feature] in k9-orchestrator"</div>
+          <div class="step-note">Use the AI tab for complex, multi-context prompts</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">4</div>
+            <div class="step-title">Run tests</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">pytest tests/ -v --cov=src/</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">5</div>
+            <div class="step-title">Commit and push</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">git add . && git commit -m "feat: [description]" && git push -u origin HEAD</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">6</div>
+            <div class="step-title">Open PR via GitHub CLI</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">gh pr create --web</div>
+        </div>
+
+      </div>
+
+      <!-- GitHub App setup -->
+      <div class="sec-title" style="margin-top:20px">GitHub App Setup</div>
+      <div class="git-steps">
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">A</div>
+            <div class="step-title">Install Claude Code + GitHub CLI</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">npm install -g @anthropic-ai/claude-code && gh auth login</div>
+          <div class="step-note">Node.js 18+ required · gh auth opens browser OAuth flow</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">B</div>
+            <div class="step-title">Install GitHub App (inside claude session)</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">/install-github-app</div>
+          <div class="step-note">Grants Read + Write access to Contents, Issues, Pull Requests · enables @claude mentions on issues</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">C</div>
+            <div class="step-title">Create CLAUDE.md at repo root</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">claude "Generate a CLAUDE.md for k9-orchestrator with coding standards, venv activation, and common commands"</div>
+          <div class="step-note">CLAUDE.md gives Claude persistent context on every session — treat it like a team onboarding doc</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">D</div>
+            <div class="step-title">Run in tmux for persistent remote sessions</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">tmux new -s k9-claude && claude</div>
+          <div class="step-note">Moonlight/SSH drops won't kill your Claude session · reattach with: tmux attach -t k9-claude</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">E</div>
+            <div class="step-title">Auto-approve safe commands</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">/permissions</div>
+          <div class="step-note">Set auto-approve for git status, ls, pytest — reduces manual taps when working from Kindle</div>
+        </div>
+
+      </div>
+
+      <!-- Vercel workflow -->
+      <div class="sec-title" style="margin-top:20px">Vercel Deployment</div>
+      <div class="git-steps">
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">1</div>
+            <div class="step-title">Link project + sync env vars</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">vercel link && vercel env pull .env.local</div>
+          <div class="step-note">env pull syncs production vars to local — Claude Code runs with identical env to live site</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">2</div>
+            <div class="step-title">Local build check before pushing</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">vercel build</div>
+          <div class="step-note">Catches Next.js/React errors locally — faster than waiting for cloud build minutes</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">3</div>
+            <div class="step-title">Claude Code → GitHub → auto preview URL</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">claude "I just pushed a new UI from v0. Connect it to the backend and deploy a preview."</div>
+          <div class="step-note">Every push generates a unique Vercel preview URL — open in Kindle/Chromebook browser to test mobile</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">4</div>
+            <div class="step-title">Agentic log debugging</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">claude "Check my latest Vercel logs and fix the error"</div>
+          <div class="step-note">Claude fetches logs via vercel CLI, analyzes crash, pushes fix to GitHub automatically</div>
+        </div>
+
+        <div class="git-step">
+          <div class="git-step-top">
+            <div class="step-num">5</div>
+            <div class="step-title">Deploy to production</div>
+          </div>
+          <div class="step-cmd" onclick="tapStep(this)">vercel --prod</div>
+        </div>
+
+      </div>
+
+    <!-- ── PAGE: SWARM ── -->
+    <div class="page" id="page-swarm">
+
+      <div class="sec-title">Swarm Network</div>
+
+      <!-- Phase indicator -->
+      <div class="swarm-phase">
+        <span class="phase-badge">PHASE 1 · SPRINT 3</span>
+        <div class="phase-txt"><strong>Agent-zero live.</strong> Headscale mesh active. Gossip emitter ready for Sprint 7.</div>
+      </div>
+
+      <!-- Live agent registry — populated by JS polling -->
+      <div id="agent-registry">
+        <!-- Populated by pollSwarm() -->
+        <div class="agent-card" id="agent-local">
+          <div class="agent-card-header">
+            <div class="agent-role-label" id="local-role">k9-orchestrator</div>
+            <div class="agent-id-label" id="local-id">—</div>
+            <div class="agent-status-pill pill-online" id="local-status">● online</div>
+          </div>
+          <div class="agent-meta">
+            <div class="agent-meta-row"><span class="meta-key">TAILSCALE IP</span><span class="meta-val ok" id="local-ip">detecting...</span></div>
+            <div class="agent-meta-row"><span class="meta-key">PORT</span><span class="meta-val" id="local-port">8744</span></div>
+            <div class="agent-meta-row"><span class="meta-key">CPU</span><span class="meta-val" id="local-cpu">—</span></div>
+            <div class="agent-meta-row"><span class="meta-key">UPTIME</span><span class="meta-val ok" id="local-uptime">—</span></div>
+            <div class="agent-meta-row"><span class="meta-key">PEERS</span><span class="meta-val" id="local-peers">0</span></div>
+            <div class="agent-meta-row"><span class="meta-key">INBOX</span><span class="meta-val" id="local-inbox">0</span></div>
+          </div>
+        </div>
+        <div id="peer-cards"></div>
+      </div>
+
+      <!-- Sprint progress tracker -->
+      <div class="sprint-progress">
+        <div class="sprint-header">
+          <div class="sprint-title">Giant Steps — Sprint Tracker</div>
+          <div class="sprint-num-badge">Sprint 3 active</div>
+        </div>
+        <div class="sprint-items">
+          <div class="sprint-item">
+            <div class="sprint-check check-done">✓</div>
+            <div class="sprint-item-text done">Sprint 1 — Headscale deploy + K-9 mesh</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-done">✓</div>
+            <div class="sprint-item-text done">Sprint 2 — Dashboard wired to Headscale API</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-active">▶</div>
+            <div class="sprint-item-text active">Sprint 3 — First Python swarm agent (k9-swarm-agent.py)</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 4 — WireGuard userspace tunnel</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 5 — STUN client / NAT traversal</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 6 — libp2p P2P discovery</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 7 — Gossip protocol</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 8 — DHT + distributed task queue</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 9 — Raft consensus</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-check check-todo">○</div>
+            <div class="sprint-item-text todo">Sprint 10 — Blockchain audit ledger</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="swarm-actions">
+        <div class="swarm-action-btn" onclick="pollSwarm()">
+          <span class="swarm-action-icon">🔄</span>
+          <span>Refresh</span>
+          <span class="swarm-action-label">poll agents</span>
+        </div>
+        <div class="swarm-action-btn" onclick="copySwarmCmd()">
+          <span class="swarm-action-icon">▶</span>
+          <span>Launch agent</span>
+          <span class="swarm-action-label">copy cmd</span>
+        </div>
+        <div class="swarm-action-btn" onclick="copySwarmUrl('health')">
+          <span class="swarm-action-icon">💓</span>
+          <span>Health URL</span>
+          <span class="swarm-action-label">copy endpoint</span>
+        </div>
+        <div class="swarm-action-btn" onclick="copySwarmUrl('peers')">
+          <span class="swarm-action-icon">🕸</span>
+          <span>Peers URL</span>
+          <span class="swarm-action-label">copy endpoint</span>
+        </div>
+      </div>
+
+      <!-- Agent API endpoints -->
+      <div class="swarm-url" onclick="copySwarmUrl('health')">
+        <span class="swarm-url-label">HEALTH ENDPOINT</span>
+        <span id="url-health">http://&lt;tailscale-ip&gt;:8744/swarm/health</span>
+      </div>
+      <div class="swarm-url" onclick="copySwarmUrl('peers')">
+        <span class="swarm-url-label">PEERS ENDPOINT</span>
+        <span id="url-peers">http://&lt;tailscale-ip&gt;:8744/swarm/peers</span>
+      </div>
+      <div class="swarm-url" onclick="copySwarmUrl('stats')">
+        <span class="swarm-url-label">STATS ENDPOINT</span>
+        <span id="url-stats">http://&lt;tailscale-ip&gt;:8744/swarm/stats</span>
+      </div>
+
+    </div>
+
+  </div><!-- /scroll-area -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-ai" onclick="goTo('ai')">
+      <span class="nav-icon">🤖</span>
+      <span class="nav-label">AI</span>
+    </button>
+    <button class="nav-btn" id="nav-status" onclick="goTo('status')">
+      <span class="nav-icon">📡</span>
+      <span class="nav-label">Status</span>
+    </button>
+    <button class="nav-btn" id="nav-cmds" onclick="goTo('cmds')">
+      <span class="nav-icon">⌨️</span>
+      <span class="nav-label">Commands</span>
+    </button>
+    <button class="nav-btn" id="nav-git" onclick="goTo('git')">
+      <span class="nav-icon">🌿</span>
+      <span class="nav-label">Git</span>
+    </button>
+    <button class="nav-btn" id="nav-swarm" onclick="goTo('swarm')">
+      <span class="nav-icon">🕸</span>
+      <span class="nav-label">Swarm</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SERVICE WORKER registration (inline, avoids separate sw.js file) -->
+<script>
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'k9-pwa-v1';
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { 
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('api.anthropic.com') || e.request.url.includes('fonts.googleapis.com')) {
+    return;
+  }
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const fetchPromise = fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => cached);
+      return cached || fetchPromise;
+    })
+  );
+});`;
+  const blob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope: './'}).then(reg => {
+    document.getElementById('sw-status').textContent = 'active';
+  }).catch(() => {
+    document.getElementById('sw-status').textContent = 'unavailable';
+  });
+}
+</script>
+
+<script>
+// ── Clock
+function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tick,1000); tick();
+
+// ── Device info
+document.getElementById('screen-size').textContent = window.screen.width + 'x' + window.screen.height;
+document.getElementById('pwa-mode').textContent = 
+  window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser';
+
+// ── State
+let activeComp = 'k9-orchestrator';
+let activePat = 'generate';
+let ctx = {comp:true, defi:false, mcp:false, vercel:false};
+let lastResp = '';
+let busy = false;
+
+// ── Navigation
+function goTo(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('nav-' + id).classList.add('active');
+  document.getElementById('scroll-area').scrollTop = 0;
+}
+
+// ── Component selector
+function setComp(el, name) {
+  document.querySelectorAll('.comp-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  activeComp = name;
+  const step1 = document.getElementById('git-step1');
+  const alias = {
+    'k9-orchestrator':'k9-orchestrator',
+    'k9-llm-router':'k9-llm',
+    'k9-quant-engine':'k9-quant',
+    'orbitron-diag':'k9-orbitron',
+    'k9-mcp-server':'k9-mcp-server'
+  };
+  step1.textContent = (alias[name] || name) + ' && code .';
+}
+
+// ── Pattern
+const PATS = {
+  generate: {
+    ph: 'Create a Python module for [feature] in {comp}:\n- async/await patterns\n- error handling + retry\n- export main class\n- target: src/[path].py',
+    sys: 'You are Claude Code embedded in K-9. Generate production Python with async patterns, type hints, docstrings, proper error handling. Be concise but complete.'
+  },
+  debug: {
+    ph: 'Error in {comp}:\n[paste error/log]\n\nFile: src/[file.py]\nFocus: [specific area]',
+    sys: 'You are Claude Code, expert debugger for K-9. Identify root cause, explain why, give a concrete fix with code. Be direct and technical.'
+  },
+  test: {
+    ph: 'Generate pytest tests for {comp}:\n[paste code]\n\nInclude edge cases, boundary conditions, async patterns, mocked deps.',
+    sys: 'You are Claude Code, testing expert for K-9. Write comprehensive pytest tests with fixtures, mocks, and pytest-asyncio for async code.'
+  },
+  review: {
+    ph: 'Review {comp} code for:\n- DeFi/signing security\n- Performance\n- Architecture\n\n[paste code]',
+    sys: 'You are Claude Code, senior security reviewer for K-9 DeFi/AI system. Flag key-handling issues, injection risks, async problems, separation of concerns. Be specific and actionable.'
+  }
+};
+
+function setPat(el, pat) {
+  document.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  activePat = pat;
+  updatePh();
+}
+function updatePh() {
+  const p = PATS[activePat];
+  if(p) document.getElementById('prompt-input').placeholder = p.ph.replace('{comp}', activeComp);
+}
+updatePh();
+
+// ── Context toggles
+function toggleCtx(k) {
+  ctx[k] = !ctx[k];
+  document.getElementById('ctx-'+k).classList.toggle('on', ctx[k]);
+}
+
+function buildSys() {
+  let s = PATS[activePat].sys;
+  if(ctx.comp) s += `\n\nCOMPONENT: ${activeComp} — part of K-9 distributed AI agent network (orchestration layer for Orbitron + PackAI). Python async, FastAPI, WSL2 Fedora.`;
+  if(ctx.defi) s += '\n\nDEFI: Apply strict security — no hardcoded keys, HSM patterns for signing, distinguish Level 1 advisory vs Level 2 autonomous execution. Flag signing concerns.';
+  if(ctx.mcp) s += '\n\nMCP: System uses Model Context Protocol for inter-agent comms (Rhasspy, Home Assistant, blockchain). Ensure tool definitions are MCP-compatible.';
+  if(ctx.vercel) s += '\n\nVERCEL/DEPLOYMENT: Project deploys via Vercel CLI. Use `vercel build` locally before pushing. Env vars synced via `vercel env pull`. GitHub App installed — Claude can push branches and create PRs. Persistent sessions run in tmux. CLAUDE.md at repo root defines coding standards. For web artifacts (PackAI, Orbitron UI) target Next.js/React compatible output.';
+  return s;
+}
+
+// ── Run Claude
+async function runClaude() {
+  if(busy) return;
+  const input = document.getElementById('prompt-input').value.trim();
+  if(!input){ toast('Enter a prompt'); return; }
+  busy = true;
+  const btn = document.getElementById('exec-btn');
+  btn.disabled = true; btn.textContent = 'RUNNING...';
+  const rb = document.getElementById('resp-body');
+  rb.className = 'resp-body loading';
+  rb.innerHTML = '<span class="spinner"></span>Processing...';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:buildSys(),
+        messages:[{role:'user',content:input}]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b=>b.text||'').join('') || 'No response.';
+    lastResp = text;
+    const rendered = text
+      .replace(/```[\w]*\n([\s\S]*?)```/g, '<div style="background:rgba(0,0,0,0.35);border:0.5px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;margin:6px 0;color:var(--cyan);font-size:11px;overflow-x:auto">$1</div>')
+      .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;color:var(--cyan);font-size:11px">$1</code>');
+    rb.className = 'resp-body'; rb.innerHTML = rendered;
+  } catch(e) {
+    rb.className = 'resp-body';
+    rb.innerHTML = '<span style="color:var(--red)">Error: ' + e.message + '</span>';
+  }
+  busy = false; btn.disabled = false; btn.textContent = '▶ EXECUTE';
+}
+
+function clearAll() {
+  document.getElementById('prompt-input').value = '';
+  document.getElementById('resp-body').className = 'resp-body';
+  document.getElementById('resp-body').innerHTML = '<span style="color:var(--text-dim)">// Ready</span>';
+  lastResp = '';
+}
+
+async function copyResp() {
+  if(!lastResp) return;
+  await navigator.clipboard.writeText(lastResp).catch(()=>{});
+  const btn = document.getElementById('copy-btn');
+  btn.classList.add('flash'); btn.textContent = '✓ COPIED';
+  setTimeout(()=>{ btn.classList.remove('flash'); btn.textContent='COPY'; }, 1500);
+}
+
+// ── Command tap-to-copy
+function tapCmd(el) {
+  const text = el.querySelector('.cmd-code').textContent;
+  navigator.clipboard.writeText(text).catch(()=>{});
+  toast('Copied');
+}
+function tapStep(el) {
+  navigator.clipboard.writeText(el.textContent).catch(()=>{});
+  toast('Copied');
+}
+
+// ── Swarm polling
+const SWARM_BASE = () => {
+  const stored = localStorage.getItem('k9-agent-url');
+  return stored || `http://${window.location.hostname}:8744`;
+};
+
+async function pollSwarm() {
+  const base = SWARM_BASE();
+  try {
+    const [healthRes, statsRes, peersRes] = await Promise.all([
+      fetch(`${base}/swarm/health`, {signal: AbortSignal.timeout(3000)}),
+      fetch(`${base}/swarm/stats`,  {signal: AbortSignal.timeout(3000)}),
+      fetch(`${base}/swarm/peers`,  {signal: AbortSignal.timeout(3000)}),
+    ]);
+    if (!healthRes.ok) throw new Error('agent unreachable');
+    const h = await healthRes.json();
+    const s = await statsRes.json();
+    const p = await peersRes.json();
+    // update local agent card
+    document.getElementById('local-id').textContent  = (h.agent_id||'').slice(0,8) + '...';
+    document.getElementById('local-ip').textContent  = h.tailscale_ip || '—';
+    document.getElementById('local-cpu').textContent = h.cpu_pct !== undefined ? h.cpu_pct + '%' : '—';
+    document.getElementById('local-uptime').textContent = h.uptime_s ? Math.round(h.uptime_s) + 's' : '—';
+    document.getElementById('local-peers').textContent = s.peer_count || 0;
+    document.getElementById('local-inbox').textContent = s.inbox_size || 0;
+    const pill = document.getElementById('local-status');
+    pill.textContent = '● ' + (h.status || 'online');
+    pill.className = 'agent-status-pill ' + (h.status === 'online' ? 'pill-online' : 'pill-idle');
+    // update URL labels
+    const ip = h.tailscale_ip || window.location.hostname;
+    document.getElementById('url-health').textContent = `http://${ip}:8744/swarm/health`;
+    document.getElementById('url-peers').textContent  = `http://${ip}:8744/swarm/peers`;
+    document.getElementById('url-stats').textContent  = `http://${ip}:8744/swarm/stats`;
+    // render peer cards
+    const pc = document.getElementById('peer-cards');
+    pc.innerHTML = '';
+    (p.peers || []).forEach(peer => {
+      pc.innerHTML += `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-role-label">${peer.role}</div>
+            <div class="agent-id-label">${(peer.id||'').slice(0,8)}</div>
+            <div class="agent-status-pill ${peer.reachable ? 'pill-online' : 'pill-off'}">
+              ${peer.reachable ? '● online' : '○ unreachable'}
+            </div>
+          </div>
+          <div class="agent-meta">
+            <div class="agent-meta-row"><span class="meta-key">IP</span><span class="meta-val ok">${peer.ip||'—'}</span></div>
+            <div class="agent-meta-row"><span class="meta-key">STATUS</span><span class="meta-val">${peer.status||'—'}</span></div>
+          </div>
+        </div>`;
+    });
+    toast('Swarm refreshed');
+  } catch(e) {
+    toast('Agent offline — start k9-swarm-agent.py');
+  }
+}
+
+function copySwarmCmd() {
+  const cmd = 'python k9-swarm-agent.py --role orchestrator --port 8744';
+  navigator.clipboard.writeText(cmd).catch(()=>{});
+  toast('Copied launch command');
+}
+
+function copySwarmUrl(endpoint) {
+  const el = document.getElementById('url-' + endpoint);
+  if(el) { navigator.clipboard.writeText(el.textContent).catch(()=>{}); toast('Copied URL'); }
+}
+
+// Auto-poll swarm when tab is opened
+const _origGoTo = goTo;
+function goTo(id) {
+  _origGoTo(id);
+  if(id === 'swarm') pollSwarm();
+}
+document.getElementById('prompt-input').addEventListener('keydown', e => {
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); runClaude(); }
+});
+
+// ── Toast
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>
