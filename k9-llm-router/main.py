@@ -137,6 +137,22 @@ TASK_MODEL_MAP: dict[str, str] = {
 }
 
 
+
+# ── ORBITRON INTEGRATION ──────────────────────────────────────────────────────
+try:
+    from src.orbitron_client import OrbitronClient, OrbitronEvent
+    from src.fed_whisperer_bridge import enrich_trading_request
+    _orbitron = OrbitronClient.from_env()
+    _orbitron_enabled = bool(os.getenv("ORBITRON_AUTH_TOKEN"))
+    if _orbitron_enabled:
+        log.info("Orbitron integration ENABLED (K9_AGENT)")
+    else:
+        log.info("Orbitron integration DISABLED (no ORBITRON_AUTH_TOKEN)")
+except ImportError as e:
+    log.warning("Orbitron modules not found: %s", e)
+    _orbitron = None
+    _orbitron_enabled = False
+
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
     Build model registry based on ROUTER_MODE.
@@ -372,6 +388,12 @@ class LLMRouter:
         t0 = time.time()
         backend = self.resolve_model(req.task_type, req.force_model)
 
+        # Enrich trading/quant requests with Orbitron context
+        if _orbitron_enabled and _orbitron:
+            req.messages, req.system = await enrich_trading_request(
+                req.task_type, req.messages, req.system
+            )
+
         log.info(
             "ROUTE %s → %s [%s] (component=%s)",
             req.task_type, backend.name, backend.provider, req.component
@@ -384,7 +406,7 @@ class LLMRouter:
             self._routed += 1
             latency = (time.time() - t0) * 1000
             backend._latency_ms = latency
-            return RouterResponse(
+            response = RouterResponse(
                 content=content,
                 model_used=backend.name,
                 task_type=req.task_type,
@@ -392,6 +414,16 @@ class LLMRouter:
                 latency_ms=round(latency, 1),
                 tokens_used=tokens or None,
             )
+            # Report to Orbitron (fire-and-forget)
+            if _orbitron_enabled and _orbitron:
+                asyncio.create_task(_orbitron.report_routing_decision(
+                    task_type=req.task_type,
+                    model_used=backend.name,
+                    backend=backend.provider,
+                    latency_ms=round(latency, 1),
+                    component=req.component,
+                ))
+            return response
         except Exception as e:
             self._failed += 1
             backend._healthy = False
@@ -446,6 +478,18 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(30)
             for backend in router_instance.registry.values():
                 await check_backend_health(backend)
+            # Orbitron heartbeat every 30s
+            if _orbitron_enabled and _orbitron:
+                h = router_instance.health()
+                await _orbitron.heartbeat(
+                    component="k9-llm-router",
+                    extra={
+                        "models_healthy": len(h["models_healthy"]),
+                        "models_total": len(h["models_available"]),
+                        "routed_total": h["routed_total"],
+                        "mode": ROUTER_MODE,
+                    }
+                )
     asyncio.create_task(_health_loop(), name="health-checker")
     yield
     log.info("LLM Router shutting down.")
