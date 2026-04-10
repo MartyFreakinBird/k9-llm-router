@@ -1,0 +1,22 @@
+# K-9 LLM Router — Replit config
+# Deploy on Replit for edge/cloud fallback when WSL2 is offline
+
+run = "python main.py"
+language = "python3"
+entrypoint = "main.py"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "python main.py"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 8765
+externalPort = 80
+
+[env]
+ROUTER_MODE = "cloud"
+ROUTER_PORT = "8765"
+# Set ANTHROPIC_API_KEY and LOCAL_MODEL_URL in Replit Secrets
