@@ -1,0 +1,44 @@
+{
+  "_comment": "K-9 n8n Workflow: Daily quant analysis trigger → LLM → Orbitron",
+  "name": "K9 Daily Quant Analysis",
+  "nodes": [
+    {
+      "name": "Schedule (daily 9am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {"interval": [{"field": "hours", "hoursInterval": 24}]},
+        "triggerAtHour": 9
+      }
+    },
+    {
+      "name": "Run Quant Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://localhost:8765/webhooks/n8n/llm/route",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{"name": "Authorization", "value": "Bearer {{$env.N8N_WEBHOOK_SECRET}}"}]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "{\"task_type\": \"quant_analysis\", \"messages\": [{\"role\": \"user\", \"content\": \"Generate a daily macro regime summary for BTC, ETH, and SPY. Include Fed policy stance, key risk events today, and a directional bias.\"}], \"component\": \"n8n-daily-quant\", \"symbol\": \"BTCUSD\"}"
+      }
+    },
+    {
+      "name": "Broadcast to Orbitron",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://localhost:8765/webhooks/n8n/signal/ingest",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{"name": "Authorization", "value": "Bearer {{$env.N8N_WEBHOOK_SECRET}}"}]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ { symbol: 'MACRO', signal_type: 'analysis', confidence_score: 0.7, strategy_name: 'daily_quant_n8n', source: 'n8n-daily-trigger', entry_price: 0 } }}"
+      }
+    }
+  ]
+}

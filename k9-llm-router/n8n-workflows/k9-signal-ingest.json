@@ -1,0 +1,30 @@
+{
+  "_comment": "K-9 n8n Workflow: TradingView Signal → Orbitron",
+  "_usage": "Import this in n8n (Settings → Import Workflow). Set K9_ROUTER_URL credential.",
+  "name": "K9 TradingView → Orbitron Signal Ingest",
+  "nodes": [
+    {
+      "name": "Webhook (TradingView alert)",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "tradingview-signal",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "Ingest to K9 Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://localhost:8765/webhooks/n8n/signal/ingest",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{"name": "Authorization", "value": "Bearer {{$env.N8N_WEBHOOK_SECRET}}"}]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ { symbol: $json.ticker, signal_type: $json.strategy.order_action, confidence_score: $json.strategy.order_price ? 0.75 : 0.5, entry_price: $json.strategy.order_price || 0, stop_loss: $json.strategy.order_price * 0.97 || 0, take_profit: $json.strategy.order_price * 1.06 || 0, timeframe: $json.interval, strategy_name: $json.strategy.strategy_desc || 'TV_Alert', source: 'tradingview-n8n' } }}"
+      }
+    }
+  ]
+}

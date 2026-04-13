@@ -174,7 +174,8 @@ TASK_MODEL_MAP: dict[str, str] = {
 # ── ORBITRON INTEGRATION ──────────────────────────────────────────────────────
 try:
     from src.orbitron_client import OrbitronClient, OrbitronEvent
-    from src.fed_whisperer_bridge import enrich_trading_request
+    from src.fed_whisperer_bridge import enrich_trading_request, start_fed_whisperer_poll_loop
+    from src.n8n_webhook_bridge import router as n8n_router
     _orbitron = OrbitronClient.from_env()
     _orbitron_enabled = bool(os.getenv("ORBITRON_AUTH_TOKEN"))
     if _orbitron_enabled:
@@ -530,6 +531,9 @@ async def lifespan(app: FastAPI):
                     }
                 )
     asyncio.create_task(_health_loop(), name="health-checker")
+    # FedWhisperer signal poller + DATA_SYNC_REQUEST responder
+    asyncio.create_task(start_fed_whisperer_poll_loop(30), name="fed-whisperer-poll")
+    log.info("[startup] FedWhisperer poll loop → 30s interval")
     yield
     log.info("LLM Router shutting down.")
 
@@ -543,6 +547,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
+
+app.include_router(n8n_router)
 
 
 @app.get("/")
