@@ -22,6 +22,39 @@ Env vars:
   HEADSCALE_URL     — Headscale control plane
   ROUTER_PORT       — default 8765
   ROUTER_MODE       — "local" | "cloud" | "hybrid" (default: hybrid)
+
+# ── PAYMASTER INTEGRATION ─────────────────────────────────────────────────────
+K9_PAYMASTER_URL    = os.getenv("K9_PAYMASTER_URL", "http://localhost:9002")
+K9_PAYMASTER_ENABLE = os.getenv("K9_PAYMASTER_ENABLE", "true").lower() == "true"
+
+# Cost estimates per model (USD per 1K tokens, approximate)
+MODEL_COST_PER_1K = {
+    "GLM-5": 0.0001, "DeepSeek-V4": 0.0002, "Qwen-3.5": 0.0001,
+    "Kimi-K2.5": 0.0003, "Llama-4": 0.00005, "Mistral": 0.00008,
+    "claude-3-5-sonnet-20241022": 0.003, "gpt-4o": 0.005,
+}
+
+async def _paymaster_gate(model_name: str, tokens_est: int, agent_id: str) -> bool:
+    if not K9_PAYMASTER_ENABLE:
+        return True
+    cost = (tokens_est / 1000) * MODEL_COST_PER_1K.get(model_name, 0.001)
+    if cost < 0.0001:
+        return True
+    try:
+        async with httpx.AsyncClient(timeout=2) as c:
+            r = await c.post(f"{K9_PAYMASTER_URL}/paymaster/gate/inference", json={
+                "model": model_name, "tokens_est": tokens_est,
+                "cost_usd": cost, "agent_id": agent_id,
+            })
+            if r.status_code == 200:
+                data = r.json()
+                if not data.get("approved"):
+                    log.warning("Paymaster DENIED %s: %s", model_name, data.get("reason"))
+                    return False
+    except Exception:
+        pass  # Paymaster offline — default allow
+    return True
+
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -387,6 +420,12 @@ class LLMRouter:
         """Route a request to the correct model."""
         t0 = time.time()
         backend = self.resolve_model(req.task_type, req.force_model)
+
+        # Paymaster budget gate (non-blocking — denies only on exhausted budget)
+        tokens_est = sum(len(str(m.get("content",""))) // 4 for m in req.messages)
+        gate_ok = await _paymaster_gate(backend.name, tokens_est, req.component or "k9-router")
+        if not gate_ok:
+            raise HTTPException(status_code=402, detail="Budget gate denied — daily limit reached")
 
         # Enrich trading/quant requests with Orbitron context
         if _orbitron_enabled and _orbitron:
