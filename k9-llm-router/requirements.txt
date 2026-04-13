@@ -5,3 +5,5 @@ python-dotenv>=1.0.0
 pydantic>=2.7.0
 # Economic layer
 motor>=3.4.0         # PackAI Leader MongoDB
+# Sprint 4 — Task Queue
+redis>=5.0.0             # Redis Streams task queue (falls back to in-memory)

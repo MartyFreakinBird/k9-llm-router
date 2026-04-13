@@ -268,6 +268,178 @@ class PaymasterAgent:
             self.ledger.append(e)
             return {"recorded": True, "event_id": e.event_id}
 
+
+        # ── CLOB SIGNING PATHWAY ─────────────────────────────────────────────
+        # Level-1 Advisory: All CLOB order requests require manual approval.
+        # No order is signed or submitted autonomously.
+        # Approval via POST /paymaster/clob/{rid}/sign after human review.
+
+        @app.post("/paymaster/clob/request")
+        async def clob_request(p: dict):
+            """
+            Submit a CLOB order for L1 human review.
+
+            POST body:
+              {
+                "agent_id":   "k9-orchestrator",
+                "symbol":     "BTCUSDT",
+                "side":       "buy" | "sell",
+                "order_type": "limit" | "market",
+                "quantity":   0.01,
+                "price":      84500.0,
+                "exchange":   "binance" | "kraken" | "coinbase",
+                "strategy":   "ICT_BOS_OB",
+                "signal_id":  "n8n_1234567890"
+              }
+
+            Returns: {request_id, status: "pending_l1_review", advisory}
+
+            # L1 ADVISORY — DO NOT remove this gate without Security Auditor sign-off.
+            # Wallet signing requires HSM (Sprint 16). This endpoint queues for human approval.
+            """
+            rid = str(uuid.uuid4())[:12]
+            clob_rec = {
+                "request_id":  rid,
+                "type":        "clob_order",
+                "agent_id":    p.get("agent_id", "unknown"),
+                "symbol":      p.get("symbol", "UNKNOWN"),
+                "side":        p.get("side", "unknown"),
+                "order_type":  p.get("order_type", "limit"),
+                "quantity":    float(p.get("quantity", 0)),
+                "price":       float(p.get("price", 0)),
+                "exchange":    p.get("exchange", "unknown"),
+                "strategy":    p.get("strategy", ""),
+                "signal_id":   p.get("signal_id", ""),
+                "status":      "pending_l1_review",
+                "created_at":  datetime.now(timezone.utc).isoformat(),
+                "advisory":    "L1: Awaiting human sign-off. No order submitted.",
+            }
+            # Estimate notional value
+            notional = clob_rec["quantity"] * clob_rec["price"]
+            clob_rec["notional_usd"] = round(notional, 2)
+
+            # Always queue for L1 review — never auto-approve CLOB
+            self._pending[rid] = PaymentRequest(
+                request_id=rid,
+                from_agent=clob_rec["agent_id"],
+                to_agent=clob_rec["exchange"],
+                amount_usd=notional,
+                currency="usd",
+                purpose=f"CLOB {clob_rec['side'].upper()} {clob_rec['quantity']} "
+                        f"{clob_rec['symbol']} @ {clob_rec['price']} on {clob_rec['exchange']}",
+                metadata=clob_rec,
+            )
+
+            log.warning(
+                "[L1-ADVISORY] CLOB request queued: %s %s %s qty=%.4f @ %.2f (rid=%s)",
+                clob_rec["side"].upper(), clob_rec["quantity"], clob_rec["symbol"],
+                clob_rec["quantity"], clob_rec["price"], rid,
+            )
+
+            return {
+                "request_id": rid,
+                "status":     "pending_l1_review",
+                "notional_usd": clob_rec["notional_usd"],
+                "advisory":   "L1: Order queued for human review. Not submitted. Approve via POST /paymaster/clob/{rid}/sign",
+                "review_url": f"/paymaster/clob/{rid}",
+            }
+
+        @app.get("/paymaster/clob/pending")
+        async def clob_pending():
+            """List all CLOB orders pending L1 human review."""
+            clob_items = [
+                {**asdict(v), "metadata": v.metadata}
+                for v in self._pending.values()
+                if v.metadata.get("type") == "clob_order"
+            ]
+            return {
+                "count": len(clob_items),
+                "orders": clob_items,
+                "advisory": "L1: Review each order before signing. Verify exchange, symbol, quantity, price.",
+            }
+
+        @app.get("/paymaster/clob/{rid}")
+        async def clob_get(rid: str):
+            """Get a specific CLOB order by request_id."""
+            req = self._pending.get(rid)
+            if not req or req.metadata.get("type") != "clob_order":
+                raise HTTPException(404, f"CLOB request {rid} not found")
+            return {**asdict(req), "advisory": "L1: Human review required before signing."}
+
+        @app.post("/paymaster/clob/{rid}/sign")
+        async def clob_sign(rid: str, body: dict = {}):
+            """
+            Sign and submit a CLOB order after human approval.
+
+            # L1 ADVISORY: This endpoint EXECUTES an order.
+            # Only call after explicit human review of /paymaster/clob/pending.
+            # HSM signing not yet integrated (Sprint 16) — uses mock signing stub.
+
+            POST body (optional):
+              {"confirm": true, "note": "Manually reviewed — proceed"}
+            """
+            req = self._pending.get(rid)
+            if not req or req.metadata.get("type") != "clob_order":
+                raise HTTPException(404, f"CLOB request {rid} not found")
+
+            if req.status == PaymentStatus.EXECUTED:
+                return {"status": "already_executed", "request_id": rid}
+
+            confirm = body.get("confirm", False)
+            if not confirm:
+                raise HTTPException(400, "confirm=true required in body. This executes a live order.")
+
+            # Sprint 16: replace with HSM wallet signing
+            # For now: mock sign (safe — no live exchange connection)
+            mock_tx = {
+                "order_id":   f"mock_{rid}",
+                "symbol":     req.metadata.get("symbol"),
+                "side":       req.metadata.get("side"),
+                "quantity":   req.metadata.get("quantity"),
+                "price":      req.metadata.get("price"),
+                "exchange":   req.metadata.get("exchange"),
+                "signed_by":  "mock_hsm_stub",
+                "status":     "mock_submitted",
+                "note":       "Sprint 16: replace with real HSM signing + exchange API submission",
+                "timestamp":  datetime.now(timezone.utc).isoformat(),
+                "advisory":   "L1: Mock submission only. No real order placed until Sprint 16 HSM.",
+            }
+
+            req.status     = PaymentStatus.EXECUTED
+            req.moonpay_tx = mock_tx
+
+            self.ledger.append(CostEvent(
+                agent_id=req.from_agent,
+                category=CostCategory.PAYMENT,
+                amount_usd=req.amount_usd,
+                description=req.purpose,
+                approved=True,
+                metadata={"manual_approval": True, "l1_signed": True, "tx": mock_tx},
+            ))
+
+            log.warning(
+                "[L1-SIGNED] CLOB order signed (mock): %s rid=%s",
+                req.purpose, rid,
+            )
+
+            return {
+                "signed":      True,
+                "request_id":  rid,
+                "tx":          mock_tx,
+                "advisory":    "L1: Mock signed. Sprint 16 HSM required for live exchange submission.",
+            }
+
+        @app.post("/paymaster/clob/{rid}/reject")
+        async def clob_reject(rid: str, body: dict = {}):
+            """Reject a CLOB order and remove from pending queue."""
+            req = self._pending.get(rid)
+            if not req:
+                raise HTTPException(404, f"CLOB request {rid} not found")
+            reason = body.get("reason", "Human rejected")
+            del self._pending[rid]
+            log.info("[L1-REJECTED] CLOB request %s rejected: %s", rid, reason)
+            return {"rejected": True, "request_id": rid, "reason": reason}
+
         return app
 
     def run(self):

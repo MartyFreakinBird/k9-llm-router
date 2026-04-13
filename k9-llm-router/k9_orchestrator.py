@@ -38,6 +38,7 @@ import os
 import time
 import uuid
 from collections import deque
+from k9_task_queue import get_task_queue, BaseTaskQueue
 from datetime import datetime, timezone
 from typing import Any
 
@@ -65,9 +66,8 @@ ORBITRON_URL      = os.getenv("ORBITRON_URL",      "https://ziqenqqgnqxqrazmjohs
 ORBITRON_ANON_KEY = os.getenv("ORBITRON_ANON_KEY", "")
 ORBITRON_AUTH_TOKEN = os.getenv("ORBITRON_AUTH_TOKEN", "")
 
-# ── TASK QUEUE (in-memory — Sprint 4: replace with Celery/NATS) ───────────────
-_task_queue: deque[dict] = deque(maxlen=500)
-_task_results: dict[str, dict] = {}  # task_id → result
+# ── TASK QUEUE (Sprint 4: Redis Streams — falls back to in-memory) ─────────────
+_queue: BaseTaskQueue | None = None
 _start_time = time.time()
 
 
@@ -224,6 +224,29 @@ async def cmd_broadcast_signal(params: dict) -> dict:
     return {"broadcast": True, "signal": signal_data}
 
 
+
+@command("clob_request")
+async def cmd_clob_request(params: dict) -> dict:
+    """
+    Submit a CLOB order request to Paymaster L1 queue for human review.
+
+    # L1 ADVISORY: Creates a pending order — does NOT execute.
+    # Human must approve via POST /paymaster/clob/{rid}/sign.
+    """
+    async with httpx.AsyncClient(timeout=5) as c:
+        r = await c.post(f"{PAYMASTER_URL}/paymaster/clob/request", json=params)
+        r.raise_for_status()
+        return r.json()
+
+
+@command("clob_pending")
+async def cmd_clob_pending(params: dict) -> dict:
+    """List all CLOB orders pending L1 human review."""
+    async with httpx.AsyncClient(timeout=5) as c:
+        r = await c.get(f"{PAYMASTER_URL}/paymaster/clob/pending")
+        r.raise_for_status()
+        return r.json()
+
 # ── FASTAPI APP ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title="K-9 Orchestrator",
@@ -255,8 +278,8 @@ async def health():
         "port":         PORT,
         "layer":        "L3-Coordination",
         "uptime_s":     uptime,
-        "tasks_queued": len(_task_queue),
-        "tasks_done":   len(_task_results),
+        "tasks_queued": (await _queue.stats()).get("queued", 0) if _queue else 0,
+        "tasks_done":   0,
         "commands":     list(COMMAND_REGISTRY.keys()),
         "timestamp":    datetime.now(timezone.utc).isoformat(),
     }
@@ -281,28 +304,16 @@ async def execute_command(req: CommandRequest):
             f"Unknown command: '{req.command}'. Available: {list(COMMAND_REGISTRY.keys())}"
         )
 
-    task_id = str(uuid.uuid4())[:8]
-    task_rec = {
-        "task_id":   task_id,
-        "command":   req.command,
-        "params":    req.params,
-        "source":    req.source,
-        "status":    "running",
-        "queued_at": datetime.now(timezone.utc).isoformat(),
-    }
-    _task_queue.append(task_rec)
+    task_id = await _queue.enqueue(req.command, req.params, req.source, req.priority)
     log.info("COMMAND %s (task=%s, source=%s)", req.command, task_id, req.source)
 
     try:
+        await _queue.mark_running(task_id)
         t0 = time.time()
         result = await handler(req.params)
         latency = round((time.time() - t0) * 1000, 1)
+        await _queue.mark_done(task_id, result, latency)
 
-        task_rec["status"]    = "done"
-        task_rec["latency_ms"] = latency
-        _task_results[task_id] = {"command": req.command, "result": result, "latency_ms": latency}
-
-        # Report to Orbitron
         asyncio.create_task(orbitron_broadcast("COMMAND_EXECUTED", {
             "task_id":   task_id,
             "command":   req.command,
@@ -318,7 +329,7 @@ async def execute_command(req: CommandRequest):
             "result":     result,
         }
     except Exception as e:
-        task_rec["status"] = "failed"
+        await _queue.mark_failed(task_id, str(e))
         log.error("Command %s failed: %s", req.command, e)
         asyncio.create_task(orbitron_broadcast("COMMAND_FAILED", {
             "task_id": task_id, "command": req.command, "error": str(e),
@@ -353,18 +364,18 @@ async def dispatch_task(req: DispatchRequest):
 @app.get("/orchestrator/tasks")
 async def list_tasks(limit: int = 20):
     """List recent tasks from the in-memory queue."""
-    tasks = list(_task_queue)[-limit:]
+    tasks = await _queue.list_tasks(limit)
+    queue_stats = await _queue.stats()
     return {
-        "tasks": tasks[::-1],  # newest first
-        "total_queued": len(_task_queue),
-        "total_completed": len(_task_results),
+        "tasks": tasks,
+        **queue_stats,
     }
 
 
 @app.get("/orchestrator/tasks/{task_id}")
 async def get_task(task_id: str):
     """Get result for a specific task."""
-    result = _task_results.get(task_id)
+    result = await _queue.get_result(task_id)
     if not result:
         raise HTTPException(404, f"Task {task_id} not found")
     return result
@@ -378,8 +389,8 @@ async def _heartbeat_loop():
             "component":     "k9-orchestrator",
             "status":        "online",
             "layer":         "L3-Coordination",
-            "tasks_queued":  len(_task_queue),
-            "tasks_done":    len(_task_results),
+            "tasks_queued":  (await _queue.stats()).get("queued", 0) if _queue else 0,
+            "tasks_done":    0,  # see /orchestrator/tasks for full history
             "uptime_s":      round(time.time() - _start_time, 1),
             "sprint":        3,
             "timestamp":     datetime.now(timezone.utc).isoformat(),
@@ -389,6 +400,8 @@ async def _heartbeat_loop():
 
 @app.on_event("startup")
 async def startup():
+    global _queue
+    _queue = get_task_queue()
     asyncio.create_task(_heartbeat_loop(), name="orchestrator-heartbeat")
     log.info("K-9 Orchestrator online — port %d — %d commands registered",
              PORT, len(COMMAND_REGISTRY))
