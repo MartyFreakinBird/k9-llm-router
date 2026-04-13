@@ -49,7 +49,11 @@ start_all() {
   start_service "k9-mcp-manager"  "python3 k9_mcp_manager.py --port 3030"  3030
   sleep 1
 
-  # 3. LLM Router
+  # 3. Orchestrator (L3 Coordination)
+  start_service "k9-orchestrator" "python3 k9_orchestrator.py"              8744
+  sleep 1
+
+  # 4. LLM Router
   start_service "k9-router"       "python3 main.py"                         8765
 
   echo ""
@@ -57,23 +61,25 @@ start_all() {
   echo -e "  LLM Router:   http://localhost:8765/swarm/health"
   echo -e "  Paymaster:    http://localhost:9002/paymaster/summary"
   echo -e "  MCP Manager:  http://localhost:3030/tools"
+  echo -e "  Orchestrator: http://localhost:8744/swarm/health"
   echo -e "${BLU}─── Attach ──────────────────────────────────${NC}"
   echo -e "  tmux attach -t k9-paymaster"
   echo -e "  tmux attach -t k9-mcp-manager"
+  echo -e "  tmux attach -t k9-orchestrator"
   echo -e "  tmux attach -t k9-router"
 }
 
 stop_all() {
-  for s in k9-paymaster k9-mcp-manager k9-router; do
+  for s in k9-paymaster k9-mcp-manager k9-orchestrator k9-router; do
     tmux kill-session -t $s 2>/dev/null && echo -e "${GRN}✓  stopped $s${NC}" || echo -e "${YLW}  $s not running${NC}"
   done
 }
 
 status_all() {
   echo -e "\n${BLU}═══ K-9 Economic Stack Status ═══${NC}"
-  declare -A PORTS=([k9-paymaster]=9002 [k9-mcp-manager]=3030 [k9-router]=8765)
-  declare -A PATHS=([k9-paymaster]="/paymaster/summary" [k9-mcp-manager]="/" [k9-router]="/swarm/health")
-  for svc in k9-paymaster k9-mcp-manager k9-router; do
+  declare -A PORTS=([k9-paymaster]=9002 [k9-mcp-manager]=3030 [k9-orchestrator]=8744 [k9-router]=8765)
+  declare -A PATHS=([k9-paymaster]="/paymaster/summary" [k9-mcp-manager]="/" [k9-orchestrator]="/swarm/health" [k9-router]="/swarm/health")
+  for svc in k9-paymaster k9-mcp-manager k9-orchestrator k9-router; do
     port=${PORTS[$svc]}; path=${PATHS[$svc]}
     if tmux has-session -t "$svc" 2>/dev/null; then
       printf "${GRN}●${NC} %-20s tmux:up   " "$svc"
