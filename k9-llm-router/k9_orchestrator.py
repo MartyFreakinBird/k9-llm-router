@@ -31,6 +31,7 @@ Usage (from n8n or any HTTP client):
 """
 
 from __future__ import annotations
+from contextlib import asynccontextmanager
 
 import asyncio
 import logging
@@ -252,6 +253,7 @@ app = FastAPI(
     title="K-9 Orchestrator",
     version="0.1.0",
     description="Sprint 3 — L3 Coordination layer",
+    lifespan=lifespan
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
@@ -398,8 +400,8 @@ async def _heartbeat_loop():
         await asyncio.sleep(30)
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _queue
     _queue = get_task_queue()
     asyncio.create_task(_heartbeat_loop(), name="orchestrator-heartbeat")
@@ -413,6 +415,8 @@ async def startup():
         "commands":     list(COMMAND_REGISTRY.keys()),
         "sprint":       3,
     })
+    yield
+    log.info("K-9 Orchestrator shutting down.")
 
 
 if __name__ == "__main__":
