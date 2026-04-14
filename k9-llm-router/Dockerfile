@@ -23,6 +23,7 @@ COPY k9_paymaster.py .
 COPY k9_mcp_manager.py .
 COPY k9_orchestrator.py .
 COPY k9_task_queue.py .
+COPY k9_worker.py .
 COPY k9-swarm-agent.py .
 
 # Launch tooling

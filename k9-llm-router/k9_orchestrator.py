@@ -40,6 +40,30 @@ import time
 import uuid
 from collections import deque
 from k9_task_queue import get_task_queue, BaseTaskQueue
+
+# -- Sprint 4b: Celery worker offload -----------------------------------------
+# Heavy commands (LLM/MCP, 15-30s) fire via Celery and return 202 + task_id.
+# Light commands (<5s) remain synchronous and return 200 + inline result.
+_HEAVY_COMMANDS = {"run_quant_analysis", "run_trading_signal", "call_mcp_tool"}
+
+def _fire_celery(command: str, params: dict, task_id: str) -> bool:
+    """
+    Fire a Celery task. Returns True on success, False if Celery/Redis
+    is unavailable -- caller falls back to in-line execution.
+    """
+    try:
+        from k9_worker import run_heavy_command
+        run_heavy_command.apply_async(
+            args=[command, params, task_id],
+            queue="k9-heavy",
+            countdown=0,
+        )
+        log.info("[celery] fired command=%s task_id=%s", command, task_id)
+        return True
+    except Exception as e:
+        log.warning("[celery] unavailable (%s) -- falling back to inline", e)
+        return False
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -292,9 +316,14 @@ async def execute_command(req: CommandRequest):
     """
     Execute a named command via the orchestrator.
 
-    Available commands:
-      run_quant_analysis, run_trading_signal, paymaster_summary,
-      list_mcp_tools, call_mcp_tool, health_check, broadcast_signal
+    HEAVY commands (run_quant_analysis, run_trading_signal, call_mcp_tool):
+      Returns 202 immediately with task_id.
+      Celery worker (k9_worker.py) executes in background.
+      Poll: GET /orchestrator/tasks/{task_id}
+      Falls back to inline execution if Celery/Redis is unavailable.
+
+    LIGHT commands (all others):
+      Returns 200 synchronously with inline result.
 
     n8n: POST http://localhost:8744/orchestrator/command
       {"command": "run_quant_analysis", "params": {"symbol": "BTCUSD"}}
@@ -303,12 +332,28 @@ async def execute_command(req: CommandRequest):
     if not handler:
         raise HTTPException(
             404,
-            f"Unknown command: '{req.command}'. Available: {list(COMMAND_REGISTRY.keys())}"
+            "Unknown command: '{}'. Available: {}".format(req.command, list(COMMAND_REGISTRY.keys()))
         )
 
     task_id = await _queue.enqueue(req.command, req.params, req.source, req.priority)
-    log.info("COMMAND %s (task=%s, source=%s)", req.command, task_id, req.source)
+    log.info("COMMAND %s (task=%s source=%s heavy=%s)",
+             req.command, task_id, req.source, req.command in _HEAVY_COMMANDS)
 
+    # Heavy path: offload to Celery, return 202 immediately
+    if req.command in _HEAVY_COMMANDS:
+        fired = _fire_celery(req.command, req.params, task_id)
+        if fired:
+            await _queue.mark_running(task_id)
+            return JSONResponse(status_code=202, content={
+                "task_id":  task_id,
+                "command":  req.command,
+                "status":   "queued",
+                "poll_url": "/orchestrator/tasks/{}".format(task_id),
+                "note":     "Heavy command offloaded to Celery worker. Poll poll_url for result.",
+            })
+        log.warning("[celery-fallback] command=%s executing inline (degraded mode)", req.command)
+
+    # Light path (or Celery fallback): execute inline
     try:
         await _queue.mark_running(task_id)
         t0 = time.time()
@@ -317,9 +362,9 @@ async def execute_command(req: CommandRequest):
         await _queue.mark_done(task_id, result, latency)
 
         asyncio.create_task(orbitron_broadcast("COMMAND_EXECUTED", {
-            "task_id":   task_id,
-            "command":   req.command,
-            "source":    req.source,
+            "task_id":    task_id,
+            "command":    req.command,
+            "source":     req.source,
             "latency_ms": latency,
         }))
 
@@ -336,7 +381,7 @@ async def execute_command(req: CommandRequest):
         asyncio.create_task(orbitron_broadcast("COMMAND_FAILED", {
             "task_id": task_id, "command": req.command, "error": str(e),
         }))
-        raise HTTPException(500, f"Command failed: {e}")
+        raise HTTPException(500, "Command failed: {}".format(e))
 
 
 @app.post("/orchestrator/dispatch")

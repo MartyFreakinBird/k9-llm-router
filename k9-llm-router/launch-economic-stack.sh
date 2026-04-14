@@ -55,6 +55,8 @@ start_all() {
 
   # 4. LLM Router
   start_service "k9-router"       "python3 main.py"                         8765
+  # 5. Celery worker (Sprint 4b) -- heavy command offload queue
+  start_service "k9-worker"       "celery -A k9_worker worker --loglevel=info --concurrency=4 -Q k9-heavy"  0
 
   echo ""
   echo -e "${BLU}─── Endpoints ───────────────────────────────${NC}"
@@ -70,15 +72,15 @@ start_all() {
 }
 
 stop_all() {
-  for s in k9-paymaster k9-mcp-manager k9-orchestrator k9-router; do
+  for s in k9-paymaster k9-mcp-manager k9-orchestrator k9-router k9-worker; do
     tmux kill-session -t $s 2>/dev/null && echo -e "${GRN}✓  stopped $s${NC}" || echo -e "${YLW}  $s not running${NC}"
   done
 }
 
 status_all() {
   echo -e "\n${BLU}═══ K-9 Economic Stack Status ═══${NC}"
-  declare -A PORTS=([k9-paymaster]=9002 [k9-mcp-manager]=3030 [k9-orchestrator]=8744 [k9-router]=8765)
-  declare -A PATHS=([k9-paymaster]="/paymaster/summary" [k9-mcp-manager]="/" [k9-orchestrator]="/swarm/health" [k9-router]="/swarm/health")
+  declare -A PORTS=([k9-paymaster]=9002 [k9-mcp-manager]=3030 [k9-orchestrator]=8744 [k9-router]=8765 [k9-worker]=0)
+  declare -A PATHS=([k9-paymaster]="/paymaster/summary" [k9-mcp-manager]="/" [k9-orchestrator]="/swarm/health" [k9-router]="/swarm/health" [k9-worker]="")
   for svc in k9-paymaster k9-mcp-manager k9-orchestrator k9-router; do
     port=${PORTS[$svc]}; path=${PATHS[$svc]}
     if tmux has-session -t "$svc" 2>/dev/null; then
