@@ -565,6 +565,74 @@ async def swarm_message(payload: dict):
     return {"ok": True, "ack": payload.get("msg_id", "unknown")}
 
 
+
+# ── SUPABASE BRIDGE ENDPOINTS ─────────────────────────────────────────────────
+# These allow local WSL2 services (k9_orchestrator, k9_quant_engine, etc.)
+# to publish data to Supabase/Orbitron without needing direct Supabase credentials.
+
+class SignalPublishRequest(BaseModel):
+    signal_type: str          # BUY | SELL | HOLD
+    asset: str
+    confidence: float         # 0-100
+    reasoning: str
+    metadata: dict = {}
+
+class SharedStateRequest(BaseModel):
+    module_name: str          # e.g. "k9_tradingview", "k9_quant_engine"
+    data_key: str             # e.g. "latest_signals", "health_status"
+    data: dict
+
+@app.post("/signals/publish")
+async def publish_signal(req: SignalPublishRequest):
+    """
+    Publish a trading signal from WSL2 to Supabase trading_signals table.
+    Called by k9_orchestrator.py, k9_quant_engine, or any local service.
+    Requires ORBITRON_URL and ORBITRON_ANON_KEY env vars.
+    """
+    try:
+        from src.orbitron_client import OrbitronClient
+        client = OrbitronClient.from_env()
+        ok = await client.write_trading_signal(
+            signal_type=req.signal_type,
+            asset=req.asset,
+            confidence=req.confidence,
+            reasoning=req.reasoning,
+            metadata=req.metadata,
+        )
+        if ok:
+            await client.broadcast(
+                event_type="SIGNAL_GENERATED",
+                data={
+                    "signal_type": req.signal_type,
+                    "asset": req.asset,
+                    "confidence": req.confidence,
+                    "source": "k9_wsl2",
+                },
+                source="K9_AGENT",
+            )
+        return {"ok": ok, "signal": req.dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/status/publish")
+async def publish_status(req: SharedStateRequest):
+    """
+    Publish service health/status to Supabase module_shared_data table.
+    Called by any WSL2 K-9 service to report its state to Orbitron dashboard.
+    """
+    try:
+        from src.orbitron_client import OrbitronClient
+        client = OrbitronClient.from_env()
+        ok = await client.write_shared_state(
+            module_name=req.module_name,
+            data_key=req.data_key,
+            data=req.data,
+        )
+        return {"ok": ok, "module": req.module_name, "key": req.data_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/swarm/peer/register")
 async def swarm_peer_register(payload: dict):
     return {"ok": True, "note": "Peer registry delegated to k9-orchestrator"}

@@ -362,6 +362,90 @@ class OrbitronClient:
                 log.warning("Failed to fetch events: %s", e)
                 return []
 
+
+    async def write_shared_state(
+        self,
+        module_name: str,
+        data_key: str,
+        data: dict,
+    ) -> bool:
+        """
+        Upsert a record into module_shared_data so Lovable platforms can read it.
+        Used by k9_orchestrator.py to publish TradingView signals, health status, etc.
+        """
+        from datetime import datetime, timezone
+        payload = {
+            "module_name": module_name,
+            "data_key": data_key,
+            "data": data,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        async with httpx.AsyncClient(timeout=self._timeout) as c:
+            try:
+                r = await c.post(
+                    f"{self._base}/rest/v1/module_shared_data",
+                    json=payload,
+                    headers={
+                        **self._headers(),
+                        "Prefer": "resolution=merge-duplicates",
+                        "Content-Type": "application/json",
+                    },
+                )
+                if r.status_code in (200, 201, 204):
+                    log.debug("write_shared_state ok: %s.%s", module_name, data_key)
+                    return True
+                else:
+                    log.warning("write_shared_state failed: %d %s", r.status_code, r.text[:200])
+                    return False
+            except Exception as e:
+                self._errors += 1
+                log.warning("write_shared_state error: %s", e)
+                return False
+
+    async def write_trading_signal(
+        self,
+        signal_type: str,
+        asset: str,
+        confidence: float,
+        reasoning: str,
+        metadata: dict | None = None,
+    ) -> bool:
+        """
+        Insert a trading signal directly into trading_signals table.
+        Allows WSL2 k9_orchestrator.py to push signals from TradingView/quant engine.
+        """
+        payload = {
+            "signal_type": signal_type.upper(),
+            "asset": asset,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "metadata": {
+                "source": "k9_wsl2",
+                **(metadata or {}),
+            },
+        }
+        async with httpx.AsyncClient(timeout=self._timeout) as c:
+            try:
+                r = await c.post(
+                    f"{self._base}/rest/v1/trading_signals",
+                    json=payload,
+                    headers={
+                        **self._headers(),
+                        "Prefer": "return=minimal",
+                        "Content-Type": "application/json",
+                    },
+                )
+                if r.status_code in (200, 201, 204):
+                    log.info("write_trading_signal ok: %s %s %.0f%%", signal_type, asset, confidence)
+                    return True
+                else:
+                    log.warning("write_trading_signal failed: %d %s", r.status_code, r.text[:200])
+                    return False
+            except Exception as e:
+                self._errors += 1
+                log.warning("write_trading_signal error: %s", e)
+                return False
+
     # ── STATS ─────────────────────────────────────────────────────────────────
 
     @property
