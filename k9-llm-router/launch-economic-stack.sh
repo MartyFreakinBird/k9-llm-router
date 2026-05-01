@@ -58,7 +58,12 @@ SVC_CMD[k9-knowledge-ingestor]="python k9_knowledge_ingestor/k9_knowledge_ingest
 SVC_DIR[k9-knowledge-ingestor]="$K9_DIR"
 SVC_PORT[k9-knowledge-ingestor]="8767"
 
-START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor)
+# k9-control-plane (Sprint 8 — unified HTTP surface for Base44/Emergent/Bolt)
+SVC_CMD[k9-control-plane]="deno run --allow-net --allow-env --allow-run --allow-read --env control-plane/config/.env control-plane/src/index.ts"
+SVC_DIR[k9-control-plane]="${ORBITRON_DIR:-$HOME/orbitron-integrator}"
+SVC_PORT[k9-control-plane]="8769"
+
+START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor k9-control-plane)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
