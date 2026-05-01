@@ -1,205 +1,118 @@
 # K-9 Ecosystem — Full Audit Report
-**Date:** 2026-04-15  
-**Repos audited:** AlexaMobileWeb, MapPackManager  
-**Auditor:** Vectos
+**Date:** 2026-05-01
+**Scope:** All 6 repos post Sprint 6
 
 ---
 
-## EXECUTIVE SUMMARY
+## REPO STATE
 
-Both repos are Replit-exported production systems that have been normalized (Dockerfile, CI, README). The core code is **significantly more advanced than expected** — this is not prototype territory. However, there are **7 critical broken seams** that will prevent the stack from running outside Replit. These are all fixable. None require architectural changes.
-
----
-
-## REPO 1 — AlexaMobileWeb (PackAI Multi-Agent Platform)
-
-### What it actually is
-- Full Express + React + TypeScript platform
-- **10 LAM action domains** — PackAI, Trading, Orbitron, AIYield, Voice, EdgeDevice, K9 Automotive, DeFi, Education, CodeDev
-- **7 specialized agents** — Scout, Whisperer, FedWatcher, Narrator, Router, NetWatcher, Orbitron
-- Chromebook edge agent (Python, `/chromebook-agent/`)
-- Multi-platform edge deployments: Chromebook, Raspberry Pi, Windows
-- Real-time WebSocket server on `/ws` and `/ws/chromebook`
-- Orbitron connector wired to Supabase `external-integration` edge function ✅
-- Auth system (currently Replit OIDC — **broken outside Replit**)
-- Memory system, RAG, Pack Management, Automation Gateway, MCP routes
-
-### CRITICAL BROKEN SEAMS
-
-**🔴 SEAM 1 — replitAuth.ts: Hard crash on startup**
-```
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
-}
-```
-The app will throw and die immediately outside Replit. `replitAuth.ts` uses Replit OIDC (`REPL_ID`, `REPLIT_DOMAINS`, `ISSUER_URL`). All 6 route files import `isAuthenticated` from this.
-
-**Fix required:** Replace `replitAuth.ts` with a lightweight JWT/session auth or a `bypass` stub for WSL2 local dev. The `isAuthenticated` middleware must remain signature-compatible.
+| Repo | Last Sprint Commit | Status |
+|---|---|---|
+| k9-llm-router | Sprint 6 — ingestor + launch script | ✅ Clean |
+| ai-yield-whisperer | Sprint 6 — RAG loop closed | ✅ Clean |
+| fed-whisperer | Sprint 5 — generate-trading-signals | ✅ Clean |
+| orbitron-integrator | Post-Sprint: 7 new edge fns + vibe update | ✅ Clean |
+| AlexaMobileWeb | Sprint 4c — Replit detached | ✅ Clean |
+| MapPackManager | Sprint 4c — Replit detached | ✅ Clean |
 
 ---
 
-**🔴 SEAM 2 — Orbitron connector hardcoded to dead Replit URL**
-```
-// server/utils/orbitron-integration.ts
-curl -X POST https://packai.replit.app/api/lam/command
-curl -X GET  https://packai.replit.app/api/ios/status
-```
-These are stale curl examples in utility docs — but they indicate the original integration target was `packai.replit.app`, which is gone.
+## CONFIRMED WORKING
 
-**Fix required:** Update all `packai.replit.app` references to point to `http://localhost:5000` (AlexaMobileWeb itself) or the actual K-9 LLM router at `:8765`.
-
----
-
-**🔴 SEAM 3 — Missing `.env` — 18 required environment variables**
-No `.env.example` at root level. App expects:
-```
-DATABASE_URL          ORBITRON_API_KEY       ORBITRON_ENDPOINT
-SESSION_SECRET        ORBITRON_WEBHOOK_URL   N8N_WEBHOOK_URL
-REPL_ID               OPENAI_API_KEY         ANTHROPIC_API_KEY
-REPLIT_DOMAINS        AIYIELD_API_KEY        AIYIELD_ENDPOINT
-ISSUER_URL            TRADING_API_KEY        CHROMEBOOK_API_KEY
-VOICE_MONKEY_TOKEN    LAM_MOCK_MODE          N8N_WEBHOOK_SECRET
-```
-
-**Fix required:** Generate `.env.example` with all vars documented, mark which are required vs optional, add WSL2-local defaults.
+- ✅ FedWhisperer → trading_signals persisted + broadcast (Sprint 5)
+- ✅ PackAI ai_engine.py → query_rag() wired to search_similar_patterns_local()
+- ✅ PackAI main.py → /memory/event embeds immediately via asyncio.create_task()
+- ✅ k9-knowledge-ingestor service file exists (:8767)
+- ✅ launch-economic-stack.sh — all 5 services defined with correct cmds
+- ✅ AlexaMobileWeb — replitAuth.ARCHIVED.ts confirmed, no Replit URLs in server/
+- ✅ orbitron-integrator 7 new fns registered in config.toml
+- ✅ auto-sync.sh + ecosystem-up.sh exist (references k9-llm-router launch script)
+- ✅ Sprint 6 migration file committed and staged
 
 ---
 
-**🟡 SEAM 4 — Database dependency: Neon PostgreSQL required on startup**
-`server/db.ts` + session store both need `DATABASE_URL`. Without it the app won't start. `replitAuth.ts` also uses a pg session store.
+## OPEN SEAMS (Ranked by Priority)
 
-**Fix required:** Either provision a local PostgreSQL via Docker or add a graceful startup mode that falls back to in-memory storage when `DATABASE_URL` is absent.
+### 🔴 CRITICAL
 
----
+**S1 — Sprint 6 migration NOT applied to Supabase**
+- File: `ai-yield-whisperer/supabase/migrations/20260417000000_sprint6_local_embeddings.sql`
+- Adds `embedding_local vector(768)` column + `search_similar_patterns_local()` fn
+- Until applied: `query_rag()` will 500 and `k9-knowledge-ingestor` upserts will fail
+- Fix: `cd ~/ai-yield-whisperer && supabase db push`
 
-**🟡 SEAM 5 — MCP service allows `.replit.app` as trusted origin**
-```
-// server/services/mcp-service.ts:370
-".replit.app",
-```
-Low risk but should be cleaned — this is a CORS/origin trust policy.
+**S2 — k9-llm-router/requirements.txt missing ingestor deps**
+- Router requirements only has: fastapi, uvicorn, httpx, python-dotenv, pydantic
+- Ingestor needs: sentence-transformers, motor, pymongo, torch, transformers
+- These live in `k9_knowledge_ingestor/requirements.txt` (separate) — OK for Docker
+- Risk: if running from a single venv, ingestor will fail to import
+- Fix: WSL2 install path should `pip install -r k9_knowledge_ingestor/requirements.txt` separately
 
----
+### 🟡 MEDIUM
 
-### WORKING SEAMS ✅
-- Orbitron connector properly uses Supabase endpoint (`ziqenqqgnqxqrazmjohs.supabase.co`) — matches memory entry #4
-- K-9 action registry is complete — 10 domains, all handlers implemented
-- `chromebook-agent/` is standalone Python with its own `.env.example` and `requirements.txt` — can run independently
-- Edge deployments (`edge-deployments/`) have install scripts for Chromebook, RPi, Windows
-- WebSocket architecture is sound — real sensor data path works correctly
-- Orbitron signal aggregator wired to Supabase platform-sync function
+**S3 — ecosystem-up.sh path is wrong**
+- Line: `cd ../k9-llm-router/k9-llm-router && ./launch-economic-stack.sh start`
+- Double-nests the dir: `k9-llm-router/k9-llm-router` — will fail to cd
+- Fix: `cd ../k9-llm-router && ./launch-economic-stack.sh start`
 
----
+**S4 — Tailscale Funnel (AlexaMobileWeb → ai-yield-whisperer)**
+- TAILSCALE_FUNNEL_SETUP.md exists and documents the steps
+- Not yet executed on WSL2 (manual step, requires Tailscale auth)
+- Blocks AlexaMobileWeb from reaching PackAI leader over the internet
+- Fix: Follow TAILSCALE_FUNNEL_SETUP.md on WSL2
 
-## REPO 2 — MapPackManager (K-9 Automotive LAM Dashboard)
+**S5 — orbitron-integrator new edge fns not wired to k9-action-executor**
+- 7 post-Sprint-5 edge fns (signal-forge, great-rebalancing-signals, three-body-calibration,
+  alpha-lifecycle-engine, listing-sniper, recovery-intelligence-agent, venue-operations-agent)
+- k9-action-executor only routes to original 16 actions — these new fns are callable
+  directly but not reachable via the K-9 action dispatch system
+- Fix: Add action routes to k9-action-executor switch block
 
-### What it actually is
-- Honda Civic edge node dashboard — K24 5AT transmission map pack manager
-- KITT-inspired UI (voice assistant, knight scanner, ecosystem status)
-- PWA with service worker + manifest — installable on Civic head unit
-- LLM router (Ollama-first → PackAI Cloud → Akash/io.net fallback)
-- PackAI client with agent lifecycle, context packs, feedback logs
-- Orbitron sync service
-- OBD-II integration, real-time gauges, shift map editor
-- Full Drizzle ORM schema for transmission data
+### 🟢 LOW / FUTURE
 
-### CRITICAL BROKEN SEAMS
+**S6 — k9_paymaster_dir / k9_mcp_dir / k9_orch_dir env vars**
+- launch-economic-stack.sh falls back to `$HOME/k9-paymaster` etc.
+- These dirs may not exist on WSL2 yet (services built separately)
+- Fix: Set env vars pointing to actual service dirs, or build the services
 
-**🔴 SEAM 6 — PackAI endpoint pointing to dead Replit instance**
-```
-// server/llm-router.ts:68
-endpoint: process.env.PACKAI_ENDPOINT || "https://packai.replit.app",
-```
-When `PACKAI_ENDPOINT` is unset, all cloud LLM queries die silently (returns "PackAI endpoint not configured"). It falls back to Ollama only.
+**S7 — PaymasterLedger on-chain (Sprint 10)**
+- Paymaster currently writes to in-memory/local only
+- On-chain signing via HSM wallet deferred to Sprint 16
 
-**Fix required:** Set `PACKAI_ENDPOINT=http://localhost:5000` (AlexaMobileWeb) or `http://localhost:8765` (k9-llm-router). This wires MapPackManager's cloud LLM path to the actual K-9 router.
-
----
-
-**🔴 SEAM 7 — PackAI client has 3 commented-out TODO API calls**
-```typescript
-// packai-client.ts:146
-// TODO: Replace with actual PackAI deployment API call when endpoint is available
-// packai-client.ts:281
-// TODO: Replace with actual PackAI evaluation API call when endpoint is available  
-// packai-client.ts:345
-// TODO: Replace with actual PackAI API call when endpoint is available
-```
-These 3 agent lifecycle operations (deploy, evaluate, getContextPack) run in permanent mock mode even when connected. Agent management is simulated, not real.
-
-**Fix required:** Implement the 3 actual API calls once AlexaMobileWeb is running locally and endpoint is confirmed.
+**S8 — auto-sync.sh hourly polling**
+- Runs `git pull` every hour — no restart logic implemented
+- If k9-llm-router updates while running, tmux session won't reload
+- Fix: Add tmux restart signal after relevant file changes
 
 ---
 
-### WORKING SEAMS ✅
-- LLM complexity analyzer is functional — routes simple/medium/complex queries correctly
-- Local Ollama routing works — hits `:11434` correctly
-- Transmission storage, shift maps, OBD schema all defined and working
-- KITT UI components (voice assistant, knight scanner, ecosystem status) are built
-- PWA manifest + service worker are present
-- K9_ORBITRON_MODULE_SPEC.md + PackAI integration spec are solid developer contracts
-- `shared/packai-types.ts` defines full telemetry schema matching k9-actions.ts in AlexaMobileWeb
+## NEW CAPABILITIES SINCE SPRINT 6 AUDIT
+
+orbitron-integrator added 7 new edge functions (post Sprint 5, not tracked in memory):
+- `signal-forge` — signal generation + backtesting (Zod-validated inputs)
+- `great-rebalancing-signals` — portfolio rebalancing signal engine
+- `three-body-calibration` — 3-body regime calibration (BTC/ETH/DXY)
+- `alpha-lifecycle-engine` — edge tracking (Sharpe, hit rate, decay)
+- `listing-sniper` — new token listing opportunity detection
+- `recovery-intelligence-agent` — drawdown recovery intelligence
+- `venue-operations-agent` — exchange venue ops
+
+ai-yield-whisperer added 4 new tables (Apr 2026):
+- `entropy_readings` — market entropy/regime analysis
+- `chain_discoveries` — chain discovery scoring
+- `exchange_reserves` — exchange reserve tracking
+- `narrative_signals` — market narrative detection
 
 ---
 
-## CROSS-REPO INTEGRATION MAP
+## ACTION SUMMARY
 
-```
-MapPackManager (:5000)
-  └── llm-router.ts
-        ├── LOCAL:  → Ollama :11434           ✅ works
-        └── CLOUD:  → PACKAI_ENDPOINT         🔴 → should be AlexaMobileWeb :5000
-
-AlexaMobileWeb (:5000)
-  ├── LAM router                              ✅ works
-  ├── replitAuth                              🔴 crashes outside Replit
-  ├── Orbitron connector → Supabase           ✅ works (matches memory #4)
-  └── k9-integration routes → k9-llm-router  ✅ wired to :8765
-
-k9-llm-router (:8765)
-  ├── Paymaster :9002                         ✅ Sprint 4 complete
-  ├── MCP Manager :3030                       ✅ Sprint 4 complete
-  ├── Orchestrator :8744                      ✅ Sprint 4 complete
-  └── Orbitron client                         ✅ registered
-```
-
----
-
-## PRIORITY ACTION LIST
-
-| # | Severity | Repo | Fix |
+| Priority | Action | Repo | Effort |
 |---|---|---|---|
-| 1 | 🔴 BLOCKER | AlexaMobileWeb | Replace `replitAuth.ts` with JWT/session stub for local dev |
-| 2 | 🔴 BLOCKER | AlexaMobileWeb | Generate `.env.example` with all 18 vars + WSL2 defaults |
-| 3 | 🔴 BLOCKER | MapPackManager | Set `PACKAI_ENDPOINT` default → `http://localhost:5000` |
-| 4 | 🔴 HIGH | MapPackManager | Implement 3 TODO PackAI API calls in `packai-client.ts` |
-| 5 | 🟡 MEDIUM | AlexaMobileWeb | Add DB-less startup mode (in-memory fallback) |
-| 6 | 🟡 MEDIUM | AlexaMobileWeb | Clean `packai.replit.app` references from orbitron-integration.ts |
-| 7 | 🟢 LOW | AlexaMobileWeb | Remove `.replit.app` from MCP trusted origins |
+| 🔴 | `supabase db push` (Sprint 6 migration) | ai-yield-whisperer | 1 cmd |
+| 🔴 | Install ingestor deps in WSL2 venv | k9-llm-router | 1 cmd |
+| 🟡 | Fix ecosystem-up.sh path | orbitron-integrator | 1 line |
+| 🟡 | Execute Tailscale Funnel setup | AlexaMobileWeb | 10 min |
+| 🟡 | Wire 7 new Orbitron fns to k9-action-executor | orbitron-integrator | Sprint 7 |
+| 🟢 | Set K9_*_DIR env vars on WSL2 | local | env config |
 
----
-
-## SPRINT RECOMMENDATION: Sprint 4c — Local Detachment
-
-**Goal:** Both repos run fully on WSL2 without Replit dependencies.  
-**Estimated effort:** 3-4 targeted file edits + env files.
-
-**Deliverables:**
-1. `server/localAuth.ts` — JWT bypass replacing replitAuth (dev mode flag)
-2. `.env.example` for AlexaMobileWeb
-3. `.env.example` for MapPackManager with `PACKAI_ENDPOINT=http://localhost:5000`
-4. Implement 3 PackAI client TODO stubs
-5. Patch `packai.replit.app` → `localhost:5000`
-
-After Sprint 4c: both repos start cleanly in WSL2, MapPackManager routes LLM calls through AlexaMobileWeb → k9-llm-router → Ollama/cloud.
-
----
-
-## ADDITIONAL FINDING — Other Repos in Local GitHub Folder
-
-From the GitHub Desktop screenshot and memory, these likely have the same Replit-dependency pattern:
-- `fed-whisperer` — FedWhisperer UI + Supabase functions
-- `ai-yield-whisperer` — DeFi AI + PackAI Leader (known partially broken, memory #6)
-- `orbitron-integrator` — Main Orbitron UI
-
-All should go through the same `import_replit_service.yaml` + auth detachment process.
