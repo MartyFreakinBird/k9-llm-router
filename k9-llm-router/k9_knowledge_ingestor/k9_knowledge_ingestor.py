@@ -1,5 +1,5 @@
 """
-k9-knowledge-ingestor — Sprint 6
+k9-knowledge-ingestor — Sprint 9
 WSL2 Python service — Port :8767
 
 Closes the RAG loop by:
@@ -18,6 +18,15 @@ Supabase target:
   - Column: embedding_local vector(768)
   - Function: search_similar_patterns_local(query_embedding, threshold, count)
 
+Sprint 9 additions:
+  - FastAPI HTTP server on :8767 (replaces bare asyncio loop)
+  - POST /embed            — embed a single text string → float[768]
+  - POST /embed_batch      — embed multiple strings → float[768][]
+  - GET  /health           — liveness + model status + ingest stats
+  - POST /ingest/trigger   — manually trigger one ingest cycle
+  - K9_LOCAL_ONLY mode     — writes embeddings to local Postgres (k9_local)
+                             instead of Supabase
+
 Run:
   python k9_knowledge_ingestor.py
 
@@ -28,6 +37,13 @@ Env:
   OBSIDIAN_VAULT_PATH    — optional: /home/novum/obsidian-vault
   INGEST_INTERVAL_SECS   — default 300 (5 min)
   EMBEDDING_MODEL        — default all-mpnet-base-v2
+  K9_LOCAL_ONLY          — "true" → write to local Postgres instead of Supabase
+  K9_PG_HOST             — default localhost
+  K9_PG_PORT             — default 5432
+  K9_PG_DB               — default k9_local
+  K9_PG_USER             — default postgres
+  K9_PG_PASSWORD         — required when K9_LOCAL_ONLY=true
+  INGESTOR_PORT          — default 8767
 """
 
 from __future__ import annotations
@@ -46,6 +62,14 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
+# Sprint 9: HTTP server
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+import threading
+import psycopg2
+import psycopg2.extras
+
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -57,6 +81,13 @@ OBSIDIAN_VAULT      = os.getenv("OBSIDIAN_VAULT_PATH", "")
 INTERVAL            = int(os.getenv("INGEST_INTERVAL_SECS", "300"))
 MODEL_NAME          = os.getenv("EMBEDDING_MODEL", "all-mpnet-base-v2")
 LOOKBACK_MINUTES    = int(os.getenv("LOOKBACK_MINUTES", "60"))  # how far back to fetch on each cycle
+INGESTOR_PORT       = int(os.getenv("INGESTOR_PORT", "8767"))
+LOCAL_ONLY          = os.getenv("K9_LOCAL_ONLY", "false").lower() == "true"
+PG_HOST             = os.getenv("K9_PG_HOST", "localhost")
+PG_PORT             = int(os.getenv("K9_PG_PORT", "5432"))
+PG_DB               = os.getenv("K9_PG_DB", "k9_local")
+PG_USER             = os.getenv("K9_PG_USER", "postgres")
+PG_PASSWORD         = os.getenv("K9_PG_PASSWORD", "")
 
 log = logging.getLogger("k9-ingestor")
 logging.basicConfig(
@@ -92,6 +123,53 @@ class LocalEmbedder:
 
 
 embedder = LocalEmbedder()
+
+# ── Ingest stats (for /health endpoint) ──────────────────────────────────────
+
+class IngestStats:
+    def __init__(self):
+        self.last_cycle_at: str | None = None
+        self.last_cycle_elapsed_s: float = 0.0
+        self.last_error: str | None = None
+        self.total_cycles: int = 0
+        self.total_embedded: int = 0
+        self.cycle_running: bool = False
+
+stats = IngestStats()
+
+# ── Local Postgres upsert ─────────────────────────────────────────────────────
+
+def pg_upsert_embeddings(rows: list[dict]) -> int:
+    """Write embedding rows to local k9_local.embeddings_local table."""
+    if not rows:
+        return 0
+    conn = psycopg2.connect(
+        host=PG_HOST, port=PG_PORT, dbname=PG_DB,
+        user=PG_USER, password=PG_PASSWORD
+    )
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                for row in rows:
+                    emb_str = "[" + ",".join(str(v) for v in row["embedding_local"]) + "]"
+                    cur.execute(
+                        """
+                        INSERT INTO embeddings_local
+                          (content, pattern_type, embedding, metadata, source)
+                        VALUES (%s, %s, %s::vector, %s, %s)
+                        ON CONFLICT DO NOTHING
+                        """,
+                        [
+                            row.get("content", ""),
+                            row.get("pattern_type", "unknown"),
+                            emb_str,
+                            json.dumps(row.get("metadata", {})),
+                            row.get("source", "ingestor"),
+                        ]
+                    )
+        return len(rows)
+    finally:
+        conn.close()
 
 # ── Supabase helpers ───────────────────────────────────────────────────────────
 
@@ -176,7 +254,10 @@ async def ingest_trading_signals(client: httpx.AsyncClient) -> int:
     for p, emb in zip(patterns, embeddings):
         upsert_rows.append({**p, "embedding_local": emb})
 
-    ok = await supa_upsert(client, upsert_rows)
+    if LOCAL_ONLY:
+            ok = pg_upsert_embeddings(upsert_rows) > 0
+        else:
+            ok = await supa_upsert(client, upsert_rows)
     count = len(upsert_rows) if ok else 0
     log.info("trading_signals → %d patterns upserted", count)
     return count
@@ -232,7 +313,10 @@ async def ingest_cross_module_events(client: httpx.AsyncClient) -> int:
 
     embeddings = embedder.embed_batch(texts)
     upsert_rows = [{**p, "embedding_local": emb} for p, emb in zip(patterns, embeddings)]
-    ok = await supa_upsert(client, upsert_rows)
+    if LOCAL_ONLY:
+            ok = pg_upsert_embeddings(upsert_rows) > 0
+        else:
+            ok = await supa_upsert(client, upsert_rows)
     count = len(upsert_rows) if ok else 0
     log.info("cross_module_events → %d events upserted", count)
     return count
@@ -283,7 +367,10 @@ async def ingest_memory_events(client: httpx.AsyncClient) -> int:
 
     embeddings = embedder.embed_batch(texts)
     upsert_rows = [{**p, "embedding_local": emb} for p, emb in zip(patterns, embeddings)]
-    ok = await supa_upsert(client, upsert_rows)
+    if LOCAL_ONLY:
+            ok = pg_upsert_embeddings(upsert_rows) > 0
+        else:
+            ok = await supa_upsert(client, upsert_rows)
     count = len(upsert_rows) if ok else 0
 
     if ok:
@@ -367,12 +454,15 @@ async def ingest_obsidian(client: httpx.AsyncClient, vault_path: str) -> int:
 
     embeddings = embedder.embed_batch(all_texts)
     upsert_rows = [{**p, "embedding_local": emb} for p, emb in zip(all_patterns, embeddings)]
-    ok = await supa_upsert(client, upsert_rows)
+    if LOCAL_ONLY:
+            ok = pg_upsert_embeddings(upsert_rows) > 0
+        else:
+            ok = await supa_upsert(client, upsert_rows)
     count = len(upsert_rows) if ok else 0
     log.info("Obsidian vault → %d chunks upserted", count)
     return count
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
+# ── Main ingest loop ─────────────────────────────────────────────────────────
 
 async def run_cycle() -> dict[str, int]:
     totals: dict[str, int] = {}
@@ -384,31 +474,136 @@ async def run_cycle() -> dict[str, int]:
             totals["obsidian"] = await ingest_obsidian(client, OBSIDIAN_VAULT)
     return totals
 
-async def main():
-    log.info("🧠 k9-knowledge-ingestor starting — interval=%ds model=%s", INTERVAL, MODEL_NAME)
-    log.info("Supabase: %s", SUPABASE_URL)
+async def ingest_loop():
+    log.info("🧠 k9-knowledge-ingestor starting — interval=%ds model=%s port=%d",
+             INTERVAL, MODEL_NAME, INGESTOR_PORT)
+    log.info("Local-only mode: %s | DB: %s@%s:%d/%s", LOCAL_ONLY, PG_USER, PG_HOST, PG_PORT, PG_DB)
     if OBSIDIAN_VAULT:
         log.info("Obsidian vault: %s", OBSIDIAN_VAULT)
-    else:
-        log.info("Obsidian vault: not configured (set OBSIDIAN_VAULT_PATH to enable)")
 
     while True:
         start = time.monotonic()
+        stats.cycle_running = True
         try:
             totals = await run_cycle()
             elapsed = time.monotonic() - start
+            stats.last_cycle_at = datetime.now(timezone.utc).isoformat()
+            stats.last_cycle_elapsed_s = round(elapsed, 2)
+            stats.last_error = None
+            stats.total_cycles += 1
+            stats.total_embedded += sum(totals.values())
             log.info(
-                "✅ Cycle complete in %.1fs — signals:%d events:%d memory:%d obsidian:%s",
-                elapsed,
+                "✅ Cycle %d in %.1fs — signals:%d events:%d memory:%d obsidian:%s",
+                stats.total_cycles, elapsed,
                 totals.get("trading_signals", 0),
                 totals.get("cross_module_events", 0),
                 totals.get("memory_events", 0),
                 totals.get("obsidian", "off"),
             )
         except Exception as e:
+            stats.last_error = str(e)
             log.error("Cycle error: %s", e, exc_info=True)
-
+        finally:
+            stats.cycle_running = False
         await asyncio.sleep(INTERVAL)
 
+# ── FastAPI HTTP server (Sprint 9) ────────────────────────────────────────────
+
+app_http = FastAPI(title="k9-knowledge-ingestor", version="0.9.0")
+
+class EmbedRequest(BaseModel):
+    text: str
+
+class EmbedBatchRequest(BaseModel):
+    texts: list[str]
+
+class EmbedResponse(BaseModel):
+    embedding: list[float]
+    dim: int
+    model: str
+
+class EmbedBatchResponse(BaseModel):
+    embeddings: list[list[float]]
+    count: int
+    dim: int
+    model: str
+
+@app_http.post("/embed", response_model=EmbedResponse)
+def embed_single(req: EmbedRequest):
+    """
+    Embed a single text string using local sentence-transformers model.
+    Returns float[768] vector.
+    Used by control-plane /rag/query to replace stub zero-vector.
+    """
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="text must be non-empty")
+    try:
+        vec = embedder.embed(req.text.strip())
+        return EmbedResponse(embedding=vec, dim=len(vec), model=MODEL_NAME)
+    except Exception as e:
+        log.error("Embed error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app_http.post("/embed_batch", response_model=EmbedBatchResponse)
+def embed_batch(req: EmbedBatchRequest):
+    """Embed multiple texts. Max 64 per request."""
+    if not req.texts:
+        raise HTTPException(status_code=400, detail="texts list must be non-empty")
+    if len(req.texts) > 64:
+        raise HTTPException(status_code=400, detail="max 64 texts per batch")
+    try:
+        vecs = embedder.embed_batch([t.strip() for t in req.texts if t.strip()])
+        return EmbedBatchResponse(
+            embeddings=vecs, count=len(vecs),
+            dim=len(vecs[0]) if vecs else 0, model=MODEL_NAME
+        )
+    except Exception as e:
+        log.error("Embed batch error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app_http.get("/health")
+def health():
+    """Liveness + model status + ingest stats."""
+    model_loaded = embedder._model is not None
+    return {
+        "status": "online",
+        "service": "k9-knowledge-ingestor",
+        "port": INGESTOR_PORT,
+        "sprint": 9,
+        "model": MODEL_NAME,
+        "model_loaded": model_loaded,
+        "local_only": LOCAL_ONLY,
+        "ingest": {
+            "interval_s": INTERVAL,
+            "last_cycle_at": stats.last_cycle_at,
+            "last_cycle_elapsed_s": stats.last_cycle_elapsed_s,
+            "last_error": stats.last_error,
+            "total_cycles": stats.total_cycles,
+            "total_embedded": stats.total_embedded,
+            "cycle_running": stats.cycle_running,
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app_http.post("/ingest/trigger")
+async def trigger_ingest():
+    """Manually trigger one ingest cycle (non-blocking — runs in background)."""
+    if stats.cycle_running:
+        return {"status": "already_running", "message": "A cycle is already in progress"}
+    asyncio.create_task(run_cycle())
+    return {"status": "triggered", "message": "Ingest cycle started",
+            "timestamp": datetime.now(timezone.utc).isoformat()}
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def run_uvicorn():
+    """Run FastAPI in a background thread so asyncio ingest loop owns the event loop."""
+    uvicorn.run(app_http, host="0.0.0.0", port=INGESTOR_PORT, log_level="warning")
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Start uvicorn in a daemon thread
+    t = threading.Thread(target=run_uvicorn, daemon=True)
+    t.start()
+    log.info("HTTP server started on :%d", INGESTOR_PORT)
+    # Run ingest loop on main event loop
+    asyncio.run(ingest_loop())
