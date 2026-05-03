@@ -4,11 +4,13 @@
 # Sprint 6 — includes k9-knowledge-ingestor
 #
 # Services (start order matters):
-#   1. k9-paymaster       :9002  — economic gate + CLOB signing
-#   2. k9-mcp-manager     :3030  — tool registry
-#   3. k9-orchestrator    :8744  — k9_orchestrator.py
-#   4. k9-llm-router      :8765  — main.py (this repo)
-#   5. k9-knowledge-ingestor :8767 — k9_knowledge_ingestor.py
+#   1. k9-paymaster          :9002  — economic gate + CLOB signing
+#   2. k9-mcp-manager        :3030  — tool registry
+#   3. k9-orchestrator       :8744  — k9_orchestrator.py
+#   4. k9-llm-router         :8765  — main.py (this repo)
+#   5. k9-knowledge-ingestor :8767  — Sprint 9: HTTP embed server + ingest loop
+#   6. k9-control-plane      :8769  — Sprint 8: auth, rate-limit, local Postgres
+#   7. k9-gemini-agent       :8770  — Sprint 10: Gemini computer_use + task API
 #
 # Usage:
 #   ./launch-economic-stack.sh start     — start all services in tmux
@@ -59,11 +61,16 @@ SVC_DIR[k9-knowledge-ingestor]="$K9_DIR"
 SVC_PORT[k9-knowledge-ingestor]="8767"
 
 # k9-control-plane (Sprint 8 — unified HTTP surface for Base44/Emergent/Bolt)
-SVC_CMD[k9-control-plane]="deno run --allow-net --allow-env --allow-run --allow-read --env control-plane/config/.env control-plane/src/index.ts"
+SVC_CMD[k9-control-plane]="deno run --allow-net --allow-env --allow-run --allow-read --allow-write --env control-plane/config/.env control-plane/src/index.ts"
 SVC_DIR[k9-control-plane]="${ORBITRON_DIR:-$HOME/orbitron-integrator}"
 SVC_PORT[k9-control-plane]="8769"
 
-START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor k9-control-plane)
+# k9-gemini-agent (Sprint 10 — Gemini 2.5 computer_use + task API, Paymaster-gated)
+SVC_CMD[k9-gemini-agent]="python k9_gemini_agent/k9_gemini_agent.py"
+SVC_DIR[k9-gemini-agent]="$K9_DIR"
+SVC_PORT[k9-gemini-agent]="8770"
+
+START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor k9-control-plane k9-gemini-agent)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -107,7 +114,7 @@ ensure_session() {
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_start() {
-  log "=== K-9 Economic Stack START (Sprint 6) ==="
+  log "=== K-9 Economic Stack START (Sprint 10) ==="
   ensure_session
 
   for svc in "${START_ORDER[@]}"; do
