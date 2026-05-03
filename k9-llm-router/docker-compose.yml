@@ -262,6 +262,38 @@ services:
       timeout: 3s
       retries: 3
 
+
+  # ── aeg-node-adapter (:8768) ──────────────────────────────────────────────
+  aeg-node-adapter:
+    <<: *k9-defaults
+    image: node:20-slim
+    container_name: aeg-node-adapter
+    working_dir: /app
+    volumes:
+      - ${AEG_DIR:-../aeg-protocol}:/app:ro
+      - k9-logs:/app/logs
+    command: ["npx", "tsx", "sdk/aegAdapter.ts"]
+    ports:
+      - "8768:8768"
+    environment:
+      AEG_ADAPTER_PORT: "8768"
+      AEG_NODE_ID: ${AEG_NODE_ID:-dev-node-0x0000}
+      AEG_OPERATOR_KEY: ${AEG_OPERATOR_KEY:-dev}
+      AEG_PROTOCOL_RELAY: ${AEG_PROTOCOL_RELAY:-http://localhost:9100}
+      K9_ROUTER_URL: "http://k9-llm-router:8765"
+      K9_ORCHESTRATOR_URL: "http://k9-orchestrator:8744"
+      K9_CONTROL_URL: "http://k9-control-plane:8769"
+      K9_PAYMASTER_URL: "http://k9-paymaster:9002"
+      POA_CONTRACT_ADDRESS: ${POA_CONTRACT_ADDRESS:-}
+    depends_on:
+      - k9-control-plane
+      - k9-llm-router
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8768/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
 # ── Networks ──────────────────────────────────────────────────────────────────
 networks:
   k9-net:

@@ -11,6 +11,7 @@
 #   5. k9-knowledge-ingestor :8767  — Sprint 9: HTTP embed server + ingest loop
 #   6. k9-control-plane      :8769  — Sprint 8: auth, rate-limit, local Postgres
 #   7. k9-gemini-agent       :8770  — Sprint 10: Gemini computer_use + task API
+#   8. aeg-node-adapter       :8768  — Sprint AEG-3: AEG protocol wrapper for K-9
 #
 # Usage:
 #   ./launch-economic-stack.sh start     — start all services in tmux
@@ -70,7 +71,12 @@ SVC_CMD[k9-gemini-agent]="python k9_gemini_agent/k9_gemini_agent.py"
 SVC_DIR[k9-gemini-agent]="$K9_DIR"
 SVC_PORT[k9-gemini-agent]="8770"
 
-START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor k9-control-plane k9-gemini-agent)
+# aeg-node-adapter (Sprint AEG-3 — AEG protocol wrapper for K-9, :8768)
+SVC_CMD[aeg-node-adapter]="npx tsx sdk/aegAdapter.ts"
+SVC_DIR[aeg-node-adapter]="${AEG_DIR:-$HOME/aeg-protocol}"
+SVC_PORT[aeg-node-adapter]="8768"
+
+START_ORDER=(k9-paymaster k9-mcp-manager k9-orchestrator k9-llm-router k9-knowledge-ingestor k9-control-plane k9-gemini-agent aeg-node-adapter)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,7 +120,7 @@ ensure_session() {
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_start() {
-  log "=== K-9 Economic Stack START (Sprint 10) ==="
+  log "=== K-9 Economic Stack START (Sprint AEG-3) ==="
   ensure_session
 
   for svc in "${START_ORDER[@]}"; do
