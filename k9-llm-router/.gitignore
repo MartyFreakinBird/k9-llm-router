@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Docker compose secrets
+.env.compose
+
+# Logs and runtime
+logs/
+*.log
+runtime/
+
+# Models
+models/
+
+# OS
+.DS_Store

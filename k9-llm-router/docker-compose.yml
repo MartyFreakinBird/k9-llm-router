@@ -1,0 +1,276 @@
+# K-9 Economic Stack — docker-compose.yml
+# Sprint 10 — full containerized stack
+#
+# Usage:
+#   docker compose up -d                  # start all services
+#   docker compose up -d k9-gemini-agent  # start single service
+#   docker compose logs -f k9-llm-router  # tail logs
+#   docker compose ps                     # service status + ports
+#   docker compose down                   # stop all
+#
+# IMPORTANT — WSL2 host networking:
+#   Services that need to reach Ollama on the WSL2 host use
+#   host-gateway as the host IP. This is resolved automatically
+#   via extra_hosts below on Docker 20.10+.
+#
+# Secret management:
+#   Copy .env.compose.example → .env.compose and fill in secrets.
+#   docker compose --env-file .env.compose up -d
+#
+# Port map:
+#   k9-paymaster          :9002
+#   k9-mcp-manager        :3030
+#   k9-orchestrator       :8744
+#   k9-llm-router         :8765
+#   k9-knowledge-ingestor :8767
+#   k9-control-plane      :8769
+#   k9-gemini-agent       :8770
+#   postgres (k9_local)   :5432  (internal only — not exposed)
+
+version: "3.9"
+
+# ── Shared defaults ────────────────────────────────────────────────────────────
+x-k9-defaults: &k9-defaults
+  restart: unless-stopped
+  # Reach host (Ollama, n8n, Tailscale) via host-gateway
+  extra_hosts:
+    - "host-gateway:host-gateway"
+  networks:
+    - k9-net
+
+x-python-service: &python-service
+  <<: *k9-defaults
+  image: python:3.11-slim
+  working_dir: /app
+  volumes:
+    - .:/app:ro
+    - k9-logs:/app/logs
+  environment:
+    PYTHONUNBUFFERED: "1"
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+
+  # ── Postgres (k9_local) ────────────────────────────────────────────────────
+  k9-postgres:
+    <<: *k9-defaults
+    image: pgvector/pgvector:pg16
+    container_name: k9-postgres
+    environment:
+      POSTGRES_DB: k9_local
+      POSTGRES_USER: k9
+      POSTGRES_PASSWORD: ${K9_PG_PASSWORD:-k9local}
+    volumes:
+      - k9-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"    # localhost only — not exposed externally
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "k9", "-d", "k9_local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── k9-paymaster (:9002) ──────────────────────────────────────────────────
+  k9-paymaster:
+    <<: *python-service
+    container_name: k9-paymaster
+    volumes:
+      - ${K9_PAYMASTER_DIR:-../k9-paymaster}:/app:ro
+      - k9-logs:/app/logs
+    command: ["python", "k9_paymaster.py"]
+    ports:
+      - "9002:9002"
+    environment:
+      K9_PAYMASTER_PORT: "9002"
+      K9_PG_HOST: k9-postgres
+      K9_PG_DB: k9_local
+      K9_PG_USER: k9
+      K9_PG_PASSWORD: ${K9_PG_PASSWORD:-k9local}
+    depends_on:
+      k9-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9002/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── k9-mcp-manager (:3030) ────────────────────────────────────────────────
+  k9-mcp-manager:
+    <<: *python-service
+    container_name: k9-mcp-manager
+    volumes:
+      - ${K9_MCP_DIR:-../k9-mcp-manager}:/app:ro
+      - k9-logs:/app/logs
+    command: ["python", "k9_mcp_manager.py"]
+    ports:
+      - "3030:3030"
+    environment:
+      K9_MCP_PORT: "3030"
+      K9_PAYMASTER_URL: "http://k9-paymaster:9002"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OLLAMA_BASE_URL: "http://host-gateway:11434"
+    depends_on:
+      k9-paymaster:
+        condition: service_healthy
+
+  # ── k9-orchestrator (:8744) ───────────────────────────────────────────────
+  k9-orchestrator:
+    <<: *python-service
+    container_name: k9-orchestrator
+    volumes:
+      - ${K9_ORCH_DIR:-../k9-orchestrator}:/app:ro
+      - k9-logs:/app/logs
+    command: ["python", "k9_orchestrator.py"]
+    ports:
+      - "8744:8744"
+    environment:
+      K9_ORCH_PORT: "8744"
+      K9_PAYMASTER_URL: "http://k9-paymaster:9002"
+      K9_MCP_URL: "http://k9-mcp-manager:3030"
+      K9_PG_HOST: k9-postgres
+      K9_PG_DB: k9_local
+      K9_PG_USER: k9
+      K9_PG_PASSWORD: ${K9_PG_PASSWORD:-k9local}
+    depends_on:
+      - k9-paymaster
+      - k9-mcp-manager
+
+  # ── k9-llm-router (:8765) ────────────────────────────────────────────────
+  k9-llm-router:
+    <<: *k9-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: k9-llm-router:latest
+    container_name: k9-llm-router
+    volumes:
+      - k9-logs:/app/logs
+    ports:
+      - "8765:8765"
+    environment:
+      ROUTER_PORT: "8765"
+      ROUTER_MODE: ${ROUTER_MODE:-hybrid}
+      OLLAMA_BASE_URL: "http://host-gateway:11434"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      K9_PAYMASTER_URL: "http://k9-paymaster:9002"
+      K9_GEMINI_URL: "http://k9-gemini-agent:8770"
+      ORBITRON_AUTH_TOKEN: ${ORBITRON_AUTH_TOKEN:-}
+    depends_on:
+      - k9-paymaster
+      - k9-gemini-agent
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8765/swarm/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── k9-knowledge-ingestor (:8767) ─────────────────────────────────────────
+  k9-knowledge-ingestor:
+    <<: *k9-defaults
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ingestor
+    image: k9-knowledge-ingestor:latest
+    container_name: k9-knowledge-ingestor
+    volumes:
+      - k9-logs:/app/logs
+    command: ["python", "k9_knowledge_ingestor/k9_knowledge_ingestor.py"]
+    ports:
+      - "8767:8767"
+    environment:
+      K9_INGESTOR_PORT: "8767"
+      K9_LOCAL_ONLY: "true"
+      K9_PG_HOST: k9-postgres
+      K9_PG_DB: k9_local
+      K9_PG_USER: k9
+      K9_PG_PASSWORD: ${K9_PG_PASSWORD:-k9local}
+      OLLAMA_BASE_URL: "http://host-gateway:11434"
+    depends_on:
+      k9-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8767/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── k9-control-plane (:8769) ──────────────────────────────────────────────
+  k9-control-plane:
+    <<: *k9-defaults
+    image: denoland/deno:2.2.1
+    container_name: k9-control-plane
+    working_dir: /app
+    volumes:
+      - ${ORBITRON_DIR:-../orbitron-integrator}:/app:ro
+      - k9-logs:/tmp/k9-logs
+    command: >
+      deno run
+        --allow-net --allow-env --allow-run --allow-read --allow-write
+        --env control-plane/config/.env
+        control-plane/src/index.ts
+    ports:
+      - "8769:8769"
+    environment:
+      K9_ORCHESTRATOR_URL: "http://k9-orchestrator:8744"
+      K9_PACKAI_URL: "http://k9-llm-router:8765"
+      K9_INGESTOR_URL: "http://k9-knowledge-ingestor:8767"
+      K9_GEMINI_URL: "http://k9-gemini-agent:8770"
+      K9_LOCAL_ONLY: "true"
+      K9_PG_HOST: k9-postgres
+      K9_PG_DB: k9_local
+      K9_PG_USER: k9
+      K9_PG_PASSWORD: ${K9_PG_PASSWORD:-k9local}
+    depends_on:
+      - k9-orchestrator
+      - k9-gemini-agent
+      - k9-knowledge-ingestor
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8769/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── k9-gemini-agent (:8770) ───────────────────────────────────────────────
+  k9-gemini-agent:
+    <<: *k9-defaults
+    build:
+      context: k9_gemini_agent
+      dockerfile: Dockerfile
+    image: k9-gemini-agent:latest
+    container_name: k9-gemini-agent
+    volumes:
+      - k9-logs:/app/logs
+    ports:
+      - "8770:8770"
+    environment:
+      K9_GEMINI_PORT: "8770"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-computer-use-preview}
+      GEMINI_TASK_MODEL: ${GEMINI_TASK_MODEL:-gemini-2.5-pro}
+      K9_PAYMASTER_URL: "http://k9-paymaster:9002"
+      BROWSERBASE_API_KEY: ${BROWSERBASE_API_KEY:-}
+    depends_on:
+      k9-paymaster:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8770/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  k9-net:
+    driver: bridge
+    name: k9-network
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  k9-postgres-data:
+    name: k9-postgres-data
+  k9-logs:
+    name: k9-logs
