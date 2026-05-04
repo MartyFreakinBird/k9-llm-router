@@ -1,0 +1,21 @@
+{
+  "name": "@k9/integration",
+  "version": "1.0.0",
+  "description": "K-9 Unified Integration Layer — Sprint INT-1",
+  "type": "module",
+  "scripts": {
+    "dev":       "ts-node lovable-bridge/server.ts",
+    "build":     "tsc",
+    "typecheck": "tsc --noEmit",
+    "register":  "ts-node lovable-bridge/register-all.ts",
+    "test":      "ts-node tests/run.ts"
+  },
+  "dependencies": {
+    "fastify": "^4.27.0"
+  },
+  "devDependencies": {
+    "typescript":   "^5.4.5",
+    "ts-node":      "^10.9.2",
+    "@types/node":  "^20.14.0"
+  }
+}
