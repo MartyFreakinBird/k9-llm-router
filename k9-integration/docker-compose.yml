@@ -1,0 +1,68 @@
+##
+## K-9 Local Dev Stack — Integration Layer
+## Sprint INT-1
+##
+## Adds: lovable-bridge service to existing K-9 docker-compose
+##
+## Usage:
+##   docker compose -f ../k9-llm-router/docker-compose.yml \
+##                  -f ./docker-compose.yml \
+##                  --env-file .env.compose up -d
+##
+## Or standalone (bridges to existing K-9 services on host):
+##   docker compose up -d
+##
+
+version: "3.9"
+
+networks:
+  k9-net:
+    external: true      # joins existing K-9 network
+    name: k9-llm-router_default
+
+services:
+
+  # ── Lovable Bridge — MCP registration + proxy ────────────────────────────
+  lovable-bridge:
+    build:
+      context: .
+      dockerfile: lovable-bridge/Dockerfile
+    container_name: lovable-bridge
+    restart: unless-stopped
+    ports:
+      - "8780:8780"
+    environment:
+      MCP_URL:          "http://k9-mcp-manager:3030"
+      PACKAI_UI_URL:    "${PACKAI_UI_URL:-https://packai.lovable.app}"
+      PACKAI_UI_API_KEY: "${PACKAI_UI_API_KEY:-}"
+      PORT:             "8780"
+    networks:
+      - k9-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8780/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      k9.service: "lovable-bridge"
+      k9.sprint:  "INT-1"
+      k9.port:    "8780"
+
+  # ── Integration test runner (optional, run manually) ─────────────────────
+  integration-tests:
+    build:
+      context: .
+      dockerfile: lovable-bridge/Dockerfile
+    container_name: k9-integration-tests
+    profiles: ["test"]          # only starts with: docker compose --profile test up
+    command: ["npx", "ts-node", "tests/run.ts"]
+    environment:
+      MCP_URL:         "http://k9-mcp-manager:3030"
+      K9_ORCH_URL:     "http://k9-orchestrator:8744"
+      LLM_ROUTER_URL:  "http://k9-llm-router:8765"
+      PACKAI_UI_URL:   "${PACKAI_UI_URL:-https://packai.lovable.app}"
+    networks:
+      - k9-net
+    depends_on:
+      lovable-bridge:
+        condition: service_healthy
