@@ -776,14 +776,17 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <!-- ══ LEFT PANEL: Agent Status ══════════════════ -->
   <!-- Maps to: left dark-framed portrait panel -->
   <div class="hz hz-left">
-    <div class="home-zone-hd">⊛ K-9 Agents</div>
-    <div class="home-pill hp-ok"  id="home-orch" style="background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.22)">ORCHESTRATOR · :8080</div>
-    <div class="home-pill hp-ok"  style="background:rgba(74,222,128,.09);color:var(--green);border:1px solid rgba(74,222,128,.18)">QUANT ENGINE · :9001</div>
-    <div class="home-pill hp-ok"  style="background:rgba(74,222,128,.09);color:var(--green);border:1px solid rgba(74,222,128,.18)">ORBITRON · :4000</div>
-    <div class="home-pill hp-warn" style="background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2)">PACKAI · API-DIRECT</div>
-    <div class="home-pill hp-dim"  style="background:rgba(51,65,85,.3);color:var(--muted);border:1px solid rgba(51,65,85,.5)">FEDWHISPERER · STUBBED</div>
-    <div class="home-pill hp-dim"  style="background:rgba(51,65,85,.3);color:var(--muted);border:1px solid rgba(51,65,85,.5)">OSINT CMD · IDLE</div>
-    <div class="home-pill hp-dim"  style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">AGENT ORCH · :8085 PLANNED</div>
+    <div class="home-zone-hd">⊛ K-9 Stack</div>
+    <!-- Pills updated live by runHomeStackPoll() -->
+    <div class="home-pill" id="hp-paymaster"   style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">PAYMASTER · :9002</div>
+    <div class="home-pill" id="hp-mcp"         style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">MCP MANAGER · :3030</div>
+    <div class="home-pill" id="hp-orch"        style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">ORCHESTRATOR · :8744</div>
+    <div class="home-pill" id="hp-router"      style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">LLM ROUTER · :8765</div>
+    <div class="home-pill" id="hp-ingestor"    style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">KNOWLEDGE · :8767</div>
+    <div class="home-pill" id="hp-control"     style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">CONTROL PLANE · :8769</div>
+    <div class="home-pill" id="hp-gemini"      style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">GEMINI AGENT · :8770</div>
+    <div class="home-pill" id="hp-aeg"         style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(167,139,250,.3);font-size:8.5px">AEG ADAPTER · :8768</div>
+    <div class="home-pill" id="hp-ollama"      style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">OLLAMA · :11434</div>
       <div class="home-pill" id="home-chain-alpha" style="background:rgba(74,222,128,.09);color:var(--green);border:1px solid rgba(74,222,128,.16);margin-top:3px;font-size:8.5px">CHAIN ALPHA · —</div>
       <div class="home-pill" id="home-narrative"   style="background:rgba(34,211,238,.07);color:var(--cyan); border:1px solid rgba(34,211,238,.15);margin-top:3px;font-size:8.5px">NARRATIVE · —</div>
     <div style="margin-top:auto;border-top:1px solid rgba(34,211,238,.08);padding-top:6px">
@@ -897,9 +900,10 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <!-- ══ RIGHT PANEL 3: MCP / Infra ════════════════ -->
   <!-- Maps to: bottom-right stacked panel (shorter) -->
   <div class="hz hz-right3">
-    <div class="home-zone-hd">❖ MCP · Infra</div>
-    <div class="home-pill" style="background:rgba(20,184,166,.09);color:var(--teal);border:1px solid rgba(20,184,166,.2)">MCP SERVER · 13 TOOLS</div>
-    <div class="home-pill" style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.45);font-size:8.5px">HEADSCALE · PLANNED</div>
+    <div class="home-zone-hd">⬡ AEG Protocol</div>
+    <div class="home-pill" id="home-aeg-adapter" style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(167,139,250,.3);font-size:8.5px">NODE ADAPTER · :8768</div>
+    <div class="home-pill" id="home-aeg-sprint"  style="background:rgba(167,139,250,.09);color:var(--purple);border:1px solid rgba(167,139,250,.2);font-size:8.5px">SPRINT AEG-3 ✓</div>
+    <div class="home-pill" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px;cursor:pointer" onclick="copyToClip('cd ~/aeg-protocol && npm install && npx tsx sdk/aegAdapter.ts')">AEG-4: TOKEN DEPLOY ↗</div>
   </div>
 
   <!-- ══ BOTTOM STRIP: uptime + stack ══════════════ -->
@@ -911,12 +915,32 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <span style="color:rgba(34,211,238,.2);font-size:11px">·</span>
     <span class="home-pill" style="background:rgba(51,65,85,.25);color:var(--muted);border:1px solid rgba(51,65,85,.4)">WIN11 · Tucker GA</span>
     <span style="color:rgba(34,211,238,.2);font-size:11px">·</span>
-    <span class="home-pill" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">LLM: claude-sonnet-4-6</span>
+    <!-- K-9 Stack online count — updated by runHomeStackPoll() -->
+    <span class="home-pill" id="home-stack-status" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px;cursor:pointer" onclick="showView('security');setTimeout(runHeartbeat,100)">K-9 STACK · polling…</span>
     <span style="color:rgba(34,211,238,.2);font-size:11px">·</span>
-    <span class="home-pill" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">3 servers · 13 MCP tools</span>
-    <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
-      <span class="home-pill" style="background:rgba(245,158,11,.09);color:var(--amber);border:1px solid rgba(245,158,11,.18);font-size:8.5px">HETZNER VPS · PENDING</span>
-      <span class="home-pill" style="background:rgba(167,139,250,.09);color:var(--purple);border:1px solid rgba(167,139,250,.18);font-size:8.5px">PIPELINE STEP 1: LLM ROUTER</span>
+    <!-- AEG adapter status pill -->
+    <span class="home-pill" id="home-aeg-status" style="background:rgba(167,139,250,.09);color:var(--purple);border:1px solid rgba(167,139,250,.18);font-size:8.5px;cursor:pointer" onclick="showView('security');setTimeout(runHeartbeat,100)">AEG :8768 · polling…</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <!-- LAUNCH STACK — copies launch command to clipboard -->
+      <span class="home-pill" id="home-launch-btn"
+        style="background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.28);font-size:8.5px;cursor:pointer;user-select:none;padding:4px 10px;letter-spacing:.05em"
+        onclick="homeLaunchStack()"
+        title="Copy: cd ~/k9-llm-router && ./launch-economic-stack.sh start">
+        ▶ LAUNCH K-9 STACK
+      </span>
+      <!-- DOCKER COMPOSE — copies docker compose command -->
+      <span class="home-pill"
+        style="background:rgba(34,211,238,.08);color:var(--cyan);border:1px solid rgba(34,211,238,.18);font-size:8.5px;cursor:pointer;user-select:none;padding:4px 10px"
+        onclick="copyToClip('cd ~/k9-llm-router && docker compose --env-file .env.compose up -d')"
+        title="Copy: docker compose --env-file .env.compose up -d">
+        🐳 COMPOSE UP
+      </span>
+      <!-- STATUS CHECK -->
+      <span class="home-pill"
+        style="background:rgba(51,65,85,.25);color:var(--muted);border:1px solid rgba(51,65,85,.4);font-size:8.5px;cursor:pointer;padding:4px 10px"
+        onclick="copyToClip('cd ~/k9-llm-router && ./launch-economic-stack.sh status')">
+        ◉ STATUS
+      </span>
     </span>
   </div>
 
@@ -1001,14 +1025,14 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <div class="cell cell-dark" style="grid-column:3;grid-row:1">
     <div class="lbl">Quick Launch</div>
     <div class="ql-grid">
-      <a class="ql-btn" href="http://localhost:8080" target="_blank"><span class="ql-ico">⚙</span>Orchestrator<span class="ql-port">:8080</span></a>
-      <a class="ql-btn" href="http://localhost:8888" target="_blank"><span class="ql-ico">⚡</span>LLM Router<span class="ql-port">:8888</span></a>
-      <a class="ql-btn" href="http://localhost:8123" target="_blank"><span class="ql-ico">⌂</span>Home Asst<span class="ql-port">:8123</span></a>
-      <a class="ql-btn" href="http://localhost:3000" target="_blank"><span class="ql-ico">◈</span>PackAI<span class="ql-port">:3000</span></a>
-      <a class="ql-btn" href="http://localhost:4000" target="_blank"><span class="ql-ico">◎</span>Orbitron<span class="ql-port">:4000</span></a>
-      <a class="ql-btn" href="http://localhost:9001" target="_blank"><span class="ql-ico">∿</span>Quant API<span class="ql-port">:9001</span></a>
-      <a class="ql-btn" href="http://localhost:5001" target="_blank"><span class="ql-ico">◐</span>OSINT CMD<span class="ql-port">:5001</span></a>
-      <a class="ql-btn" href="http://localhost:3030" target="_blank"><span class="ql-ico">❖</span>MCP Server<span class="ql-port">:3030</span></a>
+      <a class="ql-btn" href="http://localhost:8765/swarm/health" target="_blank"><span class="ql-ico">⚡</span>LLM Router<span class="ql-port">:8765</span></a>
+      <a class="ql-btn" href="http://localhost:8744/health" target="_blank"><span class="ql-ico">⚙</span>Orchestrator<span class="ql-port">:8744</span></a>
+      <a class="ql-btn" href="http://localhost:9002/health" target="_blank"><span class="ql-ico">💲</span>Paymaster<span class="ql-port">:9002</span></a>
+      <a class="ql-btn" href="http://localhost:3030/health" target="_blank"><span class="ql-ico">❖</span>MCP Manager<span class="ql-port">:3030</span></a>
+      <a class="ql-btn" href="http://localhost:8769/health" target="_blank"><span class="ql-ico">◎</span>Control Plane<span class="ql-port">:8769</span></a>
+      <a class="ql-btn" href="http://localhost:8770/health" target="_blank"><span class="ql-ico">✦</span>Gemini Agent<span class="ql-port">:8770</span></a>
+      <a class="ql-btn" href="http://localhost:8768/health" target="_blank" style="border-color:rgba(167,139,250,.3);color:var(--purple)"><span class="ql-ico">⬡</span>AEG Adapter<span class="ql-port">:8768</span></a>
+      <a class="ql-btn" href="http://localhost:11434" target="_blank"><span class="ql-ico">◐</span>Ollama<span class="ql-port">:11434</span></a>
     </div>
   </div>
   <!-- log -->
@@ -1022,9 +1046,9 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <span class="f-sep">·</span>
     <div class="f-item"><span class="f-lbl">VENV</span><span class="f-val" id="f-env">k9-orchestrator</span></div>
     <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">LLM</span><span class="f-val">claude-sonnet-4-6</span></div>
+    <div class="f-item"><span class="f-lbl">LLM</span><span class="f-val">k9-router · :8765</span></div>
     <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">MCP</span><span class="f-val" style="color:var(--teal)">3 servers · 13 tools</span></div>
+    <div class="f-item"><span class="f-lbl">AEG</span><span class="f-val" style="color:var(--purple)">Sprint AEG-3 · :8768</span></div>
     <div class="f-r">
       <div class="f-item"><span class="f-lbl">Hetzner</span><span class="f-val" style="color:var(--amber)">pending</span></div>
       <span class="f-sep">·</span>
@@ -1048,16 +1072,17 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
           <span class="proj-badge pb-github">github</span>
           <span class="proj-badge pb-deploy" style="opacity:.4">hetzner</span>
         </div>
-        <div class="proj-port">:8080 · FastAPI · MCP bridge</div>
+        <div class="proj-port">:8744 · FastAPI · MCP bridge</div>
       </div>
 
-      <div class="proj-card" data-cmd="llm-migrate" data-proj="k9-llm-router">
+      <div class="proj-card" data-cmd="cc-start" data-proj="k9-llm-router">
         <div class="proj-name">⚡ k9-llm-router</div>
         <div class="proj-meta">
-          <span class="proj-badge pb-replit">replit</span>
-          <span class="proj-badge pb-migrate">migrate first</span>
+          <span class="proj-badge pb-local">local</span>
+          <span class="proj-badge pb-github">github</span>
+          <span class="proj-badge pb-deploy">docker</span>
         </div>
-        <div class="proj-port">:8888 · highest priority migration</div>
+        <div class="proj-port">:8765 · Sprint 10 · Gemini + AEG wired</div>
       </div>
 
       <div class="proj-card" data-cmd="quant-start" data-proj="k9-quant-engine">
@@ -1118,10 +1143,20 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
       <div class="proj-card" data-cmd="docker-stack" data-proj="k9-docker-compose">
         <div class="proj-name">🐳 k9-docker-compose</div>
         <div class="proj-meta">
-          <span class="proj-badge pb-stub">pending</span>
-          <span class="proj-badge pb-deploy">hetzner target</span>
+          <span class="proj-badge pb-local">local</span>
+          <span class="proj-badge pb-github">github</span>
+          <span class="proj-badge pb-deploy">sprint 10</span>
         </div>
-        <div class="proj-port">full stack · docker compose up -d</div>
+        <div class="proj-port">full stack · docker compose --env-file .env.compose up -d</div>
+      </div>
+
+      <div class="proj-card" data-cmd="aeg-start" data-proj="aeg-node-adapter" style="border-color:rgba(167,139,250,.3)">
+        <div class="proj-name" style="color:var(--purple)">⬡ aeg-node-adapter</div>
+        <div class="proj-meta">
+          <span class="proj-badge pb-local" style="background:rgba(167,139,250,.15);color:var(--purple)">aeg-3</span>
+          <span class="proj-badge pb-github">github</span>
+        </div>
+        <div class="proj-port">:8768 · GovernanceProof · Fastify · Base Sepolia</div>
       </div>
 
       <div class="proj-card" data-cmd="agent-scaffold" data-proj="agent-orchestrator">
@@ -1203,6 +1238,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <div class="script-strip" id="scriptStrip">
       <div class="strip-card active-cmd" data-cmd="cc-start"><span class="strip-title">⚡ Claude Code</span><span class="strip-tag">CLAUDE</span></div>
       <div class="strip-card" data-cmd="tmux-k9"><span class="strip-title">⬡ Tmux K-9</span><span class="strip-tag">TMUX</span></div>
+      <div class="strip-card" data-cmd="aeg-start"><span class="strip-title" style="color:var(--purple)">⬡ AEG Adapter</span><span class="strip-tag" style="color:var(--purple)">:8768</span></div>
       <div class="strip-card" data-cmd="llm-migrate"><span class="strip-title">🔄 LLM Migration</span><span class="strip-tag">MIGRATE</span></div>
       <div class="strip-card" data-cmd="wsl-start"><span class="strip-title">◎ WSL2 Stack</span><span class="strip-tag">WSL2</span></div>
       <div class="strip-card" data-cmd="docker-stack"><span class="strip-title">🐳 Docker Stack</span><span class="strip-tag">DOCKER</span></div>
@@ -1916,17 +1952,21 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <div class="cell cell-dark" style="grid-column:1;grid-row:1">
     <div class="lbl">Service Heartbeat</div>
     <div class="mod-status" id="heartbeatList">
-      <div class="ms-row" id="hb-8080"><div class="dot dd" id="hb-dot-8080"></div><span class="ms-name">k9-orchestrator</span><span class="ms-val ms-off" id="hb-val-8080">checking</span></div>
-      <div class="ms-row" id="hb-8888"><div class="dot dd" id="hb-dot-8888"></div><span class="ms-name">k9-llm-router</span><span class="ms-val ms-off" id="hb-val-8888">checking</span></div>
-      <div class="ms-row" id="hb-9001"><div class="dot dd" id="hb-dot-9001"></div><span class="ms-name">k9-quant-engine</span><span class="ms-val ms-off" id="hb-val-9001">checking</span></div>
-      <div class="ms-row" id="hb-3000"><div class="dot dd" id="hb-dot-3000"></div><span class="ms-name">packai-scout</span><span class="ms-val ms-off" id="hb-val-3000">checking</span></div>
-      <div class="ms-row" id="hb-4000"><div class="dot dd" id="hb-dot-4000"></div><span class="ms-name">orbitron-diag</span><span class="ms-val ms-off" id="hb-val-4000">checking</span></div>
-      <div class="ms-row" id="hb-5001"><div class="dot dd" id="hb-dot-5001"></div><span class="ms-name">osint-cmd</span><span class="ms-val ms-off" id="hb-val-5001">checking</span></div>
-      <div class="ms-row" id="hb-3030"><div class="dot dd" id="hb-dot-3030"></div><span class="ms-name">k9-mcp-server</span><span class="ms-val ms-off" id="hb-val-3030">checking</span></div>
-      <div class="ms-row" id="hb-47990"><div class="dot dd" id="hb-dot-47990"></div><span class="ms-name">sunshine-stream</span><span class="ms-val ms-off" id="hb-val-47990">checking</span></div>
-      <div class="ms-row" id="hb-8123"><div class="dot dd" id="hb-dot-8123"></div><span class="ms-name">home-assistant</span><span class="ms-val ms-off" id="hb-val-8123">checking</span></div>
-      <div class="ms-row" id="hb-8088"><div class="dot dd" id="hb-dot-8088"></div><span class="ms-name">janus-gateway</span><span class="ms-val ms-off" id="hb-val-8088">checking</span></div>
-      <div class="ms-row" id="hb-4953"><div class="dot dd" id="hb-dot-4953"></div><span class="ms-name">netjack2-master</span><span class="ms-val ms-off" id="hb-val-4953">checking</span></div>
+      <!-- CORE K-9 STACK (Sprint AEG-3) -->
+      <div class="ms-row" id="hb-9002"><div class="dot dd" id="hb-dot-9002"></div><span class="ms-name">k9-paymaster</span><span class="ms-val ms-off" id="hb-val-9002">—</span></div>
+      <div class="ms-row" id="hb-3030"><div class="dot dd" id="hb-dot-3030"></div><span class="ms-name">k9-mcp-manager</span><span class="ms-val ms-off" id="hb-val-3030">—</span></div>
+      <div class="ms-row" id="hb-8744"><div class="dot dd" id="hb-dot-8744"></div><span class="ms-name">k9-orchestrator</span><span class="ms-val ms-off" id="hb-val-8744">—</span></div>
+      <div class="ms-row" id="hb-8765"><div class="dot dd" id="hb-dot-8765"></div><span class="ms-name">k9-llm-router</span><span class="ms-val ms-off" id="hb-val-8765">—</span></div>
+      <div class="ms-row" id="hb-8767"><div class="dot dd" id="hb-dot-8767"></div><span class="ms-name">k9-knowledge-ingestor</span><span class="ms-val ms-off" id="hb-val-8767">—</span></div>
+      <div class="ms-row" id="hb-8769"><div class="dot dd" id="hb-dot-8769"></div><span class="ms-name">k9-control-plane</span><span class="ms-val ms-off" id="hb-val-8769">—</span></div>
+      <!-- AI AGENTS -->
+      <div class="ms-row" id="hb-8770"><div class="dot dd" id="hb-dot-8770"></div><span class="ms-name">k9-gemini-agent</span><span class="ms-val ms-off" id="hb-val-8770">—</span></div>
+      <!-- AEG PROTOCOL LAYER -->
+      <div class="ms-row" id="hb-8768"><div class="dot dd" id="hb-dot-8768"></div><span class="ms-name" style="color:var(--purple)">aeg-node-adapter</span><span class="ms-val ms-off" id="hb-val-8768">—</span></div>
+      <!-- INFRA -->
+      <div class="ms-row" id="hb-11434"><div class="dot dd" id="hb-dot-11434"></div><span class="ms-name">ollama</span><span class="ms-val ms-off" id="hb-val-11434">—</span></div>
+      <div class="ms-row" id="hb-5678"><div class="dot dd" id="hb-dot-5678"></div><span class="ms-name">n8n</span><span class="ms-val ms-off" id="hb-val-5678">—</span></div>
+      <div class="ms-row" id="hb-47990"><div class="dot dd" id="hb-dot-47990"></div><span class="ms-name">sunshine-stream</span><span class="ms-val ms-off" id="hb-val-47990">—</span></div>
     </div>
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
       <div class="act-btn" style="flex:1;justify-content:center;padding:6px 10px;font-size:10px" onclick="runHeartbeat()">⟳ Recheck All</div>
@@ -2950,6 +2990,169 @@ setInterval(()=>{envIdx=(envIdx+1)%ENVS.length;const e=document.getElementById('
 /* ══════════════════════════════════════
    COPY UTILITY
 ══════════════════════════════════════ */
+
+/* ══════════════════════════════════════
+   K-9 HOME PANEL — live service status
+   Maps HB_SERVICES to home view pills.
+   Polls every 30s + on page load.
+══════════════════════════════════════ */
+
+// Port → home pill ID map
+const HOME_PILL_MAP = {
+  9002:  'hp-paymaster',
+  3030:  'hp-mcp',
+  8744:  'hp-orch',
+  8765:  'hp-router',
+  8767:  'hp-ingestor',
+  8769:  'hp-control',
+  8770:  'hp-gemini',
+  8768:  'hp-aeg',
+  11434: 'hp-ollama',
+};
+
+// Port label for pills (abbreviated)
+const HOME_PILL_LABEL = {
+  9002:  'PAYMASTER · :9002',
+  3030:  'MCP MANAGER · :3030',
+  8744:  'ORCHESTRATOR · :8744',
+  8765:  'LLM ROUTER · :8765',
+  8767:  'KNOWLEDGE · :8767',
+  8769:  'CONTROL PLANE · :8769',
+  8770:  'GEMINI AGENT · :8770',
+  8768:  'AEG ADAPTER · :8768',
+  11434: 'OLLAMA · :11434',
+};
+
+function setHomePill(port, up, ms) {
+  const pillId = HOME_PILL_MAP[port];
+  if (!pillId) return;
+  const el = document.getElementById(pillId);
+  if (!el) return;
+  const label = HOME_PILL_LABEL[port] || `:${port}`;
+  const suffix = ms ? ` · ${ms}ms` : '';
+  if (up) {
+    el.textContent = `✓ ${label}${suffix}`;
+    el.style.background = 'rgba(74,222,128,.10)';
+    el.style.color       = 'var(--green)';
+    el.style.borderColor = 'rgba(74,222,128,.25)';
+  } else {
+    el.textContent = `✗ ${label} · offline`;
+    el.style.background  = 'rgba(248,113,113,.08)';
+    el.style.color       = 'var(--red)';
+    el.style.borderColor = 'rgba(248,113,113,.2)';
+  }
+  // Special: AEG adapter gets purple when online
+  if (port === 8768 && up) {
+    el.style.background  = 'rgba(167,139,250,.12)';
+    el.style.color       = 'var(--purple)';
+    el.style.borderColor = 'rgba(167,139,250,.3)';
+  }
+}
+
+async function runHomeStackPoll() {
+  const corePorts = [9002,3030,8744,8765,8767,8769,8770,8768,11434];
+  let upCount = 0;
+  const promises = corePorts.map(async port => {
+    const svc = HB_SERVICES.find(s => s.port === port);
+    if (!svc) return;
+    const t0 = Date.now();
+    const res = await checkPort(port, svc.path);
+    const ms  = Date.now()-t0;
+    if (res.up) upCount++;
+    setHomePill(port, res.up, res.up ? ms : null);
+  });
+  await Promise.allSettled(promises);
+
+  // Update bottom strip counter
+  const statusEl = document.getElementById('home-stack-status');
+  if (statusEl) {
+    const ratio = upCount / corePorts.length;
+    if (ratio >= 0.85) {
+      statusEl.textContent  = `K-9 STACK · ${upCount}/${corePorts.length} ONLINE`;
+      statusEl.style.color  = 'var(--green)';
+      statusEl.style.borderColor = 'rgba(74,222,128,.25)';
+      statusEl.style.background  = 'rgba(74,222,128,.08)';
+    } else if (ratio >= 0.5) {
+      statusEl.textContent  = `K-9 STACK · ${upCount}/${corePorts.length} DEGRADED`;
+      statusEl.style.color  = 'var(--amber)';
+      statusEl.style.borderColor = 'rgba(245,158,11,.2)';
+      statusEl.style.background  = 'rgba(245,158,11,.07)';
+    } else {
+      statusEl.textContent  = `K-9 STACK · ${upCount}/${corePorts.length} OFFLINE`;
+      statusEl.style.color  = 'var(--red)';
+      statusEl.style.borderColor = 'rgba(248,113,113,.2)';
+      statusEl.style.background  = 'rgba(248,113,113,.07)';
+    }
+  }
+
+  // AEG pill in bottom strip + hz-right3 panel
+  const aegUp2 = (await checkPort(8768, '/health')).up;
+  const aegEl = document.getElementById('home-aeg-status');
+  const aegCard = document.getElementById('home-aeg-adapter');
+  if (aegEl) {
+    if (aegUp2) {
+      aegEl.textContent  = 'AEG :8768 · LIVE';
+      aegEl.style.color  = 'var(--purple)';
+      aegEl.style.borderColor = 'rgba(167,139,250,.35)';
+      aegEl.style.background  = 'rgba(167,139,250,.12)';
+    } else {
+      aegEl.textContent  = 'AEG :8768 · offline';
+      aegEl.style.color  = 'var(--dim)';
+      aegEl.style.borderColor = 'rgba(51,65,85,.4)';
+      aegEl.style.background  = 'rgba(51,65,85,.25)';
+    }
+  }
+  if (aegCard) {
+    if (aegUp2) {
+      aegCard.textContent  = 'NODE ADAPTER · :8768 ✓';
+      aegCard.style.color  = 'var(--purple)';
+      aegCard.style.borderColor = 'rgba(167,139,250,.4)';
+      aegCard.style.background  = 'rgba(167,139,250,.12)';
+    } else {
+      aegCard.textContent  = 'NODE ADAPTER · :8768 offline';
+      aegCard.style.color  = 'var(--dim)';
+    }
+  }
+}
+
+// Boot poll + 30s recurring
+runHomeStackPoll();
+setInterval(runHomeStackPoll, 30000);
+
+/* ══════════════════════════════════════
+   STACK LAUNCH HELPERS
+   Buttons copy WSL2 commands to clipboard.
+   The wallpaper can't exec shell directly —
+   commands are designed to be pasted in
+   a WSL2 terminal or Windows Terminal.
+══════════════════════════════════════ */
+
+const K9_LAUNCH_CMDS = {
+  start:   'cd ~/k9-llm-router && ./launch-economic-stack.sh start',
+  stop:    'cd ~/k9-llm-router && ./launch-economic-stack.sh stop',
+  restart: 'cd ~/k9-llm-router && ./launch-economic-stack.sh restart',
+  status:  'cd ~/k9-llm-router && ./launch-economic-stack.sh status',
+  compose: 'cd ~/k9-llm-router && docker compose --env-file .env.compose up -d',
+  logs:    'cd ~/k9-llm-router && ./launch-economic-stack.sh logs k9-llm-router',
+  aeg:     'cd ~/aeg-protocol && npm install && AEG_NODE_ID=$AEG_NODE_ID AEG_OPERATOR_KEY=$AEG_OPERATOR_KEY npx tsx sdk/aegAdapter.ts',
+};
+
+function homeLaunchStack(mode) {
+  const cmd = K9_LAUNCH_CMDS[mode || 'start'];
+  copyToClip(cmd);
+  const btn = document.getElementById('home-launch-btn');
+  if (btn) {
+    const prev = btn.textContent;
+    btn.textContent = '✓ COPIED — paste in WSL2';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = prev;
+      btn.style.color = '';
+    }, 2500);
+  }
+  pushLog('secLog','stack-launch','l-ok', `Launch cmd copied: ${cmd.slice(0,50)}…`);
+}
+
 function copyToClip(text){navigator.clipboard.writeText(text).catch(()=>{});}
 
 /* ══════════════════════════════════════
@@ -3078,16 +3281,17 @@ const CMDS = {
     {c:'// 5. verify',lines:['curl http://localhost:8888/swarm/health']},
   ]},
   'tmux-k9':{badge:'TMUX WORKSPACE',blocks:[
-    {c:'// create K-9 4-pane session',lines:['tmux new-session -d -s k9 -n orchestrator']},
-    {c:'// pane 1: orchestrator',lines:['tmux send-keys -t k9 "cd ~/k9/k9-orchestrator && source .venv/bin/activate && uvicorn main:app --port 8080 --reload" Enter']},
-    {c:'// pane 2: llm-router (split right)',lines:['tmux split-window -h -t k9','tmux send-keys -t k9 "cd ~/k9/k9-llm-router && source .venv/bin/activate && uvicorn main:app --port 8888 --reload" Enter']},
-    {c:'// pane 3: logs (split bottom-left)',lines:['tmux split-window -v -t k9:0.0','tmux send-keys -t k9 "tail -f ~/k9/logs/k9.log" Enter']},
-    {c:'// attach + manage',lines:['tmux attach-session -t k9','# Ctrl+B d  detach | Ctrl+B z  zoom | Ctrl+B [  scroll']},
+    {c:'// attach existing K-9 tmux session',lines:['tmux attach-session -t k9 || tmux new-session -s k9']},
+    {c:'// launch full K-9 stack (Sprint AEG-3)',lines:['cd ~/k9-llm-router && ./launch-economic-stack.sh start']},
+    {c:'// status check',lines:['./launch-economic-stack.sh status']},
+    {c:'// tail a specific service log',lines:['./launch-economic-stack.sh logs k9-llm-router','./launch-economic-stack.sh logs aeg-node-adapter']},
+    {c:'// tmux nav',lines:['# Ctrl+B d  detach | Ctrl+B z  zoom | Ctrl+B [  scroll','# Ctrl+B n  next window | Ctrl+B s  session list']},
   ]},
-  'wsl-start':{badge:'WSL2 FASTAPI',blocks:[
-    {c:'// start all services',lines:['wsl -d fedora-remix -- bash -c "cd ~/k9 && ./scripts/start-all.sh"']},
-    {c:'// check ports',lines:['wsl -d fedora-remix -- ss -tlnp | grep -E "8080|8888|9001|3000|4000|5001"']},
-    {c:'// hard reset',lines:['wsl --shutdown && wsl -d fedora-remix']},
+  'wsl-start':{badge:'WSL2 · fedora-remix',blocks:[
+    {c:'// launch K-9 stack from Windows Terminal (WSL2)',lines:['wsl -d fedora-remix -- bash -c "cd ~/k9-llm-router && ./launch-economic-stack.sh start"']},
+    {c:'// check all K-9 ports live',lines:['wsl -d fedora-remix -- ss -tlnp | grep -E "9002|3030|8744|8765|8767|8769|8770|8768|11434"']},
+    {c:'// start AEG adapter only',lines:['wsl -d fedora-remix -- bash -c "cd ~/aeg-protocol && npx tsx sdk/aegAdapter.ts"']},
+    {c:'// hard reset WSL2',lines:['wsl --shutdown && wsl -d fedora-remix']},
   ]},
   'docker-stack':{badge:'DOCKER STACK',blocks:[
     {c:'// build and start full K-9 stack',lines:['cd ~/k9 && docker compose up -d --build']},
@@ -3095,6 +3299,14 @@ const CMDS = {
     {c:'// tail logs for a service',lines:['docker logs -f k9-orchestrator']},
     {c:'// standard Dockerfile for any K-9 service',lines:['FROM python:3.11','WORKDIR /app','COPY . .','RUN pip install --no-cache-dir -r requirements.txt','CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]']},
     {c:'// stop stack',lines:['docker compose down']},
+  ]},
+  'aeg-start':{badge:'AEG NODE ADAPTER · Sprint AEG-3',blocks:[
+    {c:'// start AEG adapter (requires npm install first)',lines:['cd ~/aeg-protocol && npm install']},
+    {c:'// run adapter server :8768',lines:['AEG_NODE_ID=$AEG_NODE_ID AEG_OPERATOR_KEY=dev npx tsx sdk/aegAdapter.ts']},
+    {c:'// check health',lines:['curl http://localhost:8768/health | jq .']},
+    {c:'// check node identity (8 capabilities)',lines:['curl http://localhost:8768/identity | jq .capabilities']},
+    {c:'// test a task round-trip',lines:['curl -X POST http://localhost:8768/task -H "Content-Type: application/json" -d '{"task_id":"test-001","task_type":"inference","payload":{"type":"inference","prompt":"Hello K-9"},"requester_id":"wallpaper","reward_amount":0,"deadline_ms":9999999999999,"min_alignment_score":0.7,"on_chain_result":false,"priority":3}'']},
+    {c:'// AEG-4 next: deploy POA contract',lines:['cd ~/aeg-protocol && npx hardhat compile','npx hardhat test','# Then: forge script contracts/script/Deploy.s.sol --rpc-url base_sepolia --broadcast']},
   ]},
   'git-pr':{badge:'GITHUB CLI',blocks:[
     {c:'// stage, commit, push, open PR',lines:['git add -A','git commit -m "feat(k9): [message]"','git push -u origin HEAD','gh pr create --fill --web']},
@@ -4440,29 +4652,27 @@ function popoutApp() {
    if it's a CORS rejection vs timeout.
 ══════════════════════════════════════ */
 const HB_SERVICES = [
-  {port:8080,name:'k9-orchestrator'},
-  {port:8888,name:'k9-llm-router'},
-  {port:9001,name:'k9-quant-engine'},
-  {port:3000,name:'packai-scout'},
-  {port:4000,name:'orbitron-diag'},
-  {port:5001,name:'osint-cmd'},
-  {port:3030,name:'k9-mcp-server'},
-  {port:47990,name:'sunshine-stream'},
-  {port:8123,name:'home-assistant'},
-  {port:8088,name:'janus-gateway'},
-  {port:4953,name:'netjack2-master'},
+  {port:9002, name:'k9-paymaster',          path:'/health',       group:'core'},
+  {port:3030, name:'k9-mcp-manager',        path:'/health',       group:'core'},
+  {port:8744, name:'k9-orchestrator',       path:'/health',       group:'core'},
+  {port:8765, name:'k9-llm-router',         path:'/swarm/health', group:'core'},
+  {port:8767, name:'k9-knowledge-ingestor', path:'/health',       group:'core'},
+  {port:8769, name:'k9-control-plane',      path:'/health',       group:'core'},
+  {port:8770, name:'k9-gemini-agent',       path:'/health',       group:'ai'},
+  {port:8768, name:'aeg-node-adapter',      path:'/health',       group:'aeg'},
+  {port:11434,name:'ollama',                path:'/api/tags',     group:'ai'},
+  {port:5678, name:'n8n',                   path:'/healthz',      group:'infra'},
+  {port:47990,name:'sunshine-stream',       path:'/',             group:'infra'},
 ];
 
-async function checkPort(port) {
+async function checkPort(port, path) {
+  const url = `http://localhost:${port}${path||'/health'}`;
   try {
-    const r = await fetch(`http://localhost:${port}/swarm/health`, {
-      signal: AbortSignal.timeout(2000),
-      mode: 'no-cors'
-    });
-    // no-cors returns opaque response — means port responded
-    return { up: true, latency: null };
+    const t0 = Date.now();
+    await fetch(url, { signal: AbortSignal.timeout(2000), mode: 'no-cors' });
+    // no-cors opaque = port alive; actual JSON available via CORS-enabled services
+    return { up: true, latency: Date.now()-t0 };
   } catch(e) {
-    // timeout = offline; TypeError (CORS refused) = port is up but no CORS header
     const offline = e.name === 'TimeoutError' || e.name === 'AbortError';
     return { up: !offline, latency: null };
   }
@@ -4478,7 +4688,7 @@ async function runHeartbeat() {
       if (dot) { dot.className='dot da'; }
       if (val) { val.textContent='checking...'; val.className='ms-val ms-warn'; }
       const t0 = Date.now();
-      const res = await checkPort(svc.port);
+      const res = await checkPort(svc.port, svc.path);
       const ms  = Date.now()-t0;
       if (res.up) {
         upCount++;
