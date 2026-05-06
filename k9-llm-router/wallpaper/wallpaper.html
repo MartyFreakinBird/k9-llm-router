@@ -254,7 +254,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
      At 16:9 desktop the image will letterbox slightly — overlay zones stay locked
      to vw/vh percentages so they track the image correctly under cover scaling. */
   background-color: #050810;
-  background-image: url('./background.png');
+  background-image: url('./assets/img/background.png');
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -3924,10 +3924,10 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <div class="agent-carbon-panel" style="grid-column:3;grid-row:1/3">
     <!-- Scene always visible (no boot video in embedded mode) -->
     <div id="ag-carbon-scene" style="flex:1;position:relative;min-height:0;overflow:hidden">
-      <img id="ag-carbon-bg" src="assets/img/workstation_bg.jpg" alt="" onerror="this.style.display='none'">
+      <img id="ag-carbon-bg" src="assets/img/workstation_bg.png" alt="" onerror="this.style.display='none'">
       <div id="ag-carbon-avatar">
         <video id="ag-carbon-base" autoplay loop muted playsinline preload="none">
-          <source src="assets/video/vectos_idle.mp4" type="video/mp4">
+          <source src="assets/video/Vectos_idle.MP4" type="video/mp4">
         </video>
         <img id="ag-carbon-expression"
              src="assets/img/vectos_expression_neutral.png"
@@ -3945,7 +3945,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
       <div id="ag-carbon-placeholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5;text-align:center;font-family:var(--font-mono);font-size:9px;color:var(--dim);pointer-events:none">
         <div style="font-size:32px;opacity:0.2;margin-bottom:8px">◎</div>
         <div style="color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">VectOS Carbon</div>
-        <div style="font-size:8px;line-height:1.8">Drop assets/video/vectos_idle.mp4<br>to activate avatar</div>
+        <div style="font-size:8px;line-height:1.8">Drop assets/video/Vectos_idle.MP4<br>to activate avatar</div>
       </div>
     </div>
     <!-- Compact speak bar -->
