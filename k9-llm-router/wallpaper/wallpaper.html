@@ -1638,6 +1638,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <div class="home-pill" id="hp-control"     style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">CONTROL PLANE · :8769</div>
     <div class="home-pill" id="hp-gemini"      style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">GEMINI AGENT · :8770</div>
     <div class="home-pill" id="hp-aeg"         style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(167,139,250,.3);font-size:8.5px">AEG ADAPTER · :8768</div>
+    <div class="home-pill" id="hp-lovable"     style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">LOVABLE BRIDGE · :8780</div>
     <div class="home-pill" id="hp-ollama"      style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px">OLLAMA · :11434</div>
     <div class="home-pill" id="home-chain-alpha" style="background:rgba(74,222,128,.09);color:var(--green);border:1px solid rgba(74,222,128,.16);margin-top:3px;font-size:8.5px">CHAIN ALPHA · —</div>
     <div class="home-pill" id="home-narrative"   style="background:rgba(34,211,238,.07);color:var(--cyan);border:1px solid rgba(34,211,238,.15);margin-top:3px;font-size:8.5px">NARRATIVE · —</div>
@@ -1701,7 +1702,17 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
           <text x="60" y="104" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#475569">CB</text>
         <circle cx="580" cy="100" r="14" fill="rgba(20,20,30,.7)" stroke="rgba(100,116,139,.25)" stroke-width="1"/>
           <text x="580" y="104" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#475569">KF</text>
-        <text x="10" y="215" font-family="JetBrains Mono,monospace" font-size="7.5" fill="rgba(34,211,238,.18)">CB=Chromebook · KF=Kindle Fire · Tailscale mesh · Hetzner VPS pending · OpenClaw :18789 · miniSWE :local</text>
+        <!-- AEG-4 contracts node — Base Sepolia -->
+        <rect x="468" y="192" width="64" height="22" rx="3" fill="rgba(167,139,250,.09)" stroke="rgba(167,139,250,.45)" stroke-width="1"/>
+          <text x="500" y="202" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="6.5" fill="var(--purple)">$AEG · GOV</text>
+          <text x="500" y="211" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5.5" fill="rgba(167,139,250,.5)">Base Sepolia</text>
+        <line x1="500" y1="183" x2="500" y2="192" stroke="rgba(167,139,250,.35)" stroke-width="1" stroke-dasharray="3 3"/>
+        <!-- INT-1 lovable-bridge :8780 -->
+        <rect x="108" y="192" width="64" height="22" rx="3" fill="rgba(34,211,238,.06)" stroke="rgba(34,211,238,.3)" stroke-width="1"/>
+          <text x="140" y="202" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="6.5" fill="var(--cyan)">LOV-BRIDGE</text>
+          <text x="140" y="211" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="5.5" fill="rgba(34,211,238,.45)">:8780 INT-1</text>
+        <line x1="140" y1="183" x2="140" y2="192" stroke="rgba(34,211,238,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="10" y="225" font-family="JetBrains Mono,monospace" font-size="7" fill="rgba(34,211,238,.18)">AEG-4 ✓ · $AEG ERC20 · Governor · Treasury · INT-1: lovable-bridge :8780 · Tailscale mesh</text>
       </svg>
     </div>
     <!-- Market pill row at bottom of center frame -->
@@ -1754,34 +1765,42 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <div class="hz hz-right3">
     <div class="home-zone-hd">⬡ AEG Protocol</div>
     <div class="home-pill" id="home-aeg-adapter" style="background:rgba(51,65,85,.3);color:var(--dim);border:1px solid rgba(167,139,250,.3);font-size:8.5px">NODE ADAPTER · :8768</div>
-    <div class="home-pill" id="home-aeg-sprint"  style="background:rgba(167,139,250,.09);color:var(--purple);border:1px solid rgba(167,139,250,.2);font-size:8.5px">SPRINT AEG-3 ✓</div>
-    <div class="home-pill" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px;cursor:pointer" onclick="copyToClip('cd ~/aeg-protocol && npx tsx sdk/aegAdapter.ts')">▶ START AEG</div>
+    <div class="home-pill" id="home-aeg-sprint"  style="background:rgba(74,222,128,.09);color:var(--green);border:1px solid rgba(74,222,128,.25);font-size:8.5px">AEG-4 ✓ · $AEG · Governor · Treasury</div>
+    <div class="home-pill" style="background:rgba(167,139,250,.09);color:var(--purple);border:1px solid rgba(167,139,250,.22);font-size:8.5px">AEG-5 → staking UI + /register</div>
+    <div class="home-pill" style="background:rgba(51,65,85,.25);color:var(--dim);border:1px solid rgba(51,65,85,.4);font-size:8.5px;cursor:pointer"
+         onclick="copyToClip('cd ~/aeg-protocol && forge script contracts/script/Deploy.s.sol:DeployAEG --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify --etherscan-api-key $BASESCAN_API_KEY')"
+         title="Copy forge deploy command">▶ DEPLOY AEG-4</div>
   </div>
 
-  <!-- ══ SPRINT-9 / BASE44 STATUS ══════════════════ -->
-  <!-- Sits in the gap between hz-right3 and hz-bottom -->
+  <!-- ══ SPRINT-9 / AEG STATUS ══════════════════════ -->
   <div class="hz hz-sprint9">
     <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-shrink:0">
       <div class="pulse" style="width:5px;height:5px;flex-shrink:0"></div>
-      <span class="home-zone-hd" style="margin:0">◈ Sprint-9 · Base44</span>
-      <span style="margin-left:auto;font-size:8px;color:var(--dim);letter-spacing:.1em">CONTROL-PLANE</span>
+      <span class="home-zone-hd" style="margin:0">◈ KyPro · AEG Protocol</span>
+      <span style="margin-left:auto;font-size:8px;color:var(--dim);letter-spacing:.1em">INT-1 LIVE</span>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:nowrap">
       <div style="flex:1;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.15);border-radius:5px;padding:5px 8px;min-width:0">
         <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">AGENT</div>
         <div style="font-size:10px;color:var(--cyan)">base44 · <span style="color:var(--green)">online</span></div>
       </div>
-      <div style="flex:1;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.15);border-radius:5px;padding:5px 8px;min-width:0">
-        <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">SPRINT</div>
-        <div style="font-size:10px;color:var(--purple)">9 · <span style="color:var(--muted)">ctrl-plane</span></div>
+      <div style="flex:1;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:5px;padding:5px 8px;min-width:0">
+        <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">DONE</div>
+        <div style="font-size:10px;color:var(--green)">AEG-4 ✓</div>
       </div>
-      <div style="flex:1;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.15);border-radius:5px;padding:5px 8px;min-width:0">
-        <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">MODE</div>
-        <div style="font-size:10px;color:var(--amber)">LAN · <span style="color:var(--muted)">local</span></div>
+      <div style="flex:1;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:5px;padding:5px 8px;min-width:0">
+        <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">NEXT</div>
+        <div style="font-size:10px;color:var(--purple)">AEG-5</div>
       </div>
-      <div style="flex:1;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.15);border-radius:5px;padding:5px 8px;min-width:0;cursor:pointer" onclick="showView('carbon')" title="Open Carbon chat">
+      <div style="flex:1;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.15);border-radius:5px;padding:5px 8px;min-width:0;cursor:pointer"
+           onclick="copyToClip('cd ~/aeg-protocol && forge script contracts/script/Deploy.s.sol:DeployAEG --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify --etherscan-api-key $BASESCAN_API_KEY')"
+           title="Copy: deploy AEG-4 contracts to Base Sepolia">
+        <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">DEPLOY</div>
+        <div style="font-size:10px;color:var(--amber)">Base Sep.</div>
+      </div>
+      <div style="flex:1;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.15);border-radius:5px;padding:5px 8px;min-width:0" id="sp9-carbon-status">
         <div style="font-size:8px;color:var(--dim);letter-spacing:.1em;margin-bottom:2px">CARBON</div>
-        <div style="font-size:10px;color:var(--green)" id="sp9-carbon-status">:8744 <span id="sp9-carbon-dot">·&nbsp;—</span></div>
+        <div style="font-size:10px;color:var(--green)" id="sp9-carbon-dot">:8744</div>
       </div>
     </div>
   </div>
@@ -2131,14 +2150,16 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   <div class="cell cell-dark" style="grid-column:3;grid-row:1">
     <div class="lbl">Quick Launch</div>
     <div class="ql-grid">
-      <a class="ql-btn" href="http://localhost:8080" target="_blank"><span class="ql-ico">⚙</span>Orchestrator<span class="ql-port">:8080</span></a>
+      <a class="ql-btn" href="http://localhost:8744" target="_blank"><span class="ql-ico">⚙</span>Orchestrator<span class="ql-port">:8744</span></a>
       <a class="ql-btn" href="http://localhost:8765" target="_blank"><span class="ql-ico">⚡</span>LLM Router<span class="ql-port">:8765</span></a>
-      <a class="ql-btn" href="http://127.0.0.1:18789/?token=f9a551b75758c3d16a1da8dc5c7bd323acf909d61de94f0c" target="_blank" style="border-color:rgba(245,158,11,.2)"><span class="ql-ico">🦞</span>OpenClaw<span class="ql-port">:18789</span></a>
-      <a class="ql-btn" href="http://localhost:5000" target="_blank"><span class="ql-ico">◈</span>PackNet<span class="ql-port">:5000</span></a>
-      <a class="ql-btn" href="http://localhost:4000" target="_blank"><span class="ql-ico">◎</span>Orbitron<span class="ql-port">:4000</span></a>
-      <a class="ql-btn" href="http://localhost:9001" target="_blank"><span class="ql-ico">∿</span>Quant API<span class="ql-port">:9001</span></a>
-      <a class="ql-btn" href="http://localhost:5001" target="_blank"><span class="ql-ico">◐</span>OSINT CMD<span class="ql-port">:5001</span></a>
-      <a class="ql-btn" href="http://localhost:3030" target="_blank"><span class="ql-ico">❖</span>MCP Server<span class="ql-port">:3030</span></a>
+      <a class="ql-btn" href="http://localhost:9002" target="_blank"><span class="ql-ico">◈</span>Paymaster<span class="ql-port">:9002</span></a>
+      <a class="ql-btn" href="http://localhost:3030" target="_blank"><span class="ql-ico">❖</span>MCP Manager<span class="ql-port">:3030</span></a>
+      <a class="ql-btn" href="http://localhost:8769" target="_blank"><span class="ql-ico">◎</span>Control Plane<span class="ql-port">:8769</span></a>
+      <a class="ql-btn" href="http://localhost:8780" target="_blank"><span class="ql-ico">⬡</span>Lovable Bridge<span class="ql-port">:8780</span></a>
+      <a class="ql-btn" href="http://localhost:8768" target="_blank"><span class="ql-ico">◉</span>AEG Adapter<span class="ql-port">:8768</span></a>
+      <a class="ql-btn" href="http://localhost:11434" target="_blank"><span class="ql-ico">∿</span>Ollama<span class="ql-port">:11434</span></a>
+      <a class="ql-btn" href="http://localhost:5678" target="_blank"><span class="ql-ico">⊕</span>n8n<span class="ql-port">:5678</span></a>
+      <a class="ql-btn" href="http://localhost:8770" target="_blank"><span class="ql-ico">⊛</span>Gemini Agent<span class="ql-port">:8770</span></a>
     </div>
   </div>
   <!-- log -->
@@ -2349,6 +2370,13 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
       <div class="strip-card" data-cmd="dpdk-setup"><span class="strip-title">⚡ DPDK Server</span><span class="strip-tag">BARE</span></div>
       <div class="strip-card" data-cmd="janus-srt"><span class="strip-title">📡 Janus/SRT</span><span class="strip-tag">STREAM</span></div>
       <div class="strip-card" data-cmd="edge-test"><span class="strip-title">⏱ Edge Tests</span><span class="strip-tag">LATENCY</span></div>
+      <div class="strip-card" data-cmd="quant-start"><span class="strip-title">∿ Quant Engine</span><span class="strip-tag">SVC</span></div>
+      <div class="strip-card" data-cmd="packai-start"><span class="strip-title">◉ PackNet Scout</span><span class="strip-tag">SVC</span></div>
+      <div class="strip-card" data-cmd="fed-start"><span class="strip-title">⬢ FedWhisperer</span><span class="strip-tag">SVC</span></div>
+      <div class="strip-card" data-cmd="osint-start"><span class="strip-title">◐ OSINT CMD</span><span class="strip-tag">SVC</span></div>
+      <div class="strip-card" data-cmd="aeg-deploy"><span class="strip-title">⬡ AEG-4 Deploy</span><span class="strip-tag">AEG</span></div>
+      <div class="strip-card" data-cmd="int1-activate"><span class="strip-title">⬡ INT-1 Bridge</span><span class="strip-tag">INT1</span></div>
+      <div class="strip-card" data-cmd="git-sync"><span class="strip-title">⬡ Git Sync K-9</span><span class="strip-tag">GIT</span></div>
     </div>
 
   </div>
@@ -5732,6 +5760,14 @@ const PAL_ACTIONS = [
   { section:'Carbon',   ico:'⬡',  label:'Carbon: open chat view',      hint:'tab',   fn:()=>showView('carbon') },
   { section:'Carbon',   ico:'⚡', label:'Carbon: ping :8744',          hint:'GET',   fn:()=>carbonPing() },
   { section:'Carbon',   ico:'↺',  label:'Carbon: reload iframe',       hint:'iframe',fn:()=>carbonRefresh() },
+  { section:'AEG',      ico:'⬡',  label:'AEG: copy deploy command',    hint:'forge', fn:()=>{ copyToClip(K9_LAUNCH_CMDS['aeg-deploy']); addTermLine?.('ai','AEG-4 deploy cmd copied'); } },
+  { section:'AEG',      ico:'⚡', label:'AEG: ping adapter :8768',     hint:'GET',   fn:()=>k9Get(8768,'/health','aeg-adapter health','logStream') },
+  { section:'AEG',      ico:'◉',  label:'AEG: start node adapter',     hint:'bash',  fn:()=>{ copyToClip(K9_LAUNCH_CMDS.aeg); addTermLine?.('ai','AEG adapter cmd copied'); } },
+  { section:'INT-1',    ico:'⬡',  label:'INT-1: activate lovable-bridge', hint:':8780', fn:()=>{ copyToClip(K9_LAUNCH_CMDS['int1-activate']); addTermLine?.('ai','INT-1 cmd copied'); } },
+  { section:'INT-1',    ico:'⚡', label:'INT-1: ping bridge :8780',    hint:'GET',   fn:()=>k9Get(8780,'/health','lovable-bridge','logStream') },
+  { section:'Stack',    ico:'▶',  label:'Stack: launch economic stack', hint:'bash',  fn:()=>homeLaunchStack('start') },
+  { section:'Stack',    ico:'🐳', label:'Stack: docker compose up',    hint:'compose',fn:()=>homeLaunchStack('compose') },
+  { section:'Stack',    ico:'↺',  label:'Stack: git sync wallpaper',   hint:'git',   fn:()=>{ copyToClip(K9_LAUNCH_CMDS['git-sync']); addTermLine?.('ai','git pull cmd copied'); } },
   // Tools
   { section:'Tools',    ico:'📋', label:'Copy start-all.sh command',  hint:'clipboard', fn:()=>{ copyToClip('wsl -d fedora-remix -- bash ~/k9/scripts/start-all.sh'); addTermLine('ai','start-all.sh copied'); } },
   { section:'Tools',    ico:'◈',  label:'Open k9-orchestrator local', hint:':8080', fn:()=>openApp('k9-orchestrator','http://localhost:8080') },
@@ -5744,6 +5780,14 @@ const PAL_ACTIONS = [
   { section:'GitHub',   ico:'⟳',  label:'Sync all K-9 repos (pull)',  hint:'git',   fn:()=>ghRunAction('sync-all') },
   { section:'GitHub',   ico:'📄', label:'Seed CLAUDE.md in active repo',hint:'ctx', fn:()=>ghRunAction('claude-md') },
   { section:'GitHub',   ico:'▶',  label:'Start all K-9 services',     hint:'ops',   fn:()=>{ showView('claude'); setTimeout(()=>renderCmd('start-all'),150); } },
+  { section:'AEG',      ico:'⬡',  label:'AEG: copy deploy command',    hint:'forge', fn:()=>{ copyToClip(K9_LAUNCH_CMDS['aeg-deploy']); addTermLine?.('ai','AEG-4 deploy cmd copied'); } },
+  { section:'AEG',      ico:'⚡', label:'AEG: ping adapter :8768',     hint:'GET',   fn:()=>k9Get(8768,'/health','aeg-adapter health','logStream') },
+  { section:'AEG',      ico:'◉',  label:'AEG: start node adapter',     hint:'bash',  fn:()=>{ copyToClip(K9_LAUNCH_CMDS.aeg); addTermLine?.('ai','AEG adapter cmd copied'); } },
+  { section:'INT-1',    ico:'⬡',  label:'INT-1: activate lovable-bridge', hint:':8780', fn:()=>{ copyToClip(K9_LAUNCH_CMDS['int1-activate']); addTermLine?.('ai','INT-1 cmd copied'); } },
+  { section:'INT-1',    ico:'⚡', label:'INT-1: ping bridge :8780',    hint:'GET',   fn:()=>k9Get(8780,'/health','lovable-bridge','logStream') },
+  { section:'Stack',    ico:'▶',  label:'Stack: launch economic stack', hint:'bash',  fn:()=>homeLaunchStack('start') },
+  { section:'Stack',    ico:'🐳', label:'Stack: docker compose up',    hint:'compose',fn:()=>homeLaunchStack('compose') },
+  { section:'Stack',    ico:'↺',  label:'Stack: git sync wallpaper',   hint:'git',   fn:()=>{ copyToClip(K9_LAUNCH_CMDS['git-sync']); addTermLine?.('ai','git pull cmd copied'); } },
 ];
 
 let _palSel = 0;
@@ -6149,6 +6193,72 @@ const CMDS = {
       '# Janus WebRTC       | < 200ms   | < 500ms',
       '# osint-cmd WS push  | < 50ms    | < 200ms',
       '# K-9 quant signal   | < 100ms   | < 500ms',
+    ]},
+  ]},
+  'aeg-deploy':{badge:'AEG-4 CONTRACT DEPLOY',blocks:[
+    {c:'// 1. Configure env',lines:[
+      'cd ~/aeg-protocol',
+      'cp .env.example .env',
+      '# Fill in: PRIVATE_KEY, BASE_SEPOLIA_RPC, BASESCAN_API_KEY',
+    ]},
+    {c:'// 2. Deploy all 4 contracts to Base Sepolia',lines:[
+      'forge script contracts/script/Deploy.s.sol:DeployAEG \\',
+      '  --rpc-url $BASE_SEPOLIA_RPC \\',
+      '  --broadcast \\',
+      '  --verify \\',
+      '  --etherscan-api-key $BASESCAN_API_KEY',
+    ]},
+    {c:'// 3. Read deployment manifest + wire AEG-5',lines:[
+      'cat ~/aeg-protocol/deployments/base-sepolia.json',
+      '# Feed addresses into sdk/aegAdapter.ts',
+      '# /register → ProofOfAlignment.registerNode() (AEG-5)',
+    ]},
+    {c:'// Contract inventory',lines:[
+      '# AEGToken.sol    — 1B $AEG ERC20Votes, 50/25/25 fee split',
+      '# AEGGovernor.sol — OZ Governor, 1% quorum, 7-day vote, 10k threshold',
+      '# AEGTreasury.sol — 48h timelock, grants + spends via proposals',
+      '# Deploy.s.sol    — wires all roles, renounces admin, writes manifest',
+    ]},
+  ]},
+  'int1-activate':{badge:'INT-1 LOVABLE BRIDGE',blocks:[
+    {c:'// 1. Install + start lovable-bridge (:8780)',lines:[
+      'cd ~/k9-integration',
+      'npm install',
+      'npx ts-node lovable-bridge/server.ts',
+    ]},
+    {c:'// 2. Or via docker compose',lines:[
+      'cd ~/k9-integration',
+      'docker compose --env-file .env.compose up -d lovable-bridge',
+    ]},
+    {c:'// 3. Verify',lines:[
+      'curl http://localhost:8780/health',
+      'curl http://localhost:8780/registry',
+      'curl http://localhost:8780/health/apps',
+    ]},
+    {c:'// INT-1 file inventory',lines:[
+      '# shared-types/task.ts     — TaskRequest/Response/MCPToolCall',
+      '# lovable-bridge/index.ts  — Lovable app → MCP tool wrapper',
+      '# lovable-bridge/server.ts — Fastify :8780 POST /call GET /registry',
+      '# agent-api/callLovable.ts — MCP route + direct HTTP fallback',
+      '# lovable-sync.yml         — CI type-check + Foundry test trigger',
+    ]},
+  ]},
+  'git-sync':{badge:'K-9 GIT SYNC',blocks:[
+    {c:'// Pull latest wallpaper (source of truth)',lines:[
+      'cd /mnt/c/K9/vectos/k9-wallpaper && git pull',
+      '# First-time clone:',
+      'git clone https://github.com/MartyFreakinBird/K9.git /mnt/c/K9',
+    ]},
+    {c:'// Repo contents: vectos/k9-wallpaper/',lines:[
+      '# wallpaper.html              — Sprint AEG-4 canonical',
+      '# WALLPAPER_SYNC_PROTOCOL.md  — deploy instructions + git hook',
+      '# WALLPAPER_UPDATE_PROMPT.md  — Claude-executable sprint update prompt',
+    ]},
+    {c:'// Push updated wallpaper back',lines:[
+      'cd /mnt/c/K9/vectos/k9-wallpaper',
+      'git add wallpaper.html',
+      'git commit -m "wallpaper: AEG-4 + INT-1 merge"',
+      'git push origin main',
     ]},
   ]},
   'start-all':{badge:'START-ALL GENERATOR',blocks:[
@@ -7310,6 +7420,7 @@ const HB_SERVICES = [
   {port:8769, name:'k9-control-plane',      path:'/health',       group:'core'},
   {port:8770, name:'k9-gemini-agent',       path:'/health',       group:'ai'},
   {port:8768, name:'aeg-node-adapter',      path:'/health',       group:'aeg'},
+  {port:8780, name:'lovable-bridge',        path:'/health',       group:'int1'},
   {port:11434,name:'ollama',                path:'/api/tags',     group:'ai'},
   {port:5678, name:'n8n',                   path:'/healthz',      group:'infra'},
   {port:47990,name:'sunshine-stream',       path:'/',             group:'infra'},
@@ -7347,6 +7458,7 @@ const HOME_PILL_MAP = {
   8769:  'hp-control',
   8770:  'hp-gemini',
   8768:  'hp-aeg',
+  8780:  'hp-lovable',
   11434: 'hp-ollama',
 };
 
@@ -7359,6 +7471,7 @@ const HOME_PILL_LABEL = {
   8769:  'CONTROL PLANE · :8769',
   8770:  'GEMINI AGENT · :8770',
   8768:  'AEG ADAPTER · :8768',
+  8780:  'LOVABLE BRIDGE · :8780',
   11434: 'OLLAMA · :11434',
 };
 
@@ -7370,6 +7483,9 @@ const K9_LAUNCH_CMDS = {
   compose: 'cd ~/k9-llm-router && docker compose --env-file .env.compose up -d',
   logs:    'cd ~/k9-llm-router && ./launch-economic-stack.sh logs k9-llm-router',
   aeg:     'cd ~/aeg-protocol && npm install && AEG_NODE_ID=$AEG_NODE_ID AEG_OPERATOR_KEY=$AEG_OPERATOR_KEY npx tsx sdk/aegAdapter.ts',
+  'aeg-deploy': 'cd ~/aeg-protocol && cp .env.example .env && forge script contracts/script/Deploy.s.sol:DeployAEG --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify --etherscan-api-key $BASESCAN_API_KEY',
+  'int1-activate': 'cd ~/k9-integration && npm install && npx ts-node lovable-bridge/server.ts',
+  'git-sync': 'cd /mnt/c/K9/vectos/k9-wallpaper && git pull',
 };
 
 function setHomePill(port, up, ms) {
@@ -7679,10 +7795,14 @@ function wireIframeLoader(iframeId, loadingId) {
 }
 window.addEventListener('load', () => {
   wireIframeLoader('orbitron-iframe', 'orbitron-loading');
-  wireIframeLoader('osint-iframe', 'osint-loading');
-  wireIframeLoader('defi-iframe',  'defi-loading');
-  wireIframeLoader('fed-iframe',   'fed-loading');
-  wireIframeLoader('term-iframe',  'term-loading');
+  wireIframeLoader('osint-iframe',    'osint-loading');
+  wireIframeLoader('defi-iframe',     'defi-loading');
+  wireIframeLoader('fed-iframe',      'fed-loading');
+  wireIframeLoader('term-iframe',     'term-loading');
+  // openclaw uses inline onload — supplement with fallback timeout
+  wireIframeLoader('openclaw-iframe', 'openclaw-loading');
+  // packai uses its own loader id
+  wireIframeLoader('packai-iframe',   'packai-iframe-loader');
   setTimeout(fetchPublicIP, 1500);
 });
 /* ══════════════════════════════════════
