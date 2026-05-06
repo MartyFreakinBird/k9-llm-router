@@ -1,0 +1,14 @@
+{
+  "name": "K-9 Command Surface",
+  "author": "Tim",
+  "version": "1.0.0",
+  "description": "Live K-9 AI agent network dashboard — orchestrator status, Tailscale mesh, quant signals, DeFi, Orbitron diagnostics, PackAI.",
+  "thumbnail": "thumbnail.png",
+  "main": "wallpaper.html",
+  "tags": ["k9", "ai", "defi", "productivity", "dashboard", "mcp"],
+  "settings": {
+    "fps": 30,
+    "pauseOnFullscreen": true,
+    "pauseOnBattery": false
+  }
+}
