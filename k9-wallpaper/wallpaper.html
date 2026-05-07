@@ -5060,5 +5060,70 @@ function focusTerminal() {
   }
 }
 </script>
+
+<!-- K-9 Wallpaper WebSocket Bridge — Sprint Wallpaper-WS-1 -->
+<!-- Connects to k9_wallpaper_ws.py on :8790 to receive BOOT_COMPLETE and STATUS_UPDATE events -->
+<script>
+(function() {
+  const WS_URL = "ws://localhost:8790/ws";
+  let ws = null;
+  let retryDelay = 2000;
+  const MAX_RETRY = 30000;
+
+  function connectWS() {
+    try {
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => {
+        console.log("[K9-WS] Overlay connected to wallpaper-ws bridge");
+        retryDelay = 2000;
+        document.dispatchEvent(new CustomEvent("k9:ws-connected"));
+      };
+      ws.onmessage = (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
+        console.log("[K9-WS] Event:", msg.event, msg);
+        document.dispatchEvent(new CustomEvent("k9:" + msg.event.toLowerCase(), { detail: msg }));
+        if (msg.event === "BOOT_COMPLETE") handleBootComplete(msg);
+        else if (msg.event === "STATUS_UPDATE") handleStatusUpdate(msg.data || {});
+        else if (msg.event === "ALERT") handleAlert(msg);
+      };
+      ws.onclose = () => {
+        console.warn("[K9-WS] Disconnected — retry in", retryDelay/1000, "s");
+        setTimeout(connectWS, retryDelay);
+        retryDelay = Math.min(retryDelay * 1.5, MAX_RETRY);
+      };
+      ws.onerror = () => {};
+    } catch (err) {
+      console.warn("[K9-WS] Init failed:", err.message);
+      setTimeout(connectWS, retryDelay);
+    }
+  }
+
+  function handleBootComplete(msg) {
+    console.log("[K9-WS] BOOT_COMPLETE — activating overlay");
+    const leftPanel = document.getElementById("left-panel") || document.querySelector(".panel-left");
+    if (leftPanel) { leftPanel.style.borderColor = "var(--cyan)"; setTimeout(() => { leftPanel.style.borderColor = ""; }, 3000); }
+    const bootDot = document.getElementById("boot-status");
+    if (bootDot) { bootDot.classList.remove("dd","du"); bootDot.classList.add("dup"); bootDot.title = "Stack online"; }
+    const bootLabel = document.getElementById("boot-label");
+    if (bootLabel) { bootLabel.textContent = "STACK ONLINE"; bootLabel.style.color = "var(--cyan)"; }
+    window.K9_BOOT_COMPLETE = true;
+    window.K9_STACK_VERSION = msg.version || "AEG-5";
+  }
+
+  function handleStatusUpdate(data) {
+    Object.entries(data).forEach(([svc, status]) => {
+      const el = document.getElementById("svc-" + svc.replace(/[^a-z0-9]/gi,"-"));
+      if (el) { el.textContent = status === "UP" ? "●" : "○"; el.style.color = status === "UP" ? "var(--cyan)" : "var(--warn)"; }
+    });
+  }
+
+  function handleAlert(msg) { console.warn("[K9-WS] ALERT:", msg); }
+
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", connectWS); }
+  else { connectWS(); }
+})();
+</script>
+
 </body>
 </html>
