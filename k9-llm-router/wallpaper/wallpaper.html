@@ -236,7 +236,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
  * Measured from actual panel positions in the image.
  *
  * Zone map (as % of 1536w × 1024h image → vw/vh):
- *   LEFT panel:    left:2.3vw  top:17.1vh  w:14.0vw  h:41.0vh
+ *   LEFT panel:    left:2.3vw  top:20.1vh  w:14.0vw  h:41.0vh
  *   CENTER frame:  left:19.7vw top:17.6vh  w:42.8vw  h:35.6vh
  *   TOP-RIGHT HUD: left:68.7vw top:3.9vh   w:17.9vw  h:7.3vh
  *   RIGHT panel 1: left:69.0vw top:14.6vh  w:16.9vw  h:16.6vh
@@ -290,14 +290,14 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 
 /* LEFT panel: agent status */
 .hz-left{
-  left:2.3vw; top:17.1vh;
+  left:13.3vw; top:24.0vh;
   width:14.4vw; height:41.0vh;
   display:flex;flex-direction:column;gap:4px;
 }
 
 /* CENTER frame: topology / main status */
 .hz-center{
-  left:19.7vw; top:17.6vh;
+  left:29.42vw; top:24.0vh;
   width:43.2vw; height:35.6vh;
   display:flex;flex-direction:column;
   padding:14px 18px;
@@ -313,31 +313,31 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 
 /* RIGHT panels — individually positioned */
 .hz-right1{
-  left:69.0vw; top:14.6vh;
-  width:17.2vw; height:16.6vh;
+  left:72.0vw; top:19.6vh;
+  width:18.2vw; height:16.6vh;
   display:flex;flex-direction:column;gap:4px;
 }
 .hz-right2{
-  left:69.0vw; top:32.0vh;
-  width:17.2vw; height:14.8vh;
+  left:72.0vw; top:37.0vh;
+  width:18.2vw; height:14.8vh;
   display:flex;flex-direction:column;gap:4px;
 }
 .hz-right3{
-  left:69.0vw; top:47.7vh;
-  width:17.2vw; height:10.2vh;
+  left:72.0vw; top:52.7vh;
+  width:18.2vw; height:10.2vh;
   display:flex;flex-direction:column;gap:3px;
 }
 /* Sprint-9 / Base44 status bar — spans full width below right panels */
 .hz-sprint9{
-  left:69.0vw; top:59.0vh;
-  width:17.2vw; height:8.5vh;
+  left:52.0vw; top:58.0vh;
+  width:18.2vw; height:8.5vh;
   display:flex;flex-direction:column;gap:4px;
   padding:8px 10px;
 }
 
 /* BOTTOM strip: uptime / stack info */
 .hz-bottom{
-  left:2.3vw; top:59.6vh;
+  left:5.3vw; top:72.6vh;
   width:83.9vw; height:7.8vh;
   display:flex;align-items:center;gap:12px;
   padding:0 16px;
@@ -347,7 +347,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 /* ── CLOCK (sits below CENTER frame, left-aligned to it) ── */
 .home-clock-zone{
   position:absolute;
-  left:19.7vw; top:55.4vh; /* just below center frame bottom */
+  left:28.7vw; top:60.4vh; /* just below center frame bottom */
   z-index:2;pointer-events:none;
   /* Explicit width prevents 0-width container that makes clamp() resolve to 0 */
   width:30vw;min-width:200px;
