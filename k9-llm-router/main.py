@@ -160,6 +160,18 @@ except ImportError as e:
     _orbitron = None
     _orbitron_enabled = False
 
+# ── CB-2: SEMANTIC CACHE + GUARDRAILS ─────────────────────────────────────────
+try:
+    from src.semantic_cache import semantic_cache
+    from src.guardrails import guardrails
+    _cb2_enabled = True
+    log.info("CB-2 modules loaded: semantic_cache + guardrails")
+except ImportError as e:
+    log.warning("CB-2 modules not available: %s — cache/guardrails bypassed", e)
+    semantic_cache = None
+    guardrails = None
+    _cb2_enabled = False
+
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
     Build model registry based on ROUTER_MODE.
@@ -457,6 +469,45 @@ class LLMRouter:
     async def route(self, req: RouterRequest) -> RouterResponse:
         """Route a request to the correct model."""
         t0 = time.time()
+
+        # ── CB-2: Extract prompt for cache/guardrail checks ────────────────────
+        _prompt = " ".join(
+            m.get("content", "") for m in req.messages if m.get("role") == "user"
+        )[-2000:]  # cap at 2000 chars for embedding
+
+        # ── CB-2: Guardrails — input check ────────────────────────────────────
+        if guardrails and guardrails._ready:
+            _gr = guardrails.check_input(
+                _prompt,
+                context={"task_type": req.task_type, "component": req.component}
+            )
+            if not _gr.allowed:
+                raise HTTPException(status_code=403, detail=f"Guardrails blocked: {_gr.block_reason}")
+            if _gr.redacted_text:
+                # Replace last user message with redacted version
+                for m in reversed(req.messages):
+                    if m.get("role") == "user":
+                        m["content"] = _gr.redacted_text
+                        break
+                _prompt = _gr.redacted_text
+
+        # ── CB-2: Semantic cache check ─────────────────────────────────────────
+        if semantic_cache and semantic_cache._ready:
+            _cache_result = semantic_cache.get(_prompt, task_type=req.task_type)
+            if _cache_result.hit:
+                log.info(
+                    "CACHE HIT %s similarity=%.4f saved~%.0fms",
+                    req.task_type, _cache_result.similarity, _cache_result.saved_ms or 0
+                )
+                return RouterResponse(
+                    content    = _cache_result.response,
+                    model_used = f"{_cache_result.model_used} [CACHED]",
+                    task_type  = req.task_type,
+                    backend    = "cache",
+                    latency_ms = round((time.time() - t0) * 1000, 1),
+                    tokens_used= None,
+                )
+
         backend = self.resolve_model(req.task_type, req.force_model)
 
         # Enrich trading/quant requests with Orbitron context
@@ -485,6 +536,27 @@ class LLMRouter:
                 latency_ms=round(latency, 1),
                 tokens_used=tokens or None,
             )
+            # ── CB-2: Cache store + output guardrail ──────────────────────────
+            if semantic_cache and semantic_cache._ready and _prompt:
+                semantic_cache.set(
+                    _prompt, content, backend.name,
+                    task_type=req.task_type,
+                    latency_ms=round(latency, 1),
+                    tokens=tokens or 0,
+                )
+            if guardrails and guardrails._ready:
+                _out_gr = guardrails.check_output(
+                    content, context={"task_type": req.task_type, "component": req.component}
+                )
+                if _out_gr.redacted_text:
+                    response = RouterResponse(
+                        content=_out_gr.redacted_text,
+                        model_used=backend.name,
+                        task_type=req.task_type,
+                        backend=backend.provider,
+                        latency_ms=round(latency, 1),
+                        tokens_used=tokens or None,
+                    )
             # Report to Orbitron (fire-and-forget)
             if _orbitron_enabled and _orbitron:
                 asyncio.create_task(_orbitron.report_routing_decision(
@@ -568,6 +640,12 @@ async def lifespan(app: FastAPI):
     global router_instance
     router_instance = LLMRouter(mode=ROUTER_MODE)
     log.info("LLM Router starting | mode=%s | local=%s", ROUTER_MODE, LOCAL_MODEL_URL)
+    # ── CB-2: Initialize semantic cache + guardrails ────────────────────────
+    if _cb2_enabled:
+        if semantic_cache:
+            semantic_cache.initialize()
+        if guardrails:
+            guardrails.initialize()
     # Background health checks every 30s
     async def _health_loop():
         while True:
@@ -746,6 +824,31 @@ async def swarm_stats():
 
 
 # ── Models introspection ──────────────────────────────────────────────────────
+
+
+# ── CB-2: Semantic cache endpoints ────────────────────────────────────────────
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Semantic cache stats — hits, misses, index size."""
+    if not semantic_cache:
+        return {"enabled": False}
+    return semantic_cache.stats()
+
+@app.post("/cache/flush")
+async def cache_flush():
+    """Flush all semantic cache entries."""
+    if not semantic_cache or not semantic_cache._ready:
+        return {"flushed": 0}
+    count = semantic_cache.flush()
+    return {"flushed": count}
+
+@app.get("/guardrails/stats")
+async def guardrails_stats():
+    """Guardrails moderation stats."""
+    if not guardrails:
+        return {"enabled": False}
+    return guardrails.stats()
 
 @app.get("/models")
 async def list_models():
