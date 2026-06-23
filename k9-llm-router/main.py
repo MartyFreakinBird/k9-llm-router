@@ -32,7 +32,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 import uvicorn
@@ -172,6 +172,16 @@ except ImportError as e:
     guardrails = None
     _cb2_enabled = False
 
+# ── CB-3: TEXT-TO-SQL QUERY ENGINE ───────────────────────────────────────────
+try:
+    from src.text_to_sql import text_to_sql_engine
+    _cb3_enabled = True
+    log.info("CB-3 module loaded: text-to-sql")
+except ImportError as e:
+    log.warning("CB-3 module not available: %s", e)
+    text_to_sql_engine = None
+    _cb3_enabled = False
+
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
     Build model registry based on ROUTER_MODE.
@@ -276,6 +286,21 @@ class RouterResponse(BaseModel):
     backend: str          # "local" | "cloud"
     latency_ms: float
     tokens_used: int | None = None
+
+
+class TextToSQLRequest(BaseModel):
+    query: str = Field(..., description="Natural language query")
+    user_id: str = Field(default="anonymous", description="User identifier for rate limiting")
+
+
+class TextToSQLResponse(BaseModel):
+    success: bool
+    sql: Optional[str] = None
+    rows: Optional[list] = None
+    row_count: int
+    columns: Optional[list] = None
+    execution_time_ms: float
+    error: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
@@ -689,6 +714,29 @@ async def root():
 async def route_request(req: RouterRequest):
     """Main routing endpoint. Accepts task_type + messages, returns model response."""
     return await router_instance.route(req)
+
+
+@app.post("/query", response_model=TextToSQLResponse)
+async def text_to_sql_query(req: TextToSQLRequest):
+    if not text_to_sql_engine:
+        raise HTTPException(status_code=503, detail="CB-3 text-to-sql module unavailable")
+    result = await text_to_sql_engine.query(req.query, user_id=req.user_id)
+    return TextToSQLResponse(
+        success=result.success,
+        sql=result.query,
+        rows=result.rows,
+        row_count=result.row_count,
+        columns=result.columns,
+        execution_time_ms=result.execution_time_ms,
+        error=result.error,
+    )
+
+
+@app.get("/query/stats")
+async def query_stats():
+    if not text_to_sql_engine:
+        return {"enabled": False}
+    return text_to_sql_engine.stats()
 
 
 @app.get("/health")
