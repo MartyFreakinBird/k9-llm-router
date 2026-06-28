@@ -1,0 +1,36 @@
+{
+  "name": "K-9 Command Surface",
+  "id": "k9-command-surface",
+  "version": "1.0.0",
+  "author": "VectOS Carbon",
+  "description": "Live K-9 swarm dashboard — agent health, LLM router, Paymaster status, Tailscale mesh, quant signals, and log stream. Wires to localhost K-9 service stack.",
+  "tags": ["k9", "ai", "swarm", "dashboard", "packai", "orbitron", "trading"],
+  "entry": "wallpaper.html",
+  "thumbnail": "thumbnail.png",
+  "background": "background.png",
+  "engine": {
+    "type": "html",
+    "pauseOnFullscreen": true,
+    "pauseOnBattery": false,
+    "fps": 30
+  },
+  "permissions": [
+    "network"
+  ],
+  "endpoints": {
+    "orchestrator":  "http://localhost:8744",
+    "llm_router":    "http://localhost:8765",
+    "paymaster":     "http://localhost:9002",
+    "mcp_manager":   "http://localhost:3030",
+    "quant_engine":  "http://localhost:9001",
+    "ws_events":     "ws://localhost:8080/ws/events"
+  },
+  "compatibility": {
+    "octos_min": "1.0.0",
+    "resolution": "1920x1080",
+    "tested_on": ["1920x1080", "2560x1440"]
+  },
+  "changelog": {
+    "1.0.0": "Initial K-9 Command Surface — 6-zone layout, Monte Carlo sparklines, CoinGecko price feed, agent health polling, log stream"
+  }
+}

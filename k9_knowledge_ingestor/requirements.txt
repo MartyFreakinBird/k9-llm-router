@@ -1,0 +1,25 @@
+# k9-knowledge-ingestor — Sprint 9
+# Install: pip install -r requirements.txt
+
+# Core
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+
+# Embedding
+sentence-transformers>=2.7.0
+torch>=2.1.0
+
+# HTTP client
+httpx>=0.27.0
+
+# Mongo (memory_events)
+motor>=3.3.0
+pymongo>=4.6.0
+
+# Local Postgres
+psycopg2-binary>=2.9.9
+
+# Utilities
+python-dotenv>=1.0.0
+numpy>=1.26.0

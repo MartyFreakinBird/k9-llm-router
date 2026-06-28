@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Noir / Barretenberg — keep source, ignore generated artifacts except proof
+contracts/aeg9_circuit/target/*.json
+contracts/aeg9_circuit/target/*.gz
+# Keep the solved witness and proving key in repo (they're safe to commit)
+!contracts/aeg9_circuit/target/proof_of_rationality.json
+!contracts/aeg9_circuit/target/proof_of_rationality.gz
+# Keep proof artifacts
+!contracts/aeg9_circuit/proof_of_rationality.proof/
+!contracts/aeg9_circuit/vk
+
+# Foundry
+cache/
+out/
+broadcast/
+*.abi
+*.bin
+!contracts/src/*.sol
+!contracts/script/*.sol
+!contracts/test/*.sol
+
+# ML / embeddings
+*.pkl
+*.faiss
+bm25_index.pkl
+*.safetensors
+*.pt
+*.ckpt
+
+# Logs
+logs/
+*.log
+
+# Node
+node_modules/
+dist/
+.turbo/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
