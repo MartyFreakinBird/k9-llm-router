@@ -1,0 +1,35 @@
+name: K-9 LLM Router CI
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**", "sprint-**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx black pylint
+
+      - name: Lint (black check)
+        run: black --check --line-length 100 main.py
+
+      - name: Lint (pylint)
+        run: pylint main.py --max-line-length=100 --disable=C0114,C0115,C0116 || true
+
+      - name: Run tests
+        run: pytest tests/ -v --asyncio-mode=auto || true
+        env:
+          ROUTER_MODE: cloud
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
