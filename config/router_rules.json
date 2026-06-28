@@ -1,0 +1,41 @@
+{
+  "_comment": "K-9 LLM Router — Capability + Fallback + Load-Balance rule pack (Sprint 10)",
+  "_doc": "Rules evaluated in priority order (highest first). First match wins.",
+  "version": "1.0.0",
+  "sprint": 10,
+  "rules": [
+    {
+      "id": "gemini_capability_routing",
+      "description": "Route GUI, web, deep analysis tasks to Gemini computer_use",
+      "priority": 90,
+      "match": { "task_type_in": ["computer_use","gui_automation","desktop_control","browser_control","web_search","deep_analysis","multi_step"] },
+      "action": { "agent": "k9-gemini-agent", "endpoint": "http://localhost:8770", "model": "gemini-2.5-computer-use-preview", "route_path": "/computer_use" }
+    },
+    {
+      "id": "gemini_task_routing",
+      "description": "Route long-context reasoning and multimodal to Gemini Pro",
+      "priority": 85,
+      "match": { "task_type_in": ["long_context","multimodal","document_analysis"] },
+      "action": { "agent": "k9-gemini-agent", "endpoint": "http://localhost:8770", "model": "gemini-2.5-pro", "route_path": "/task" }
+    },
+    {
+      "id": "gemini_fallback_on_error",
+      "description": "Fall back to Gemini when any Ollama-local backend fails",
+      "priority": 10,
+      "match": { "backend_provider": "ollama", "backend_status": "error" },
+      "action": { "agent": "k9-gemini-agent", "endpoint": "http://localhost:8770", "model": "gemini-2.5-pro", "route_path": "/task", "label": "FALLBACK" }
+    },
+    {
+      "id": "qwen_gemini_load_balance",
+      "description": "General tasks: Qwen 60% / Gemini 40% weighted distribution",
+      "priority": 5,
+      "match": { "task_type_in": ["general","default"] },
+      "action": { "strategy": "weighted_random", "agents": [ { "id": "qwen35", "weight": 0.60 }, { "id": "k9-gemini-agent", "weight": 0.40 } ] }
+    }
+  ],
+  "_notes": {
+    "paymaster": "Gemini calls are pre-approved by k9-paymaster inside k9_gemini_agent.py — router does not gate separately.",
+    "load_balance": "weighted_random is defined here for Sprint 11 implementation — currently capability-routed only.",
+    "docker": "In docker-compose, replace localhost with service names (k9-gemini-agent, etc.)"
+  }
+}

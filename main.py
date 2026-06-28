@@ -22,39 +22,6 @@ Env vars:
   HEADSCALE_URL     — Headscale control plane
   ROUTER_PORT       — default 8765
   ROUTER_MODE       — "local" | "cloud" | "hybrid" (default: hybrid)
-
-# ── PAYMASTER INTEGRATION ─────────────────────────────────────────────────────
-K9_PAYMASTER_URL    = os.getenv("K9_PAYMASTER_URL", "http://localhost:9002")
-K9_PAYMASTER_ENABLE = os.getenv("K9_PAYMASTER_ENABLE", "true").lower() == "true"
-
-# Cost estimates per model (USD per 1K tokens, approximate)
-MODEL_COST_PER_1K = {
-    "GLM-5": 0.0001, "DeepSeek-V4": 0.0002, "Qwen-3.5": 0.0001,
-    "Kimi-K2.5": 0.0003, "Llama-4": 0.00005, "Mistral": 0.00008,
-    "claude-3-5-sonnet-20241022": 0.003, "gpt-4o": 0.005,
-}
-
-async def _paymaster_gate(model_name: str, tokens_est: int, agent_id: str) -> bool:
-    if not K9_PAYMASTER_ENABLE:
-        return True
-    cost = (tokens_est / 1000) * MODEL_COST_PER_1K.get(model_name, 0.001)
-    if cost < 0.0001:
-        return True
-    try:
-        async with httpx.AsyncClient(timeout=2) as c:
-            r = await c.post(f"{K9_PAYMASTER_URL}/paymaster/gate/inference", json={
-                "model": model_name, "tokens_est": tokens_est,
-                "cost_usd": cost, "agent_id": agent_id,
-            })
-            if r.status_code == 200:
-                data = r.json()
-                if not data.get("approved"):
-                    log.warning("Paymaster DENIED %s: %s", model_name, data.get("reason"))
-                    return False
-    except Exception:
-        pass  # Paymaster offline — default allow
-    return True
-
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -65,7 +32,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 import uvicorn
@@ -167,6 +134,13 @@ TASK_MODEL_MAP: dict[str, str] = {
     # Fallback
     "general":          "llama4",
     "default":          "llama4",
+
+    # Gemini — computer_use + deep analysis (Sprint 10, Paymaster-gated)
+    "computer_use":     "gemini",
+    "gui_automation":   "gemini",
+    "web_search":       "gemini",
+    "deep_analysis":    "gemini",
+    "multi_step":       "gemini",
 }
 
 
@@ -174,8 +148,7 @@ TASK_MODEL_MAP: dict[str, str] = {
 # ── ORBITRON INTEGRATION ──────────────────────────────────────────────────────
 try:
     from src.orbitron_client import OrbitronClient, OrbitronEvent
-    from src.fed_whisperer_bridge import enrich_trading_request, start_fed_whisperer_poll_loop
-    from src.n8n_webhook_bridge import router as n8n_router
+    from src.fed_whisperer_bridge import enrich_trading_request
     _orbitron = OrbitronClient.from_env()
     _orbitron_enabled = bool(os.getenv("ORBITRON_AUTH_TOKEN"))
     if _orbitron_enabled:
@@ -186,6 +159,28 @@ except ImportError as e:
     log.warning("Orbitron modules not found: %s", e)
     _orbitron = None
     _orbitron_enabled = False
+
+# ── CB-2: SEMANTIC CACHE + GUARDRAILS ─────────────────────────────────────────
+try:
+    from src.semantic_cache import semantic_cache
+    from src.guardrails import guardrails
+    _cb2_enabled = True
+    log.info("CB-2 modules loaded: semantic_cache + guardrails")
+except ImportError as e:
+    log.warning("CB-2 modules not available: %s — cache/guardrails bypassed", e)
+    semantic_cache = None
+    guardrails = None
+    _cb2_enabled = False
+
+# ── CB-3: TEXT-TO-SQL QUERY ENGINE ───────────────────────────────────────────
+try:
+    from src.text_to_sql import text_to_sql_engine
+    _cb3_enabled = True
+    log.info("CB-3 module loaded: text-to-sql")
+except ImportError as e:
+    log.warning("CB-3 module not available: %s", e)
+    text_to_sql_engine = None
+    _cb3_enabled = False
 
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
@@ -230,6 +225,17 @@ def build_model_registry(mode: str) -> dict[str, ModelBackend]:
         )
 
     if mode in ("cloud", "hybrid") and ANTHROPIC_KEY:
+        # Gemini agent — HTTP passthrough to :8770 (Sprint 10)
+        ModelBackend(
+            name="k9-gemini-agent",
+            provider="gemini",
+            model_id="gemini-2.5-computer-use-preview",
+            base_url=os.getenv("K9_GEMINI_URL", "http://localhost:8770"),
+            priority=8,               # above Claude; Paymaster-gated in the agent itself
+            max_tokens=4096,
+            context_window=1_000_000,
+        ),
+
         # Cloud Anthropic — fallback (higher priority number = lower preference)
         registry["glm5_cloud"] = ModelBackend(
             name="Claude (cloud, SCOUT fallback)", provider="anthropic",
@@ -280,6 +286,21 @@ class RouterResponse(BaseModel):
     backend: str          # "local" | "cloud"
     latency_ms: float
     tokens_used: int | None = None
+
+
+class TextToSQLRequest(BaseModel):
+    query: str = Field(..., description="Natural language query")
+    user_id: str = Field(default="anonymous", description="User identifier for rate limiting")
+
+
+class TextToSQLResponse(BaseModel):
+    success: bool
+    sql: Optional[str] = None
+    rows: Optional[list] = None
+    row_count: int
+    columns: Optional[list] = None
+    execution_time_ms: float
+    error: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
@@ -348,12 +369,63 @@ async def call_anthropic(
         return content, tokens
 
 
+async def call_gemini_agent(
+    backend: ModelBackend,
+    messages: list[dict],
+    system: str | None,
+    task_type: str,
+    max_tokens: int,
+) -> tuple[str, int]:
+    """
+    HTTP passthrough to k9-gemini-agent (:8770).
+    computer_use/gui_automation task types → /computer_use
+    All others → /task (Gemini 2.5 Pro reasoning)
+    Paymaster gating is handled inside k9-gemini-agent itself.
+    """
+    # Collapse messages into a single prompt string
+    prompt_parts = []
+    if system:
+        prompt_parts.append(f"System: {system}")
+    for msg in messages:
+        role = msg.get("role", "user")
+        txt  = msg.get("content", "")
+        if isinstance(txt, list):
+            txt = " ".join(p.get("text", "") for p in txt if isinstance(p, dict))
+        prompt_parts.append(f"{role.capitalize()}: {txt}")
+    prompt = "\n\n".join(prompt_parts)
+
+    gui_types = {"computer_use", "gui_automation", "desktop_control", "browser_control"}
+    endpoint  = "/computer_use" if task_type in gui_types else "/task"
+
+    body: dict = (
+        {"query": prompt, "request_id": f"router-{int(time.time()*1000)}"}
+        if endpoint == "/computer_use"
+        else {"prompt": prompt, "request_id": f"router-{int(time.time()*1000)}"}
+    )
+
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(f"{backend.base_url}{endpoint}", json=body)
+        r.raise_for_status()
+        data = r.json()
+
+    if not data.get("success"):
+        raise RuntimeError(f"k9-gemini-agent returned error: {data.get('error', 'unknown')}")
+
+    # Extract text — /task returns {result}, /computer_use returns {text, action}
+    result_text = data.get("result") or data.get("text") or ""
+    if data.get("action"):
+        result_text = f"{result_text}\nACTION: {data['action']}"
+
+    return result_text, 0  # token count not exposed by gemini agent
+
+
 async def call_backend(
     backend: ModelBackend,
     messages: list[dict],
     system: str | None,
     max_tokens: int,
     temperature: float,
+    task_type: str = "general",
 ) -> tuple[str, int]:
     """Dispatch to correct inference backend."""
     if backend.provider == "ollama":
@@ -362,6 +434,8 @@ async def call_backend(
         if not ANTHROPIC_KEY:
             raise RuntimeError("Anthropic key not set — cannot use cloud fallback")
         return await call_anthropic(backend, messages, system, max_tokens, temperature, ANTHROPIC_KEY)
+    elif backend.provider == "gemini":
+        return await call_gemini_agent(backend, messages, system, task_type, max_tokens)
     else:
         raise ValueError(f"Unknown provider: {backend.provider}")
 
@@ -420,13 +494,46 @@ class LLMRouter:
     async def route(self, req: RouterRequest) -> RouterResponse:
         """Route a request to the correct model."""
         t0 = time.time()
-        backend = self.resolve_model(req.task_type, req.force_model)
 
-        # Paymaster budget gate (non-blocking — denies only on exhausted budget)
-        tokens_est = sum(len(str(m.get("content",""))) // 4 for m in req.messages)
-        gate_ok = await _paymaster_gate(backend.name, tokens_est, req.component or "k9-router")
-        if not gate_ok:
-            raise HTTPException(status_code=402, detail="Budget gate denied — daily limit reached")
+        # ── CB-2: Extract prompt for cache/guardrail checks ────────────────────
+        _prompt = " ".join(
+            m.get("content", "") for m in req.messages if m.get("role") == "user"
+        )[-2000:]  # cap at 2000 chars for embedding
+
+        # ── CB-2: Guardrails — input check ────────────────────────────────────
+        if guardrails and guardrails._ready:
+            _gr = guardrails.check_input(
+                _prompt,
+                context={"task_type": req.task_type, "component": req.component}
+            )
+            if not _gr.allowed:
+                raise HTTPException(status_code=403, detail=f"Guardrails blocked: {_gr.block_reason}")
+            if _gr.redacted_text:
+                # Replace last user message with redacted version
+                for m in reversed(req.messages):
+                    if m.get("role") == "user":
+                        m["content"] = _gr.redacted_text
+                        break
+                _prompt = _gr.redacted_text
+
+        # ── CB-2: Semantic cache check ─────────────────────────────────────────
+        if semantic_cache and semantic_cache._ready:
+            _cache_result = semantic_cache.get(_prompt, task_type=req.task_type)
+            if _cache_result.hit:
+                log.info(
+                    "CACHE HIT %s similarity=%.4f saved~%.0fms",
+                    req.task_type, _cache_result.similarity, _cache_result.saved_ms or 0
+                )
+                return RouterResponse(
+                    content    = _cache_result.response,
+                    model_used = f"{_cache_result.model_used} [CACHED]",
+                    task_type  = req.task_type,
+                    backend    = "cache",
+                    latency_ms = round((time.time() - t0) * 1000, 1),
+                    tokens_used= None,
+                )
+
+        backend = self.resolve_model(req.task_type, req.force_model)
 
         # Enrich trading/quant requests with Orbitron context
         if _orbitron_enabled and _orbitron:
@@ -441,7 +548,7 @@ class LLMRouter:
 
         try:
             content, tokens = await call_backend(
-                backend, req.messages, req.system, req.max_tokens, req.temperature
+                backend, req.messages, req.system, req.max_tokens, req.temperature, req.task_type
             )
             self._routed += 1
             latency = (time.time() - t0) * 1000
@@ -454,6 +561,27 @@ class LLMRouter:
                 latency_ms=round(latency, 1),
                 tokens_used=tokens or None,
             )
+            # ── CB-2: Cache store + output guardrail ──────────────────────────
+            if semantic_cache and semantic_cache._ready and _prompt:
+                semantic_cache.set(
+                    _prompt, content, backend.name,
+                    task_type=req.task_type,
+                    latency_ms=round(latency, 1),
+                    tokens=tokens or 0,
+                )
+            if guardrails and guardrails._ready:
+                _out_gr = guardrails.check_output(
+                    content, context={"task_type": req.task_type, "component": req.component}
+                )
+                if _out_gr.redacted_text:
+                    response = RouterResponse(
+                        content=_out_gr.redacted_text,
+                        model_used=backend.name,
+                        task_type=req.task_type,
+                        backend=backend.provider,
+                        latency_ms=round(latency, 1),
+                        tokens_used=tokens or None,
+                    )
             # Report to Orbitron (fire-and-forget)
             if _orbitron_enabled and _orbitron:
                 asyncio.create_task(_orbitron.report_routing_decision(
@@ -469,24 +597,49 @@ class LLMRouter:
             backend._healthy = False
             log.error("Backend %s failed: %s — attempting fallback", backend.name, e)
 
-            # Cloud fallback if in hybrid mode and local failed
-            if self.mode == "hybrid" and backend.provider == "ollama":
-                fallback_key = f"{TASK_MODEL_MAP.get(req.task_type, 'default')}_cloud"
-                fallback = self.registry.get(fallback_key) or self.registry.get("glm5_cloud")
-                if fallback and ANTHROPIC_KEY:
-                    log.info("Falling back to cloud: %s", fallback.name)
-                    content, tokens = await call_backend(
-                        fallback, req.messages, req.system, req.max_tokens, req.temperature
-                    )
-                    latency = (time.time() - t0) * 1000
-                    return RouterResponse(
-                        content=content,
-                        model_used=f"{fallback.name} [FALLBACK]",
-                        task_type=req.task_type,
-                        backend="cloud",
-                        latency_ms=round(latency, 1),
-                        tokens_used=tokens or None,
-                    )
+            # Fallback chain: Gemini agent → Cloud Anthropic → fail
+            if self.mode in ("hybrid", "local") and backend.provider == "ollama":
+                # 1st fallback: Gemini agent (if online)
+                gemini_backend = self.registry.get("k9-gemini-agent")
+                if gemini_backend and gemini_backend.healthy:
+                    try:
+                        log.info("Fallback → k9-gemini-agent (%s)", req.task_type)
+                        content, tokens = await call_gemini_agent(
+                            gemini_backend, req.messages, req.system, req.task_type, req.max_tokens
+                        )
+                        latency = (time.time() - t0) * 1000
+                        gemini_backend._latency_ms = latency
+                        return RouterResponse(
+                            content=content,
+                            model_used=f"{gemini_backend.name} [FALLBACK]",
+                            task_type=req.task_type,
+                            backend="gemini",
+                            latency_ms=round(latency, 1),
+                            tokens_used=tokens or None,
+                        )
+                    except Exception as ge:
+                        log.warning("Gemini fallback failed: %s", ge)
+                        gemini_backend._healthy = False
+
+                # 2nd fallback: Cloud Anthropic
+                if self.mode == "hybrid" and ANTHROPIC_KEY:
+                    fallback_key = f"{TASK_MODEL_MAP.get(req.task_type, 'default')}_cloud"
+                    fallback = self.registry.get(fallback_key) or self.registry.get("glm5_cloud")
+                    if fallback:
+                        log.info("Fallback → Anthropic cloud: %s", fallback.name)
+                        content, tokens = await call_backend(
+                            fallback, req.messages, req.system, req.max_tokens, req.temperature, req.task_type
+                        )
+                        latency = (time.time() - t0) * 1000
+                        return RouterResponse(
+                            content=content,
+                            model_used=f"{fallback.name} [FALLBACK]",
+                            task_type=req.task_type,
+                            backend="cloud",
+                            latency_ms=round(latency, 1),
+                            tokens_used=tokens or None,
+                        )
+
             raise HTTPException(status_code=503, detail=f"All backends failed: {e}")
 
     def health(self) -> dict:
@@ -512,6 +665,12 @@ async def lifespan(app: FastAPI):
     global router_instance
     router_instance = LLMRouter(mode=ROUTER_MODE)
     log.info("LLM Router starting | mode=%s | local=%s", ROUTER_MODE, LOCAL_MODEL_URL)
+    # ── CB-2: Initialize semantic cache + guardrails ────────────────────────
+    if _cb2_enabled:
+        if semantic_cache:
+            semantic_cache.initialize()
+        if guardrails:
+            guardrails.initialize()
     # Background health checks every 30s
     async def _health_loop():
         while True:
@@ -531,9 +690,6 @@ async def lifespan(app: FastAPI):
                     }
                 )
     asyncio.create_task(_health_loop(), name="health-checker")
-    # FedWhisperer signal poller + DATA_SYNC_REQUEST responder
-    asyncio.create_task(start_fed_whisperer_poll_loop(30), name="fed-whisperer-poll")
-    log.info("[startup] FedWhisperer poll loop → 30s interval")
     yield
     log.info("LLM Router shutting down.")
 
@@ -548,8 +704,6 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
-app.include_router(n8n_router)
-
 
 @app.get("/")
 async def root():
@@ -560,6 +714,29 @@ async def root():
 async def route_request(req: RouterRequest):
     """Main routing endpoint. Accepts task_type + messages, returns model response."""
     return await router_instance.route(req)
+
+
+@app.post("/query", response_model=TextToSQLResponse)
+async def text_to_sql_query(req: TextToSQLRequest):
+    if not text_to_sql_engine:
+        raise HTTPException(status_code=503, detail="CB-3 text-to-sql module unavailable")
+    result = await text_to_sql_engine.query(req.query, user_id=req.user_id)
+    return TextToSQLResponse(
+        success=result.success,
+        sql=result.query,
+        rows=result.rows,
+        row_count=result.row_count,
+        columns=result.columns,
+        execution_time_ms=result.execution_time_ms,
+        error=result.error,
+    )
+
+
+@app.get("/query/stats")
+async def query_stats():
+    if not text_to_sql_engine:
+        return {"enabled": False}
+    return text_to_sql_engine.stats()
 
 
 @app.get("/health")
@@ -610,6 +787,74 @@ async def swarm_message(payload: dict):
     return {"ok": True, "ack": payload.get("msg_id", "unknown")}
 
 
+
+# ── SUPABASE BRIDGE ENDPOINTS ─────────────────────────────────────────────────
+# These allow local WSL2 services (k9_orchestrator, k9_quant_engine, etc.)
+# to publish data to Supabase/Orbitron without needing direct Supabase credentials.
+
+class SignalPublishRequest(BaseModel):
+    signal_type: str          # BUY | SELL | HOLD
+    asset: str
+    confidence: float         # 0-100
+    reasoning: str
+    metadata: dict = {}
+
+class SharedStateRequest(BaseModel):
+    module_name: str          # e.g. "k9_tradingview", "k9_quant_engine"
+    data_key: str             # e.g. "latest_signals", "health_status"
+    data: dict
+
+@app.post("/signals/publish")
+async def publish_signal(req: SignalPublishRequest):
+    """
+    Publish a trading signal from WSL2 to Supabase trading_signals table.
+    Called by k9_orchestrator.py, k9_quant_engine, or any local service.
+    Requires ORBITRON_URL and ORBITRON_ANON_KEY env vars.
+    """
+    try:
+        from src.orbitron_client import OrbitronClient
+        client = OrbitronClient.from_env()
+        ok = await client.write_trading_signal(
+            signal_type=req.signal_type,
+            asset=req.asset,
+            confidence=req.confidence,
+            reasoning=req.reasoning,
+            metadata=req.metadata,
+        )
+        if ok:
+            await client.broadcast(
+                event_type="SIGNAL_GENERATED",
+                data={
+                    "signal_type": req.signal_type,
+                    "asset": req.asset,
+                    "confidence": req.confidence,
+                    "source": "k9_wsl2",
+                },
+                source="K9_AGENT",
+            )
+        return {"ok": ok, "signal": req.dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/status/publish")
+async def publish_status(req: SharedStateRequest):
+    """
+    Publish service health/status to Supabase module_shared_data table.
+    Called by any WSL2 K-9 service to report its state to Orbitron dashboard.
+    """
+    try:
+        from src.orbitron_client import OrbitronClient
+        client = OrbitronClient.from_env()
+        ok = await client.write_shared_state(
+            module_name=req.module_name,
+            data_key=req.data_key,
+            data=req.data,
+        )
+        return {"ok": ok, "module": req.module_name, "key": req.data_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/swarm/peer/register")
 async def swarm_peer_register(payload: dict):
     return {"ok": True, "note": "Peer registry delegated to k9-orchestrator"}
@@ -627,6 +872,31 @@ async def swarm_stats():
 
 
 # ── Models introspection ──────────────────────────────────────────────────────
+
+
+# ── CB-2: Semantic cache endpoints ────────────────────────────────────────────
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Semantic cache stats — hits, misses, index size."""
+    if not semantic_cache:
+        return {"enabled": False}
+    return semantic_cache.stats()
+
+@app.post("/cache/flush")
+async def cache_flush():
+    """Flush all semantic cache entries."""
+    if not semantic_cache or not semantic_cache._ready:
+        return {"flushed": 0}
+    count = semantic_cache.flush()
+    return {"flushed": count}
+
+@app.get("/guardrails/stats")
+async def guardrails_stats():
+    """Guardrails moderation stats."""
+    if not guardrails:
+        return {"enabled": False}
+    return guardrails.stats()
 
 @app.get("/models")
 async def list_models():
