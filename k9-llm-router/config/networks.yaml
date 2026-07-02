@@ -25,6 +25,16 @@ networks:
     rpc_endpoint: "https://full-node.mainnet-1.coreum.dev:26657"
     status: "ADDITIVE — surveillance node, does not touch EVM track"
 
+  cosmos_surveillance_layer_testnet:
+    chain_name: "tx-testnet"
+    chain_id: "coreum-testnet-1"
+    address_prefix: "testcore"
+    role: "K9-GL testnet validation — same read-only boundary as mainnet"
+    lcd_endpoint: "https://full-node.testnet-1.coreum.dev:1317"
+    rpc_endpoint: "https://full-node.testnet-1.coreum.dev:26657"
+    status: "VERIFIED — LCD responds correctly, test address confirmed valid format (unfunded)"
+    test_address: "testcore149mmnnwlck440yl5zpxc3nun8zk9ypp0fldazq"  # Keplr testnet wallet, public only
+
 # ── Identity roles (addresses only — keys never stored here) ────────────────
 identities:
   deployer_eoa:
