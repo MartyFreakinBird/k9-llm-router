@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Reload vectos-base44-k9 SSH key on sandbox boot
+# Reload GitHub SSH key on sandbox boot — single clean secret, no fragment hacks.
 source /app/.agents/.env 2>/dev/null || source ~/.agents/.env 2>/dev/null || true
 
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 
-cat > ~/.ssh/id_ed25519 << KEYEOF
------BEGIN OPENSSH PRIVATE KEY-----
-${SSH_PRIVATE_KEY}
-QyNTUxOQAAACCXesb+${SSH_PRIVATE_KEY_2}
-${SSH_PRIVATE_KEY_3}+${SSH_PRIVATE_KEY_4}
-${SSH_PRIVATE_KEY_5}+${SSH_PRIVATE_KEY_6}
-${SSH_PRIVATE_KEY_7}=
------END OPENSSH PRIVATE KEY-----
-KEYEOF
-
+{
+  echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+  echo "${VECTOS_GITHUB_SSH_KEY}" | fold -w 70
+  echo "-----END OPENSSH PRIVATE KEY-----"
+} > ~/.ssh/id_ed25519
 chmod 600 ~/.ssh/id_ed25519
+ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null
 
 cat > ~/.ssh/config << EOF
 Host github.com
@@ -25,6 +21,7 @@ Host github.com
 EOF
 chmod 600 ~/.ssh/config
 
-eval "\$(ssh-agent -s)" 2>/dev/null
+pkill ssh-agent 2>/dev/null
+eval "$(ssh-agent -s)" > /dev/null
 ssh-add ~/.ssh/id_ed25519 2>/dev/null
-echo "[vectos] SSH key loaded: vectos-base44-k9 → MartyFreakinBird"
+echo "[vectos] SSH key loaded: $(ssh-keygen -lf ~/.ssh/id_ed25519.pub 2>/dev/null)"
