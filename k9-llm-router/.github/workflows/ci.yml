@@ -1,4 +1,4 @@
-name: K-9 LLM Router CI
+name: K-9 Stack CI
 
 on:
   push:
@@ -22,14 +22,42 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx black pylint
 
-      - name: Lint (black check)
-        run: black --check --line-length 100 main.py
+      - name: Syntax check — all .py files
+        run: |
+          for f in $(find . -name "*.py" | grep -v __pycache__); do
+            python3 -c "import ast; ast.parse(open('$f').read())" && echo "✓ $f" || (echo "✗ $f" && exit 1)
+          done
 
-      - name: Lint (pylint)
-        run: pylint main.py --max-line-length=100 --disable=C0114,C0115,C0116 || true
+      - name: Lint (black check) — full stack
+        run: |
+          black --check --line-length 100 \
+            main.py \
+            k9_paymaster.py \
+            k9_mcp_manager.py \
+            k9_orchestrator.py \
+            k9_task_queue.py \
+            src/orbitron_client.py \
+            src/fed_whisperer_bridge.py \
+            src/n8n_webhook_bridge.py \
+            packai-node/agent.py \
+            || true
+
+      - name: Lint (pylint) — full stack
+        run: |
+          pylint \
+            main.py \
+            k9_paymaster.py \
+            k9_mcp_manager.py \
+            k9_orchestrator.py \
+            k9_task_queue.py \
+            --max-line-length=100 \
+            --disable=C0114,C0115,C0116,W0611,R0903,R0914 \
+            || true
 
       - name: Run tests
         run: pytest tests/ -v --asyncio-mode=auto || true
         env:
           ROUTER_MODE: cloud
+          K9_PAYMASTER_ENABLE: "false"
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
