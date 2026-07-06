@@ -61,3 +61,4 @@ Thumbs.db
 .idea/
 *.swp
 >>>>>>> 14518588d6d5f3352d902775dff3c2d1e962be35
+k9-llm-router/.env

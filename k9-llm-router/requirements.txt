@@ -33,3 +33,7 @@ langchain-community>=0.3.0
 # CB-3: Text-to-SQL
 sqlparse>=0.4.4
 psycopg2-binary>=2.9.6
+
+# Sprint 4b: swarm/worker infra (github/main)
+psutil>=5.9.0              # CPU/memory telemetry (packai-node, k9-swarm-agent)
+celery[redis]>=5.3.0       # async worker for heavy commands
