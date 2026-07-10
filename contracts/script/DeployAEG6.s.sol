@@ -40,7 +40,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {SessionKeyWallet}           from "../src/SessionKeyWallet.sol";
-import {ProofOfRationalityVerifier} from "../src/ProofOfRationalityVerifier.sol";
+import {HonkVerifier as ProofOfRationalityVerifier} from "../src/ProofOfRationalityVerifier.sol";
 
 contract DeployAEG6 is Script {
 
