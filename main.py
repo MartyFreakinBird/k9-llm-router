@@ -182,6 +182,17 @@ except ImportError as e:
     text_to_sql_engine = None
     _cb3_enabled = False
 
+# ── CB-4: JPY REPATRIATION QUANT ENGINE ──────────────────────────────────────
+try:
+    from src.quant_signal_bridge import enrich_with_quant_context, run_full_analysis
+    _cb4_enabled = True
+    log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
+except ImportError as e:
+    log.warning("CB-4 module not available: %s — quant enrichment bypassed", e)
+    enrich_with_quant_context = None
+    run_full_analysis = None
+    _cb4_enabled = False
+
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
     Build model registry based on ROUTER_MODE.
@@ -538,6 +549,12 @@ class LLMRouter:
         # Enrich trading/quant requests with Orbitron context
         if _orbitron_enabled and _orbitron:
             req.messages, req.system = await enrich_trading_request(
+                req.task_type, req.messages, req.system
+            )
+
+        # CB-4: Enrich with live JPY repatriation quant signal
+        if _cb4_enabled and enrich_with_quant_context:
+            req.messages, req.system = await enrich_with_quant_context(
                 req.task_type, req.messages, req.system
             )
 
@@ -920,6 +937,49 @@ async def task_map():
     """Return full task_type → model mapping."""
     return TASK_MODEL_MAP
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CB-4: QUANT ANALYSIS ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class QuantAnalysisResponse(BaseModel):
+    signal: dict = Field(default_factory=dict)
+    cb1_envelope: dict = Field(default_factory=dict)
+    route_result: dict = Field(default_factory=dict)
+    elapsed_ms: float = 0.0
+
+@app.post("/quant/analyze", response_model=QuantAnalysisResponse)
+async def quant_analyze():
+    """
+    Run full JPY repatriation analysis pipeline.
+    Returns QuantSignal + CB v1 envelope + routing result.
+    Triggered by n8n daily quant workflow or direct API call.
+    """
+    if not _cb4_enabled or run_full_analysis is None:
+        raise HTTPException(status_code=503, detail="CB-4 quant engine unavailable")
+    result = await run_full_analysis()
+    return QuantAnalysisResponse(**result)
+
+@app.get("/quant/stats")
+async def quant_stats():
+    """CB-4 quant engine health + calibration status."""
+    if not _cb4_enabled:
+        return {"enabled": False, "reason": "CB-4 module not loaded"}
+    from src.quant_signal_bridge import get_engine
+    engine = get_engine()
+    return {
+        "enabled": True,
+        "calibrated": engine._calibrated,
+        "models": {
+            "trigger":  "TriggerModel (logit)",
+            "flow":     "FlowMagnitudeModel (ARIMAX)",
+            "gpif":     "GPIFOptimizationModel (QP)",
+            "regime":   "MarkovRegimeSwitchingModel (3-state)",
+        },
+        "signal_gate": "confidence >= 0.40 → aeg_signal_router :9004 → Orbitron",
+        "false_signal_gate": "rebalancing/crisis_flight distinguished from repatriation",
+    }
 
 if __name__ == "__main__":
     import socket
