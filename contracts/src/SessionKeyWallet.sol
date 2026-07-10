@@ -54,6 +54,20 @@ interface IEntryPoint {
     function handleOps(bytes[] calldata ops, address payable beneficiary) external;
 }
 
+// ── AEG-9 Proof of Rationality Verifier interface ─────────────────────────────
+interface IProofOfRationalityVerifier {
+    /// @dev Ultra Honk verifier (79 public inputs, see main.nr PublicInputs layout).
+    ///      proof        = raw bytes from `bb prove -t evm`
+    ///      publicInputs = bytes32[] of length 79
+    ///        [  0.. 31] params_hash     (one byte per slot)
+    ///        [      32] session_wallet  (address as field element)
+    ///        [  33..38] intent fields   (router, tokenIn, tokenOut, amountIn, minAmountOut, timestamp)
+    ///        [ 39.. 70] execution_hash  (one byte per slot, correlation-only)
+    ///        [ 71.. 78] Ultra Honk internal pairing points (populated by bb prove)
+    function verify(bytes calldata _proof, bytes32[] calldata _publicInputs)
+        external view returns (bool);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -142,6 +156,10 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
     bool    public genesisLockExpired;
     address public governor;
 
+    // ── AEG-9 ZK Verifier ─────────────────────────────────────────────────────
+    /// @notice Deployed ProofOfRationalityVerifier — set once via setVerifier() in AEG-6 deploy.
+    IProofOfRationalityVerifier public verifier;
+
     // ── Events ────────────────────────────────────────────────────────────────
 
     event IntentValidated(bytes32 indexed intentHash, address indexed router, uint256 amountIn);
@@ -151,6 +169,8 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
     event SessionKeyUpdated(address indexed newKey);
     event GenesisLockExpired();
     event RiskParamsUpdated(bytes32 paramsHash);
+    event VerifierSet(address indexed verifier);
+    event IntentExecutedWithProof(bytes32 indexed intentHash, bytes32 executionHash, uint256 amountOut);
     event EmergencyPause(address indexed caller);
 
     // ── Errors ────────────────────────────────────────────────────────────────
@@ -165,6 +185,9 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
     error CooldownActive(uint256 remainingSeconds);
     error GenesisLockActive(uint256 unlockAt);
     error EmergencyPauseActive();
+    error VerifierNotSet();
+    error ProofInvalid();
+    error PublicInputMismatch(string field);
 
     // ── Pause ─────────────────────────────────────────────────────────────────
 
@@ -217,10 +240,10 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
             address(0x2626664c2603336E57B271c5C0b26F421741e481) // Uniswap V3 SwapRouter02
         ));
         params.whitelistedRouters[1] = keccak256(abi.encodePacked(
-            address(0x18cd499E3d7ed42fEBBa595e6574a2fa5977f2B3) // Aave V3 Pool
+            address(0x18cd499e3d7ed42FEBbA595e6574a2FA5977F2b3) // Aave V3 Pool
         ));
         params.whitelistedRouters[2] = keccak256(abi.encodePacked(
-            address(0xd9E1cE17f2641f24aE83637ab66a2cca9C378B9F) // Curve Router
+            address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F) // Curve Router
         ));
         params.whitelistedRouters[3] = keccak256(abi.encodePacked(
             address(0xBA12222222228d8Ba445958a75a0704d566BF2C8) // Balancer V2 Vault
@@ -484,7 +507,7 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────────────────────────────────────
 
     /// @notice Returns keccak256 of current RiskParams — public input for AEG-9 circuit.
-    function currentParamsHash() external view returns (bytes32) {
+    function currentParamsHash() public view returns (bytes32) {
         return keccak256(abi.encode(params));
     }
 
@@ -505,5 +528,117 @@ contract SessionKeyWallet is Ownable, ReentrancyGuard {
     }
 
     /// @notice Receive ETH for gas top-ups.
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // AEG-9 ZK PROOF INTEGRATION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Wire the deployed ProofOfRationalityVerifier to this wallet.
+     * @dev    Called once during AEG-6 deployment (DeployAEG6.s.sol step 3).
+     */
+    function setVerifier(address _verifier) external onlyOwner {
+        require(_verifier != address(0), "Zero verifier address");
+        verifier = IProofOfRationalityVerifier(_verifier);
+        emit VerifierSet(_verifier);
+    }
+
+    /**
+     * @notice Execute a ZK-proven trade intent.
+     * @dev    Production execution path — enforces AEG-9 proof before any swap.
+     *         executeIntent() remains available for dev/testnet sessions without a live prover.
+     *
+     *         Proof verification flow:
+     *           1. validateIntent() — existing risk guards (drawdown, slippage, whitelist)
+     *           2. params_hash check — proof must bind to current RiskParams version
+     *           3. session_wallet check — proof must bind to this contract address
+     *           4. intent field checks — each submitted intent field matches proof public inputs
+     *           5. verifier.verify() — Ultra Honk SNARK verification (6 circuit invariants)
+     *           6. Execute swap — identical to executeIntent() post-validation
+     *
+     * @param intent       Trade intent struct
+     * @param proof        Raw Ultra Honk proof bytes (from bb prove -t evm)
+     * @param publicInputs 79-element bytes32[] (from bb prove --output public_inputs)
+     */
+    function executeIntentWithProof(
+        TradeIntent calldata intent,
+        bytes calldata proof,
+        bytes32[] calldata publicInputs
+    ) external onlySessionKey nonReentrant whenNotPaused {
+
+        if (address(verifier) == address(0)) revert VerifierNotSet();
+        require(publicInputs.length == 79, "Wrong public input count");
+
+        // ── Step 1: Standard risk validation ─────────────────────────────────
+        bytes32 intentHash = validateIntent(intent);
+
+        // ── Step 2: params_hash binding ──────────────────────────────────────
+        // Pack 32 single-byte slots (indices 0-31) into one bytes32 for comparison.
+        bytes32 onChainParamsHash = currentParamsHash();
+        bytes32 proofParamsHash   = _packBytes32FromInputs(publicInputs, 0);
+        if (proofParamsHash != onChainParamsHash) revert PublicInputMismatch("params_hash");
+
+        // ── Step 3: session_wallet binding ───────────────────────────────────
+        if (publicInputs[32] != bytes32(uint256(uint160(address(this)))))
+            revert PublicInputMismatch("session_wallet");
+
+        // ── Step 4: Intent field binding ─────────────────────────────────────
+        // protocol_router: circuit uses keccak256(abi.encodePacked(router)) as Field
+        if (publicInputs[33] != bytes32(keccak256(abi.encodePacked(intent.router))))
+            revert PublicInputMismatch("protocol_router");
+        if (publicInputs[34] != bytes32(uint256(uint160(intent.tokenIn))))
+            revert PublicInputMismatch("token_in");
+        if (publicInputs[35] != bytes32(uint256(uint160(intent.tokenOut))))
+            revert PublicInputMismatch("token_out");
+        if (publicInputs[36] != bytes32(intent.amountIn))
+            revert PublicInputMismatch("amount_in");
+        if (publicInputs[37] != bytes32(intent.amountOutMin))
+            revert PublicInputMismatch("min_amount_out");
+        if (publicInputs[38] != bytes32(intent.timestamp))
+            revert PublicInputMismatch("deadline");
+
+        // ── Step 5: execution_hash (correlation-only) ─────────────────────────
+        // Read from proof; not reconstructed on-chain (block_number not a circuit input).
+        // Replay protection is covered by lastExecutionBlock + per-block cap in validateIntent().
+        bytes32 proofExecHash = _packBytes32FromInputs(publicInputs, 39);
+
+        // ── Step 6: ZK verification ───────────────────────────────────────────
+        if (!verifier.verify(proof, publicInputs)) revert ProofInvalid();
+
+        // ── Step 7: Execute swap ──────────────────────────────────────────────
+        uint256 balanceBefore = IERC20(intent.tokenOut).balanceOf(address(this));
+        IERC20(intent.tokenIn).approve(intent.router, intent.amountIn);
+        (bool success,) = intent.router.call(intent.callData);
+        require(success, "Router call failed");
+        uint256 balanceAfter = IERC20(intent.tokenOut).balanceOf(address(this));
+
+        // ── Step 8: Drawdown recording ─────────────────────────────────────────
+        if (balanceAfter < balanceBefore + intent.amountOutMin) {
+            uint256 shortfall = (balanceBefore + intent.amountOutMin) - balanceAfter;
+            uint256 shortfallUsd = _estimatePositionUsd(intent.tokenOut, shortfall);
+            _recordDrawdown(shortfallUsd);
+        }
+
+        lastExecutionBlock   = block.number;
+        lastStrategyChangeAt = block.timestamp;
+
+        emit IntentValidated(intentHash, intent.router, intent.amountIn);
+        emit IntentExecutedWithProof(intentHash, proofExecHash, balanceAfter - balanceBefore);
+    }
+
+    /**
+     * @notice Pack 32 consecutive single-byte field elements into a bytes32.
+     * @dev    Noir encodes [u8; 32] as 32 separate bytes32 slots, one byte per slot.
+     *         This reverses that encoding: slot[i] contributes byte (31-i) of the result.
+     */
+    function _packBytes32FromInputs(
+        bytes32[] calldata inputs,
+        uint256 offset
+    ) internal pure returns (bytes32 result) {
+        for (uint256 i = 0; i < 32; i++) {
+            result |= bytes32(uint256(inputs[offset + i]) << (8 * (31 - i)));
+        }
+    }
+
     receive() external payable {}
 }
