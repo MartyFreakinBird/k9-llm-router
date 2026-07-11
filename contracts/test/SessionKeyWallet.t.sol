@@ -91,7 +91,7 @@ contract SessionKeyWalletTest is Test {
             sessionKey,
             address(treasury),
             address(chainlink),
-            address(0xEntryPoint),  // mock
+            address(0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789),  // ERC-4337 EntryPoint (Base Sepolia)
             governor
         );
 
