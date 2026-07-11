@@ -36,6 +36,12 @@ mkdir -p "$LOG_DIR"
 log()  { echo "[K9-STACK] $*"; }
 fail() { echo "[K9-STACK ERROR] $*" >&2; exit 1; }
 
+# ── AEG-6 Deployed Contract Addresses (Base Sepolia) ─────────────────────────
+export SESSION_WALLET_ADDRESS="${SESSION_WALLET_ADDRESS:-0x25e2CFC6A3ed9733a632b630953c6931113E8148}"
+export VERIFIER_ADDRESS="${VERIFIER_ADDRESS:-0x8b62Da4c17ff1B55Be033d1847648c490BA0b82D}"
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 # ── Environment assertions ────────────────────────────────────────────────────
 # These must be set before starting — warn loudly if missing
 check_env() {
