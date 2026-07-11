@@ -91,7 +91,7 @@ contract DeployAEG6 is Script {
 
         console2.log("=== [3/3] Verifier wired ===");
         console2.log("wallet.verifier():");
-        console2.log(wallet.verifier());
+        console2.log(address(wallet.verifier()));
 
         vm.stopBroadcast();
 

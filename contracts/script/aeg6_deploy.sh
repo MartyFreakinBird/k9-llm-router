@@ -42,18 +42,24 @@ command -v forge >/dev/null 2>&1 && ok "forge $(forge --version | head -1)" || f
 command -v bb    >/dev/null 2>&1 && ok "bb found" || fail "bb not found — see RELEASE_NOTES.md for install steps"
 
 # ── Step 1: Generate Solidity verifier ───────────────────────
-step "Step 1 — Generate ProofOfRationalityVerifier.sol"
+step "Step 1 — Ensure VK + ProofOfRationalityVerifier.sol"
 
 VK="$CIRCUIT_DIR/vk"
-[ -f "$VK" ] || fail "VK not found at $VK — run: bb write_vk -b $CIRCUIT_DIR/target/proof_of_rationality.json -o $VK"
+[ -f "$VK" ] || fail "VK not found at $VK"
+ok "VK found at $VK"
 
-if $DRY_RUN; then
-  ok "[DRY] Would run: bb contract -k $VK -o $SOL_OUT"
-else
-  bb contract -k "$VK" -o "$SOL_OUT"
-  ok "Solidity verifier generated → $SOL_OUT"
+if [ -f "$SOL_OUT" ]; then
   LINES=$(wc -l < "$SOL_OUT")
-  ok "  $LINES lines"
+  ok "Solidity verifier present -> $SOL_OUT ($LINES lines)"
+elif $DRY_RUN; then
+  fail "Solidity verifier not found at $SOL_OUT — generate or restore ProofOfRationalityVerifier.sol before deploy"
+else
+  # Generate verifier from VK (bb write_solidity_verifier -t evm -b <circuit.json> -k <vk> -o <out>)
+  CIRCUIT_JSON="$CIRCUIT_DIR/target/proof_of_rationality.json"
+  [ -f "$CIRCUIT_JSON" ] || fail "Circuit JSON not found at $CIRCUIT_JSON — run nargo compile first"
+  bb write_solidity_verifier -t evm -b "$CIRCUIT_JSON" -k "$VK" -o "$SOL_OUT"
+  LINES=$(wc -l < "$SOL_OUT")
+  ok "Solidity verifier generated → $SOL_OUT ($LINES lines)"
 fi
 
 # ── Step 2: Foundry install + compile ─────────────────────────
