@@ -51,7 +51,8 @@ log = logging.getLogger("k9-proof-shim")
 # ── Config ────────────────────────────────────────────────────────────────────
 
 K9_JEPA_ENDPOINT    = os.getenv("K9_JEPA_ENDPOINT", "http://localhost:8765/route")
-WALLET_ADDRESS      = os.getenv("SESSION_WALLET_ADDRESS", "")
+WALLET_ADDRESS      = os.getenv("SESSION_WALLET_ADDRESS", "0x25e2CFC6A3ed9733a632b630953c6931113E8148")  # AEG-6 Base Sepolia
+VERIFIER_ADDRESS    = os.getenv("VERIFIER_ADDRESS",       "0x8b62Da4c17ff1B55Be033d1847648c490BA0b82D")  # AEG-9 HonkVerifier
 BASE_SEPOLIA_RPC    = os.getenv("BASE_SEPOLIA_RPC", "https://sepolia.base.org")
 CIRCUITS_DIR        = Path(os.getenv("CIRCUITS_DIR", "./contracts/circuits"))
 PROOFS_DIR          = Path(os.getenv("PROOFS_DIR", "./proofs"))
