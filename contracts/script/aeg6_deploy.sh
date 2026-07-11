@@ -70,8 +70,9 @@ cd "$REPO_ROOT"
 if $DRY_RUN; then
   ok "[DRY] Would run: forge install + forge build"
 else
-  # Install OZ if not present
-  [ -d "lib/openzeppelin-contracts" ] || forge install OpenZeppelin/openzeppelin-contracts --no-commit
+  # Install dependencies if not present
+  [ -d "lib/openzeppelin-contracts" ] || forge install OpenZeppelin/openzeppelin-contracts
+  [ -d "lib/forge-std" ] || forge install foundry-rs/forge-std
   ok "OpenZeppelin installed"
 
   forge build --contracts contracts/ --skip test 2>&1 | tail -5
