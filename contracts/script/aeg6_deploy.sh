@@ -74,7 +74,7 @@ else
   [ -d "lib/openzeppelin-contracts" ] || forge install OpenZeppelin/openzeppelin-contracts --no-commit
   ok "OpenZeppelin installed"
 
-  forge build --contracts contracts/ 2>&1 | tail -5
+  forge build --contracts contracts/ --skip test 2>&1 | tail -5
   ok "Contracts compiled"
 fi
 
