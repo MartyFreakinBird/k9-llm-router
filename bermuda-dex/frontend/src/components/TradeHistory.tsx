@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ExternalLink, TrendingUp, TrendingDown, Hourglass } from 'lucide-react'
+import { ExternalLink, Hourglass } from 'lucide-react'
 
 export interface Trade {
   id: string

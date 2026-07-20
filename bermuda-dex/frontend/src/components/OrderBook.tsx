@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Activity, Radio, RadioOff } from 'lucide-react'
+import { Activity, Radio } from 'lucide-react'
 
 interface OrderBookItem {
   price: number
