@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
-import { ShieldCheck, ShieldAlert, CheckCircle2, Loader2, ArrowRight } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Loader2, ArrowRight } from 'lucide-react'
 
 interface KYCStatusProps {
   kycOverride?: boolean
@@ -21,7 +21,7 @@ export const KYCStatus: React.FC<KYCStatusProps> = ({ kycOverride, onKycChange }
   }, [kycOverride])
 
   const triggerKycFlow = async () => {
-    if (!isConnected) return
+    if (!isConnected || !address) return
     setIsVerifying(true)
     setKycStep(1)
 
@@ -50,7 +50,7 @@ export const KYCStatus: React.FC<KYCStatusProps> = ({ kycOverride, onKycChange }
     }
   }
 
-  if (!isConnected) {
+  if (!isConnected || !address) {
     return (
       <div className="bg-[#1a1d24] border border-borderDark rounded-lg p-5">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-3">KYC Passport Status</h3>

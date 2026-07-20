@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits, keccak256, stringToBytes, toHex } from 'viem'
-import { Info, AlertCircle, ArrowDownUp, CheckCircle, HelpCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, ArrowDownUp, CheckCircle, HelpCircle, Loader2 } from 'lucide-react'
 import { RWA_SWAP_ABI, CONTRACT_ADDRESSES } from '../config/contracts'
 
 interface SwapPanelProps {
@@ -192,7 +192,7 @@ export const SwapPanel: React.FC<SwapPanelProps> = ({ hasKyc, triggerKycFlow, on
             <button
               onClick={() => setOrderMode('MARKET')}
               className={`px-3 py-1 text-xs font-semibold rounded transition duration-150 ${
-                orderMode === 'MARKET' ? 'bg-[#232731] text-gray-100' : 'text-gray-400 hover:text-gray-200'
+                orderMode === 'MARKET' ? 'bg-[#232731] text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
               Market Swap
@@ -299,7 +299,9 @@ export const SwapPanel: React.FC<SwapPanelProps> = ({ hasKyc, triggerKycFlow, on
             <div className="flex justify-between text-gray-400">
               <span className="flex items-center gap-1">
                 Bermuda Regulatory Fee
-                <HelpCircle className="w-3 h-3 text-gray-500 cursor-help" title="15 bps standard compliance levy on RWA" />
+                <span className="cursor-help" title="15 bps standard compliance levy on RWA">
+                  <HelpCircle className="w-3 h-3 text-gray-500" />
+                </span>
               </span>
               <span className="font-mono font-medium text-gray-200">
                 {complianceFee > 0 ? `${complianceFee.toFixed(4)} ${tokenIn}` : '15 bps (0.15%)'}
