@@ -193,6 +193,16 @@ except ImportError as e:
     run_full_analysis = None
     _cb4_enabled = False
 
+# CB-5: MCTS Reasoning Engine
+try:
+    from src.k9_mcts.api import router as mcts_router
+    _cb5_enabled = True
+    log.info("CB-5 module loaded: k9-mcts reasoning engine")
+except Exception as e:
+    log.warning("CB-5 module not available: %s — MCTS reasoning bypassed", e)
+    mcts_router = None
+    _cb5_enabled = False
+
 def build_model_registry(mode: str) -> dict[str, ModelBackend]:
     """
     Build model registry based on ROUTER_MODE.
@@ -721,6 +731,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
+
+if _cb5_enabled and mcts_router:
+    app.include_router(mcts_router)
 
 @app.get("/")
 async def root():
