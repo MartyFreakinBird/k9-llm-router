@@ -2,17 +2,22 @@
 k9-mcts — orchestrator.py
 
 Full async MCTS loop wired into the K-9 stack:
-  - Hypothesis generation  → k9-llm-router :8765/route  (LLM, temp=0.9)
-  - Adversarial critique   → k9-llm-router :8765/route  (LLM, temp=0.2, critic role)
-  - TX graph rollout       → k9_tx_adapter :9005/query  (Coreum RPC read-only)
-  - JEPA confidence score  → aeg_token_model :9003/score
-  - Governance gate        → SessionKeyWallet risk params (drawdown/pool_share guard)
-  - CB v1 publish          → orbitron_client → Supabase cb_messages
+  - Hypothesis generation  -> k9-llm-router :8765/route  (LLM, temp=0.9)
+  - Adversarial critique   -> k9-llm-router :8765/route  (LLM, temp=0.2, critic role)
+  - TX graph rollout       -> k9_tx_adapter :9005/query  (Coreum RPC read-only)
+  - JEPA confidence score  -> aeg_token_model :9003/score
+  - Governance gate        -> SessionKeyWallet risk params (drawdown/pool_share guard)
+  - CB v1 publish          -> orbitron_client -> Supabase cb_messages
+
+CB-6 additions:
+  - JEPA target encoder steers branch expansion (prior-based pruning)
+  - Handover engine evaluates committed result (auto-execute vs human-review)
 
 Lifecycle:
-  question → expand 3 hypotheses → rollout each on TX graph →
-  critique → backprop → select by UCT → re-expand if below threshold →
-  commit when confidence >= 0.92 OR max_depth reached →
+  question -> [JEPA prior] -> expand 3 hypotheses -> rollout each on TX graph ->
+  critique -> backprop -> select by UCT -> re-expand if below threshold ->
+  commit when confidence >= 0.92 OR max_depth reached ->
+  [handover engine: auto-execute or human-review] ->
   emit CB v1 "inference" envelope with full reasoning trace
 """
 
@@ -27,6 +32,8 @@ from typing import Any, Optional
 import httpx
 
 from .tree import MCTSNode, MCTSTree
+from .jepa_target_encoder import get_target_encoder, OutcomeRecord
+from .handover_engine import get_handover_engine, HandoverDecision, classify_task
 
 logger = logging.getLogger("k9.mcts")
 
@@ -39,6 +46,8 @@ ORBITRON_URL       = os.getenv("ORBITRON_BUS_URL",     "http://localhost:8769")
 CONFIDENCE_THRESH  = float(os.getenv("MCTS_THRESHOLD", "0.92"))
 MAX_DEPTH          = int(os.getenv("MCTS_MAX_DEPTH",   "5"))
 N_BRANCHES         = int(os.getenv("MCTS_N_BRANCHES",  "3"))
+# CB-6: prune branches below this JEPA prior score (saves compute)
+PRIOR_PRUNE_THRESHOLD = float(os.getenv("JEPA_PRIOR_PRUNE", "0.35"))
 
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
@@ -79,21 +88,21 @@ Return a single string (the improved hypothesis).
 class K9MCTSOrchestrator:
     """
     Runs the full MCTS reasoning loop for a forensic or analytical query.
-    Designed to be called from main.py's POST /reason endpoint.
+    CB-6: JEPA target encoder steers expansion + handover engine gates execution.
     """
 
     def __init__(self, timeout_s: float = 30.0):
         self.timeout = httpx.Timeout(timeout_s)
+        self.encoder = get_target_encoder()
+        self.handover = get_handover_engine()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
     async def reason(self, question: str, context: dict | None = None) -> dict:
-        """
-        Run MCTS and return the committed answer + reasoning trace.
-        """
         start = time.monotonic()
         trace_id = f"mcts_{uuid.uuid4().hex[:8]}"
         ctx = context or {}
+        task_class = classify_task(question)
 
         tree = MCTSTree(
             root_question=question,
@@ -102,7 +111,7 @@ class K9MCTSOrchestrator:
             n_branches=N_BRANCHES,
         )
 
-        logger.info(f"[MCTS:{trace_id}] START  q={question[:80]}")
+        logger.info(f"[MCTS:{trace_id}] START  q={question[:80]} task_class={task_class}")
 
         for iteration in range(MAX_DEPTH * N_BRANCHES):
             tree.iteration = iteration
@@ -118,6 +127,25 @@ class K9MCTSOrchestrator:
                 context=json.dumps(ctx),
                 n=N_BRANCHES,
             )
+
+            # CB-6: JEPA prior-based pruning — skip branches with low prior score
+            if self.encoder.total_updates > 0:
+                scored = []
+                for t in thoughts:
+                    prior = self.encoder.predict_branch_prior(t, task_class)
+                    if prior["recommended"]:
+                        scored.append((t, prior))
+                    else:
+                        logger.debug(f"[MCTS:{trace_id}] PRUNED branch (prior={prior['prior_score']:.3f})")
+                # If all pruned, keep top-1 anyway (don't starve the tree)
+                if not scored and thoughts:
+                    best_prior = max(
+                        thoughts,
+                        key=lambda t: self.encoder.predict_branch_prior(t, task_class)["prior_score"],
+                    )
+                    scored = [(best_prior, self.encoder.predict_branch_prior(best_prior, task_class))]
+                thoughts = [s[0] for s in scored]
+
             children = tree.expand(node, thoughts)
 
             # 3. Rollout — execute each child concurrently
@@ -144,40 +172,54 @@ class K9MCTSOrchestrator:
             tree.commit_best()
 
         elapsed_ms = (time.monotonic() - start) * 1000
-        result = self._build_result(tree, trace_id, elapsed_ms)
+        result = self._build_result(tree, trace_id, elapsed_ms, task_class)
+
+        # CB-6: Handover engine evaluation
+        handover_result = self.handover.evaluate(
+            question=question,
+            answer=result["answer"],
+            confidence=result["confidence"],
+            iterations=result["iterations"],
+            elapsed_ms=elapsed_ms,
+            evidence_count=len(result.get("evidence", [])),
+            critique_score=tree.best_node.critique_score if tree.best_node else 0.5,
+            trace_id=trace_id,
+        )
+        result["handover"] = {
+            "decision": handover_result.decision.value,
+            "risk_level": handover_result.risk_level.value,
+            "task_class": handover_result.task_class,
+            "reason": handover_result.reason,
+            "cooldown_seconds": handover_result.cooldown_seconds,
+        }
 
         # Publish to Orbitron bus (fire-and-forget)
         asyncio.create_task(self._publish_cb(result, trace_id))
+
+        # CB-6: Also publish handover envelope if auto-execute
+        if handover_result.decision == HandoverDecision.AUTO_EXECUTE:
+            asyncio.create_task(self._publish_envelope(handover_result.execution_envelope))
 
         return result
 
     # ── Rollout ───────────────────────────────────────────────────────────────
 
     async def _rollout(self, node: MCTSNode, original_question: str) -> float:
-        """
-        Execute one branch: TX graph query → critique → JEPA score.
-        Returns composite confidence score [0, 1].
-        """
-        # Step A: TX graph traversal (read-only)
         evidence = await self._tx_query(node.thought)
         node.evidence = evidence[:5] if isinstance(evidence, list) else [str(evidence)]
 
-        # Step B: Adversarial critique
         critique = await self._critique(node.thought, node.evidence)
         node.critique_score = critique.get("score", 0.5)
 
-        # Step C: JEPA alignment score
         jepa_score = await self._jepa_score(node.thought, node.evidence)
         node.confidence = jepa_score
 
-        # Composite: weighted blend — critique 40%, JEPA 60%
         composite = 0.4 * node.critique_score + 0.6 * node.confidence
 
-        # If critique reveals weakness → reflect and refine thought
         if node.critique_score < 0.4 and node.depth < MAX_DEPTH - 1:
             refined = await self._reflect(node.thought, critique, node.evidence)
             if refined:
-                node.thought = refined  # Mutate thought in-place (backtrack)
+                node.thought = refined
 
         return composite
 
@@ -192,8 +234,7 @@ class K9MCTSOrchestrator:
                 return [str(h) for h in parsed[:n]]
         except Exception:
             pass
-        # Fallback: split on newlines
-        lines = [l.strip("- •1234567890.").strip() for l in raw.split("\n") if len(l.strip()) > 20]
+        lines = [l.strip("- \u2022\u2023123456789.").strip() for l in raw.split("\n") if len(l.strip()) > 20]
         return lines[:n] or [question]
 
     async def _critique(self, hypothesis: str, evidence: list[str]) -> dict:
@@ -232,16 +273,10 @@ class K9MCTSOrchestrator:
     # ── TX graph rollout ──────────────────────────────────────────────────────
 
     async def _tx_query(self, hypothesis: str) -> list[str]:
-        """
-        Extracts wallet address from hypothesis and queries TX adapter.
-        Returns list of evidence strings.
-        """
-        # Extract any hex/bech32 address from hypothesis (simple heuristic)
         import re
         addrs = re.findall(r'(0x[a-fA-F0-9]{40}|core1[a-z0-9]{38,})', hypothesis)
         if not addrs:
             return ["no_address_extracted"]
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(
@@ -250,7 +285,6 @@ class K9MCTSOrchestrator:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                # Flatten to list of strings for evidence
                 return [
                     f"frozen={data.get('frozen', False)}",
                     f"whitelisted={data.get('whitelisted', False)}",
@@ -277,8 +311,6 @@ class K9MCTSOrchestrator:
     # ── Orbitron publish ──────────────────────────────────────────────────────
 
     async def _publish_cb(self, result: dict, trace_id: str):
-        """Emit CB v1 'inference' envelope to Orbitron bus."""
-        import time as _time
         envelope = {
             "spec": "cb.v1",
             "message_id": str(uuid.uuid4()),
@@ -286,7 +318,7 @@ class K9MCTSOrchestrator:
             "source": "k9-mcts",
             "target": "orbitron-bus",
             "type": "inference",
-            "ontology_tags": ["mcts", "forensic", "reasoning"],
+            "ontology_tags": ["mcts", "forensic", "reasoning", "cb-6"],
             "confidence": result.get("confidence", 0.0),
             "payload": {
                 "question":         result.get("question", ""),
@@ -294,22 +326,28 @@ class K9MCTSOrchestrator:
                 "iterations":       result.get("iterations", 0),
                 "elapsed_ms":       result.get("elapsed_ms", 0),
                 "reasoning_trace":  result.get("reasoning_trace", []),
+                "handover":         result.get("handover", {}),
             },
-            "timestamp": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-                await client.post(
-                    f"{ORBITRON_URL}/cb",
-                    json=envelope,
-                    headers={"Content-Type": "application/json"},
-                )
+                await client.post(f"{ORBITRON_URL}/cb", json=envelope,
+                    headers={"Content-Type": "application/json"})
         except Exception as e:
             logger.warning(f"[MCTS] Orbitron publish failed (non-fatal): {e}")
 
+    async def _publish_envelope(self, envelope: dict):
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                await client.post(f"{ORBITRON_URL}/cb", json=envelope,
+                    headers={"Content-Type": "application/json"})
+        except Exception as e:
+            logger.warning(f"[MCTS] Envelope publish failed (non-fatal): {e}")
+
     # ── Result builder ────────────────────────────────────────────────────────
 
-    def _build_result(self, tree: MCTSTree, trace_id: str, elapsed_ms: float) -> dict:
+    def _build_result(self, tree: MCTSTree, trace_id: str, elapsed_ms: float, task_class: str = "") -> dict:
         best = tree.best_node
         return {
             "trace_id":       trace_id,
@@ -322,4 +360,6 @@ class K9MCTSOrchestrator:
             "reasoning_trace": tree.reasoning_trace(),
             "all_nodes":       tree.all_nodes(),
             "evidence":       best.evidence if best else [],
+            "task_class":     task_class,
+            "jepa_target":    self.encoder.stats(),
         }
