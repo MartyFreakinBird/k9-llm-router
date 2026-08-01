@@ -14,6 +14,7 @@ from .orchestrator import K9MCTSOrchestrator
 from .jepa_target_encoder import get_target_encoder
 from .handover_engine import get_handover_engine, HandoverDecision
 from .execution_dispatcher import get_dispatcher, DispatchResult
+from .observability import get_journal
 
 router = APIRouter(prefix="/reason", tags=["MCTS Reasoning"])
 
@@ -114,3 +115,63 @@ async def jepa_classes():
 async def dispatch_stats():
     """CB-6: Execution dispatcher statistics (dispatch count, latency)."""
     return get_dispatcher().stats()
+
+
+# ── CB-7: Observability & Decision Journal ──────────────────────────────────
+
+@router.get("/journal")
+async def journal_recent(
+    limit: int = 20,
+    decision: str = "",
+    risk_level: str = "",
+    task_class: str = "",
+):
+    """CB-7: Recent decisions in the journal, filterable."""
+    entries = get_journal().recent(
+        limit=limit, decision=decision, risk_level=risk_level, task_class=task_class
+    )
+    return {
+        "count": len(entries),
+        "entries": [e.to_dict() for e in entries],
+    }
+
+
+@router.get("/journal/summary")
+async def journal_summary():
+    """CB-7: Aggregate decision statistics (auto/human/reject counts, risk distribution)."""
+    return get_journal().summary()
+
+
+@router.get("/journal/auto")
+async def journal_auto(limit: int = 50):
+    """CB-7: Only auto-executed decisions (human audit of autonomous actions)."""
+    entries = get_journal().auto_executed(limit=limit)
+    return {
+        "count": len(entries),
+        "entries": [e.to_dict() for e in entries],
+    }
+
+
+@router.get("/journal/human")
+async def journal_human(limit: int = 50):
+    """CB-7: Only human-review decisions (pending human action)."""
+    entries = get_journal().human_reviews(limit=limit)
+    return {
+        "count": len(entries),
+        "entries": [e.to_dict() for e in entries],
+    }
+
+
+@router.get("/journal/export")
+async def journal_export():
+    """CB-7: Export full journal as JSON array (for backup/analysis)."""
+    return get_journal().export()
+
+
+@router.get("/journal/{trace_id}")
+async def journal_entry(trace_id: str):
+    """CB-7: Full decision detail by trace ID."""
+    entry = get_journal().get(trace_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"trace_id {trace_id} not found")
+    return entry.to_dict()
