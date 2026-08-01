@@ -7476,9 +7476,9 @@ const CMDS = {
   ]},
   'git-sync':{badge:'K-9 GIT SYNC',blocks:[
     {c:'// Pull latest wallpaper (source of truth)',lines:[
-      'cd /mnt/c/K9/vectos/k9-wallpaper && git pull',
+      'cd ~/k9-llm-router && git pull',
       '# First-time clone:',
-      'git clone https://github.com/MartyFreakinBird/K9.git /mnt/c/K9',
+      'git clone https://github.com/MartyFreakinBird/k9-llm-router.git ~/k9-llm-router',
     ]},
     {c:'// Repo contents: vectos/k9-wallpaper/',lines:[
       '# wallpaper.html              — Sprint AEG-4 canonical',
@@ -7486,7 +7486,7 @@ const CMDS = {
       '# WALLPAPER_UPDATE_PROMPT.md  — Claude-executable sprint update prompt',
     ]},
     {c:'// Push updated wallpaper back',lines:[
-      'cd /mnt/c/K9/vectos/k9-wallpaper',
+      'cd ~/k9-llm-router/wallpaper',
       'git add wallpaper.html',
       'git commit -m "wallpaper: AEG-4 + INT-1 merge"',
       'git push origin main',
@@ -8086,19 +8086,6 @@ const FUSION_SOURCES = {
   map:    { cls:'fev-src-tor',    label:'map   ' },
 };
 
-function gridFusionPush(src, type, msg, sev='ok') {
-  const feed = document.getElementById('fusion-feed');
-  if (!feed) return;
-  const ts   = new Date().toTimeString().slice(0,8);
-  const srcDef = FUSION_SOURCES[src] || FUSION_SOURCES.system;
-  const sevCls = sev==='crit'?'fev-sev-crit':sev==='warn'?'fev-sev-warn':'fev-sev-ok';
-  const row = document.createElement('div');
-  row.className = 'fev-row';
-  row.innerHTML = `<span class="fev-ts">${ts}</span><span class="fev-src ${srcDef.cls}">${srcDef.label}</span><span class="fev-msg ${sevCls}">${msg}</span>`;
-  feed.appendChild(row);
-  while (feed.children.length > 120) feed.removeChild(feed.firstChild);
-  feed.scrollTop = feed.scrollHeight;
-}
 
 // ── Seed fusion feed with realistic boot events ──
 function gridSeedFusionFeed() {
@@ -8982,7 +8969,7 @@ const K9_LAUNCH_CMDS = {
   'int1-activate':   'cd ~/k9-integration && npm install && npx ts-node lovable-bridge/server.ts',
   'local-api-start': 'cd ~/k9-integration/local && cp .env.example .env && npm install && npm run init-db && npm run dev',
   'local-api-sync':  'curl -X POST http://localhost:7001/api/sync/github',
-  'git-sync':        'cd /mnt/c/K9/vectos/k9-wallpaper && git pull',
+  'git-sync':        'cd ~/k9-llm-router && git pull',
 };
 
 function setHomePill(port, up, ms) {
@@ -9278,7 +9265,7 @@ function generateK9ConfigTemplate() {
       'aeg-deploy':      'cd ~/aeg-protocol && forge script contracts/script/Deploy.s.sol:DeployAEG --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify',
       'int1-activate':   'cd ~/k9-integration && npm install && npx ts-node lovable-bridge/server.ts',
       'local-api-start': 'cd ~/k9-integration/local && npm install && npm run init-db && npm run dev',
-      'git-sync':        'cd /mnt/c/K9/vectos/k9-wallpaper && git pull',
+      'git-sync':        'cd ~/k9-llm-router && git pull',
     },
     shortcuts: [
       { keys: 'k9-start',  label: 'Start K-9 economic stack', cmd: 'cd ~/k9-llm-router && ./launch-economic-stack.sh start' },
@@ -9290,7 +9277,7 @@ function generateK9ConfigTemplate() {
   const json = JSON.stringify(template, null, 2);
   copyToClip(json);
   addTermLine('ok', '✓ k9.config.json template copied to clipboard');
-  addTermLine('ai', 'Paste into: C:\\K9\\vectos\\k9-wallpaper\\k9.config.json');
+  addTermLine('ai', 'Paste into: G:\\k9\\Kiosk\\wallpaper\\k9.config.json');
   addTermLine('ai', 'Or PUT to: http://localhost:7001/api/config');
   return template;
 }
