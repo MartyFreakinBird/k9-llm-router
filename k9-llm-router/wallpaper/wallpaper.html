@@ -1619,6 +1619,253 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   gap: 1px;
   background: var(--border);
 }
+/* ── HERMES (CB-10) — Voice/Chat gateway ────── */
+.view[data-layout="hermes"].active {
+  display: grid;
+  grid-template-columns: 260px 1fr 240px;
+  grid-template-rows: 36px 1fr 40px;
+  gap: 1px;
+  background: var(--border);
+}
+
+/* Hermes chat area */
+.hermes-chat {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.hermes-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+}
+.hermes-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  animation: hermes-fade-in 0.2s ease;
+}
+@keyframes hermes-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.hermes-msg.user {
+  align-self: flex-end;
+  background: rgba(34,211,238,.08);
+  border: 1px solid rgba(34,211,238,.15);
+  color: var(--text);
+}
+.hermes-msg.assistant {
+  align-self: flex-start;
+  background: rgba(74,222,128,.06);
+  border: 1px solid rgba(74,222,128,.12);
+  color: var(--text);
+}
+.hermes-msg.system {
+  align-self: center;
+  background: rgba(245,158,11,.06);
+  border: 1px solid rgba(245,158,11,.12);
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
+.hermes-msg.error {
+  align-self: center;
+  background: rgba(248,113,113,.06);
+  border: 1px solid rgba(248,113,113,.12);
+  color: var(--red);
+  font-size: 10px;
+}
+.hermes-msg .msg-role {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: .1em;
+  margin-bottom: 3px;
+}
+
+/* Hermes input bar */
+.hermes-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg3);
+}
+.hermes-input {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border-hi);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
+}
+.hermes-input:focus {
+  border-color: rgba(34,211,238,.4);
+}
+.hermes-input::placeholder {
+  color: var(--dim);
+}
+.hermes-mic-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background: var(--bg2);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.hermes-mic-btn:hover {
+  border-color: rgba(34,211,238,.4);
+  color: var(--cyan);
+}
+.hermes-mic-btn.recording {
+  background: rgba(248,113,113,.15);
+  border-color: rgba(248,113,113,.4);
+  color: var(--red);
+  animation: hermes-pulse 1s infinite;
+}
+@keyframes hermes-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,.3); }
+  50% { box-shadow: 0 0 0 6px rgba(248,113,113,0); }
+}
+.hermes-send-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(34,211,238,.2);
+  background: rgba(34,211,238,.08);
+  color: var(--cyan);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.hermes-send-btn:hover {
+  background: rgba(34,211,238,.15);
+  border-color: rgba(34,211,238,.4);
+}
+.hermes-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Hermes settings panel */
+.hermes-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.hermes-setting-label {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: .12em;
+}
+.hermes-setting select,
+.hermes-setting input[type="range"] {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border-hi);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  outline: none;
+}
+.hermes-setting select:focus {
+  border-color: rgba(34,211,238,.4);
+}
+.hermes-range-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hermes-range-row input[type="range"] {
+  flex: 1;
+}
+.hermes-range-val {
+  font-size: 9px;
+  color: var(--muted);
+  min-width: 28px;
+  text-align: right;
+}
+.hermes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text);
+}
+.hermes-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--cyan);
+}
+
+/* Hermes status panel */
+.hermes-svc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 10px;
+}
+.hermes-svc-row .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hermes-svc-name { color: var(--muted); flex: 1 }
+.hermes-svc-port { color: var(--dim); font-size: 9px }
+
+/* Voice waveform indicator */
+.hermes-waveform {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px;
+}
+.hermes-waveform.active { display: flex; }
+.hermes-waveform .bar {
+  width: 3px;
+  background: var(--cyan);
+  border-radius: 2px;
+  animation: hermes-wave 0.6s infinite ease-in-out;
+}
+.hermes-waveform .bar:nth-child(1) { animation-delay: -0.1s; }
+.hermes-waveform .bar:nth-child(2) { animation-delay: -0.3s; }
+.hermes-waveform .bar:nth-child(3) { animation-delay: -0.5s; }
+.hermes-waveform .bar:nth-child(4) { animation-delay: -0.2s; }
+.hermes-waveform .bar:nth-child(5) { animation-delay: -0.4s; }
+@keyframes hermes-wave {
+  0%,100% { height: 4px; }
+  50% { height: 18px; }
+}
+
 .mon-approval-panel {
   grid-column: 1/-1;
   background: var(--bg);
@@ -1887,6 +2134,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
         <div class="nav-dd-item" data-view="claude" onclick="showView('claude')">⊚ Terminal · Claude Code</div>
         <div class="nav-dd-item" data-view="sw4" onclick="showView('sw4')">🛠 SW4.0 prompt generator</div>
         <div class="nav-dd-item" data-view="openclaw" onclick="showView('openclaw')">🦞 OpenClaw · WSL2</div>
+        <div class="nav-dd-item" data-view="hermes" onclick="showView('hermes')">✦ Hermes · Voice/Chat</div>
         <div class="nav-dd-sep"></div>
         <div class="nav-dd-label">Swarm</div>
         <div class="nav-dd-item" data-view="agent" onclick="showView('agent')">⊛ Agent Swarm</div>
@@ -5103,6 +5351,182 @@ Verify the following script against K-9 SW4.0 constraints.
 
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     HERMES (CB-10) — Voice/Chat Gateway
+     Connects to k9-llm-router :8765 /route for LLM responses
+     Web Speech API for voice input (SpeechRecognition) + TTS (speechSynthesis)
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="view" id="v-hermes" data-layout="hermes">
+
+  <!-- ── TOP BAR ── -->
+  <div class="cell cell-dark" style="grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 16px">
+    <div class="pulse" style="width:7px;height:7px;flex-shrink:0"></div>
+    <span style="font-size:10px;letter-spacing:.18em;color:var(--purple)">✦ HERMES · VOICE/CHAT</span>
+    <span style="font-size:9px;color:var(--dim)" id="hermes-status-text">localhost:8765 · K-9 LLM Router</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <span style="font-size:9px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.15);color:var(--purple);padding:2px 7px;border-radius:3px" id="hermes-conn-chip">checking…</span>
+      <div class="mode-switcher">
+        <div class="mode-btn active" id="hermes-btn-chat" onclick="setHermesMode('chat')">◎ CHAT</div>
+        <div class="mode-btn" id="hermes-btn-voice" onclick="setHermesMode('voice')">🎤 VOICE</div>
+        <div class="mode-btn" id="hermes-btn-settings" onclick="setHermesMode('settings')">⚙ SETTINGS</div>
+      </div>
+      <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesRefresh()">⟳ refresh</button>
+    </div>
+  </div>
+
+  <!-- ── LEFT: Chat/Settings panel ── -->
+  <div class="cell cell-dark" style="grid-column:1;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden">
+
+    <!-- CHAT panel -->
+    <div id="hermes-chat-panel" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div class="lbl">CHAT HISTORY</div>
+      <div class="hermes-messages" id="hermes-messages">
+        <div class="hermes-msg system">Hermes ready · type or tap 🎤 to speak</div>
+      </div>
+      <div class="hermes-input-bar">
+        <button class="hermes-mic-btn" id="hermes-mic-btn" onclick="hermesToggleVoice()" title="Voice input">🎤</button>
+        <input type="text" class="hermes-input" id="hermes-input" placeholder="Speak to Vectos…" onkeydown="if(event.key==='Enter')hermesSend()">
+        <button class="hermes-send-btn" id="hermes-send-btn" onclick="hermesSend()">SEND</button>
+      </div>
+      <div class="hermes-waveform" id="hermes-waveform">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <span style="font-size:9px;color:var(--muted);margin-left:8px" id="hermes-voice-status">Listening…</span>
+      </div>
+    </div>
+
+    <!-- SETTINGS panel (hidden by default) -->
+    <div id="hermes-settings-panel" style="flex:1;display:none;flex-direction:column;overflow-y:auto;padding:12px">
+      <div class="lbl">VOICE SETTINGS</div>
+
+      <div class="hermes-setting">
+        <div class="hermes-setting-label">TTS VOICE</div>
+        <select id="hermes-voice-select" onchange="hermesSaveSettings()">
+          <option value="">System default</option>
+        </select>
+      </div>
+
+      <div class="hermes-setting">
+        <div class="hermes-setting-label">RATE (SPEED)</div>
+        <div class="hermes-range-row">
+          <input type="range" id="hermes-rate" min="0.5" max="2" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-rate-val')">
+          <span class="hermes-range-val" id="hermes-rate-val">1.0</span>
+        </div>
+      </div>
+
+      <div class="hermes-setting">
+        <div class="hermes-setting-label">PITCH</div>
+        <div class="hermes-range-row">
+          <input type="range" id="hermes-pitch" min="0" max="2" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-pitch-val')">
+          <span class="hermes-range-val" id="hermes-pitch-val">1.0</span>
+        </div>
+      </div>
+
+      <div class="hermes-setting">
+        <div class="hermes-setting-label">VOLUME</div>
+        <div class="hermes-range-row">
+          <input type="range" id="hermes-volume" min="0" max="1" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-volume-val')">
+          <span class="hermes-range-val" id="hermes-volume-val">1.0</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+        <label class="hermes-toggle">
+          <input type="checkbox" id="hermes-auto-tts" checked onchange="hermesSaveSettings()">
+          <span>Auto-speak responses</span>
+        </label>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+        <label class="hermes-toggle">
+          <input type="checkbox" id="hermes-vectos-sync" checked onchange="hermesSaveSettings()">
+          <span>Sync expressions to Vectos avatar</span>
+        </label>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+        <label class="hermes-toggle">
+          <input type="checkbox" id="hermes-carbon-relay" checked onchange="hermesSaveSettings()">
+          <span>Relay chat to Carbon (:8744)</span>
+        </label>
+      </div>
+
+      <div style="margin-top:12px">
+        <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="hermesTestVoice()">🔊 Test Voice</button>
+      </div>
+      <div style="margin-top:6px">
+        <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="hermesClearChat()">🗑 Clear Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CENTER: Active conversation / voice viz ── -->
+  <div class="cell cell-dark" style="grid-column:2;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden;padding:0;position:relative">
+
+    <!-- Chat conversation view (chat mode) -->
+    <div id="hermes-conversation" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div class="hermes-messages" id="hermes-conversation-messages" style="flex:1;overflow-y:auto;padding:14px 18px">
+        <div class="hermes-msg assistant">
+          <div class="msg-role">VECTOS</div>
+          Hermes voice gateway initialized. I can hear you and speak back. Tap the mic or type to start.
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice mode viz (hidden by default) -->
+    <div id="hermes-voice-viz" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px">
+      <div style="width:120px;height:120px;border-radius:50%;border:2px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:48px;background:rgba(167,139,250,.04)" id="hermes-orb">✦</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:.15em" id="hermes-voice-mode-label">TAP MIC TO START</div>
+      <div class="hermes-waveform" id="hermes-waveform-large" style="height:40px">
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+        <div class="bar" style="width:4px"></div>
+      </div>
+      <div style="font-size:10px;color:var(--dim);max-width:300px;text-align:center" id="hermes-transcript">—</div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Service health + quick actions ── -->
+  <div class="cell cell-dark" style="grid-column:3;grid-row:2/4;display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:10px">
+    <div class="lbl">SERVICE HEALTH</div>
+    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-llmr"></div><span class="hermes-svc-name">K-9 LLM Router</span><span class="hermes-svc-port">:8765</span></div>
+    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-orch"></div><span class="hermes-svc-name">Orchestrator</span><span class="hermes-svc-port">:8744</span></div>
+    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-ollama"></div><span class="hermes-svc-name">Ollama</span><span class="hermes-svc-port">:11434</span></div>
+    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-cb"></div><span class="hermes-svc-name">Carbon Chat</span><span class="hermes-svc-port">:8744</span></div>
+
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+      <div class="lbl">VOICE STATUS</div>
+      <div style="font-size:9px;color:var(--muted);line-height:1.8">
+        Recognition: <span id="hermes-rec-status" style="color:var(--dim)">checking</span><br>
+        Synthesis: <span id="hermes-tts-status" style="color:var(--dim)">checking</span><br>
+        Voices: <span id="hermes-voice-count" style="color:var(--dim)">—</span>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+      <div class="lbl">QUICK ACTIONS</div>
+      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="hermesVoiceCommand('status')">📊 System Status</button>
+      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="hermesVoiceCommand('time')">⏰ Current Time</button>
+      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="showView('carbon')">⬡ Go to Carbon</button>
+      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="showView('agent')">⊛ Go to Agent</button>
+    </div>
+
+    <div style="flex:1;min-height:0"></div>
+    <div style="font-size:8px;color:var(--dim);text-align:center">Hermes · CB-10 · Web Speech API</div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <div class="cell cell-dark" style="grid-column:1/-1;grid-row:3;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
+    <span style="font-size:9px;color:var(--dim)" id="hermes-footer">Hermes voice gateway · powered by K-9 LLM Router</span>
+    <span style="font-size:9px;color:var(--dim)" id="hermes-msg-count">0 messages</span>
+  </div>
+
+</div>
+
 <div class="view" id="v-setup" data-layout="panel">
 
   <!-- ── COL 1 ROW 1+2: Boot Wizard ── -->
@@ -5369,8 +5793,10 @@ function showView(id) {
   if (id === 'arch')       setTimeout(archTabInit, 150);
   if (id === 'setup')      setTimeout(setupTabInit, 200);
   if (id === 'openclaw')   setTimeout(openclawInit, 200);
+  if (id === 'hermes')    setTimeout(hermesInit, 200);
   if (id === 'monitor') { _monActive = true; setTimeout(monTabInit, 100); }
   else { _monActive = false; }
+  if (id !== 'hermes') _hermesActive = false;
   if (id === 'sw4') {
     setTimeout(() => {
       const tab = document.querySelector('.rt-tab[data-rtab="sw4"]');
@@ -11232,6 +11658,471 @@ async function monResetCircuitBreaker() {
     console.error('Circuit breaker reset failed:', e);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HERMES (CB-10) — Voice/Chat Gateway + Web Speech Integration
+   Connects to k9-llm-router :8765 /route for LLM responses
+   Web Speech API: SpeechRecognition (input) + speechSynthesis (TTS)
+   Shared voice module: used by Hermes, Carbon, and Vectos avatar
+   ═══════════════════════════════════════════════════════════════ */
+
+const HERMES_BASE = 'http://localhost:8765';
+let _hermesActive = false;
+let _hermesMode = 'chat';
+let _hermesRecognizing = false;
+let _hermesRecognition = null;
+let _hermesVoices = [];
+let _hermesMsgCount = 0;
+let _hermesSettings = {
+  voice: '', rate: 1, pitch: 1, volume: 1,
+  autoTTS: true, vectosSync: true, carbonRelay: true
+};
+
+// ── Load settings from localStorage ──
+function hermesLoadSettings() {
+  try {
+    const saved = localStorage.getItem('hermes_settings');
+    if (saved) _hermesSettings = { ..._hermesSettings, ...JSON.parse(saved) };
+  } catch(e) {}
+}
+function hermesSaveSettings() {
+  _hermesSettings.voice = document.getElementById('hermes-voice-select')?.value || '';
+  _hermesSettings.rate = parseFloat(document.getElementById('hermes-rate')?.value || 1);
+  _hermesSettings.pitch = parseFloat(document.getElementById('hermes-pitch')?.value || 1);
+  _hermesSettings.volume = parseFloat(document.getElementById('hermes-volume')?.value || 1);
+  _hermesSettings.autoTTS = document.getElementById('hermes-auto-tts')?.checked ?? true;
+  _hermesSettings.vectosSync = document.getElementById('hermes-vectos-sync')?.checked ?? true;
+  _hermesSettings.carbonRelay = document.getElementById('hermes-carbon-relay')?.checked ?? true;
+  try { localStorage.setItem('hermes_settings', JSON.stringify(_hermesSettings)); } catch(e) {}
+}
+
+// ── Update range display ──
+function hermesUpdateRange(input, valId) {
+  document.getElementById(valId).textContent = parseFloat(input.value).toFixed(1);
+  hermesSaveSettings();
+}
+
+// ── Shared TTS engine ──
+function hermesTTS(text, opts = {}) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = opts.rate ?? _hermesSettings.rate;
+  u.pitch = opts.pitch ?? _hermesSettings.pitch;
+  u.volume = opts.volume ?? _hermesSettings.volume;
+  if (_hermesVoices.length > 0) {
+    const v = _hermesVoices.find(x => x.name === _hermesSettings.voice) || _hermesVoices[0];
+    if (v) u.voice = v;
+  }
+  u.onstart = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression(text);
+      CarbonTab.updateFX(text);
+    }
+  };
+  u.onend = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression('neutral');
+    }
+  };
+  window.speechSynthesis.speak(u);
+  // Also run lip-sync stub
+  if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+    CarbonTab.speak(text, null);
+  }
+}
+
+// ── Shared SpeechRecognition engine ──
+function hermesInitRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    const recEl = document.getElementById('hermes-rec-status');
+    if (recEl) recEl.textContent = 'not supported';
+    return null;
+  }
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.onstart = () => {
+    _hermesRecognizing = true;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.add('recording');
+    const wf = document.getElementById('hermes-waveform');
+    if (wf) wf.classList.add('active');
+    const wfl = document.getElementById('hermes-waveform-large');
+    if (wfl) wfl.classList.add('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'LISTENING…';
+    const vs = document.getElementById('hermes-voice-status');
+    if (vs) vs.textContent = 'Listening…';
+  };
+  r.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const tr = document.getElementById('hermes-transcript');
+    if (tr) tr.textContent = interim || final || '—';
+    const input = document.getElementById('hermes-input');
+    if (input && (interim || final)) input.value = final || interim;
+    if (final) {
+      hermesSendText(final.trim());
+    }
+  };
+  r.onerror = (e) => {
+    console.warn('SpeechRecognition error:', e.error);
+    if (e.error === 'not-allowed') {
+      hermesAddMsg('error', 'Microphone access denied. Check browser permissions.');
+    }
+  };
+  r.onend = () => {
+    _hermesRecognizing = false;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.remove('recording');
+    const wf = document.getElementById('hermes-waveform');
+    if (wf) wf.classList.remove('active');
+    const wfl = document.getElementById('hermes-waveform-large');
+    if (wfl) wfl.classList.remove('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'TAP MIC TO START';
+    const vs = document.getElementById('hermes-voice-status');
+    if (vs) vs.textContent = 'Idle';
+  };
+  return r;
+}
+
+function hermesToggleVoice() {
+  if (!_hermesRecognition) _hermesRecognition = hermesInitRecognition();
+  if (!_hermesRecognition) {
+    hermesAddMsg('error', 'Voice recognition not supported in this browser.');
+    return;
+  }
+  if (_hermesRecognizing) {
+    _hermesRecognition.stop();
+  } else {
+    try { _hermesRecognition.start(); } catch(e) { console.warn(e); }
+  }
+}
+
+// ── Load voices ──
+function hermesLoadVoices() {
+  if (!window.speechSynthesis) return;
+  _hermesVoices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('hermes-voice-select');
+  if (!sel) return;
+  // Keep first option (default)
+  while (sel.options.length > 1) sel.remove(1);
+  _hermesVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+  if (_hermesSettings.voice) sel.value = _hermesSettings.voice;
+  const vc = document.getElementById('hermes-voice-count');
+  if (vc) vc.textContent = _hermesVoices.length + ' available';
+  const ts = document.getElementById('hermes-tts-status');
+  if (ts) ts.textContent = _hermesVoices.length > 0 ? 'ready' : 'no voices';
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = hermesLoadVoices;
+}
+
+// ── Chat message helpers ──
+function hermesAddMsg(role, text, target = 'both') {
+  const msg = `<div class="hermes-msg ${role}"><div class="msg-role">${role.toUpperCase()}</div>${text}</div>`;
+  if (target === 'both' || target === 'chat') {
+    const c1 = document.getElementById('hermes-messages');
+    if (c1) { c1.insertAdjacentHTML('beforeend', msg); c1.scrollTop = c1.scrollHeight; }
+  }
+  if (target === 'both' || target === 'conversation') {
+    const c2 = document.getElementById('hermes-conversation-messages');
+    if (c2) { c2.insertAdjacentHTML('beforeend', msg); c2.scrollTop = c2.scrollHeight; }
+  }
+  _hermesMsgCount++;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = _hermesMsgCount + ' messages';
+}
+
+function hermesClearChat() {
+  ['hermes-messages', 'hermes-conversation-messages'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
+  });
+  _hermesMsgCount = 0;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = '0 messages';
+}
+
+// ── Send text to LLM ──
+async function hermesSendText(text) {
+  if (!text || !text.trim()) return;
+  text = text.trim();
+
+  hermesAddMsg('user', text);
+  const input = document.getElementById('hermes-input');
+  if (input) input.value = '';
+
+  // Show thinking indicator
+  hermesAddMsg('system', 'Vectos is thinking…', 'conversation');
+
+  // Send to k9-llm-router /route
+  try {
+    const r = await fetch(`${HERMES_BASE}/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: text }],
+        temperature: 0.7,
+        max_tokens: 500
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    // Extract response — handle various response formats
+    let response = '';
+    if (data.response) response = data.response;
+    else if (data.content) response = data.content;
+    else if (data.choices?.[0]?.message?.content) response = data.choices[0].message.content;
+    else if (data.message?.content) response = data.message.content;
+    else if (data.text) response = data.text;
+    else response = JSON.stringify(data).slice(0, 200);
+
+    // Remove thinking indicator
+    const conv = document.getElementById('hermes-conversation-messages');
+    if (conv) {
+      const sys = conv.querySelector('.hermes-msg.system:last-child');
+      if (sys && sys.textContent.includes('thinking')) sys.remove();
+    }
+
+    hermesAddMsg('assistant', response);
+
+    // TTS if enabled
+    if (_hermesSettings.autoTTS) {
+      hermesTTS(response);
+    }
+
+    // Relay to Carbon chat if enabled
+    if (_hermesSettings.carbonRelay) {
+      try {
+        await fetch('http://localhost:8744/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, response: response }),
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch(e) { /* Carbon may be offline — silent fail */ }
+    }
+
+  } catch(err) {
+    // Fallback: try a simple echo if router is offline
+    const fallback = `Router offline (${err.message}). Make sure K-9 LLM Router is running on :8765. Start it with: ./launch-economic-stack.sh start`;
+    hermesAddMsg('error', fallback);
+
+    // If router is down, still provide a basic response
+    const local = `[OFFLINE MODE] I received: "${text}" — but the K-9 LLM Router (:8765) is not responding. Check that the router service is running.`;
+    hermesAddMsg('assistant', local);
+    if (_hermesSettings.autoTTS) hermesTTS(local);
+  }
+}
+
+function hermesSend() {
+  const input = document.getElementById('hermes-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  hermesSendText(text);
+}
+
+// ── Voice commands ──
+function hermesVoiceCommand(cmd) {
+  const commands = {
+    'status': 'Give me a system status report. What services are running?',
+    'time': `The current time is ${new Date().toLocaleTimeString()}.`,
+  };
+  if (cmd === 'time') {
+    hermesAddMsg('assistant', commands[cmd]);
+    if (_hermesSettings.autoTTS) hermesTTS(commands[cmd]);
+  } else {
+    hermesSendText(commands[cmd]);
+  }
+}
+
+// ── Test voice ──
+function hermesTestVoice() {
+  hermesTTS('Hermes voice gateway test. Voice synthesis is working.');
+}
+
+// ── Mode switcher ──
+function setHermesMode(mode) {
+  _hermesMode = mode;
+  document.querySelectorAll('#v-hermes .mode-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`hermes-btn-${mode}`);
+  if (btn) btn.classList.add('active');
+
+  const chatPanel = document.getElementById('hermes-chat-panel');
+  const settingsPanel = document.getElementById('hermes-settings-panel');
+  const conversation = document.getElementById('hermes-conversation');
+  const voiceViz = document.getElementById('hermes-voice-viz');
+
+  if (mode === 'settings') {
+    if (chatPanel) chatPanel.style.display = 'none';
+    if (settingsPanel) settingsPanel.style.display = 'flex';
+    if (conversation) conversation.style.display = 'none';
+    if (voiceViz) voiceViz.style.display = 'none';
+  } else if (mode === 'voice') {
+    if (chatPanel) chatPanel.style.display = 'flex';
+    if (settingsPanel) settingsPanel.style.display = 'none';
+    if (conversation) conversation.style.display = 'none';
+    if (voiceViz) voiceViz.style.display = 'flex';
+    // Auto-start listening
+    if (!_hermesRecognizing) hermesToggleVoice();
+  } else {
+    // chat mode
+    if (chatPanel) chatPanel.style.display = 'flex';
+    if (settingsPanel) settingsPanel.style.display = 'none';
+    if (conversation) conversation.style.display = 'flex';
+    if (voiceViz) voiceViz.style.display = 'none';
+  }
+}
+
+// ── Service health check ──
+async function hermesCheckHealth() {
+  const services = [
+    { id: 'hermes-h-llmr', port: 8765, name: 'LLM Router' },
+    { id: 'hermes-h-orch', port: 8080, name: 'Orchestrator' },
+    { id: 'hermes-h-ollama', port: 11434, name: 'Ollama' },
+    { id: 'hermes-h-cb', port: 8744, name: 'Carbon' },
+  ];
+  for (const svc of services) {
+    try {
+      const r = await fetch(`http://localhost:${svc.port}/health`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      const dot = document.getElementById(svc.id);
+      if (dot) {
+        dot.classList.remove('dd');
+        dot.classList.add(r.ok ? 'dg' : 'dr');
+      }
+    } catch(e) {
+      const dot = document.getElementById(svc.id);
+      if (dot) { dot.classList.remove('dd','dg'); dot.classList.add('dr'); }
+    }
+  }
+  // Update connection chip
+  try {
+    const r = await fetch(`${HERMES_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) {
+      chip.textContent = r.ok ? ':8765 · online' : ':8765 · offline';
+      chip.style.color = r.ok ? 'var(--green)' : 'var(--red)';
+    }
+  } catch(e) {
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) { chip.textContent = ':8765 · offline'; chip.style.color = 'var(--red)'; }
+  }
+  // Check SpeechRecognition support
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recEl = document.getElementById('hermes-rec-status');
+  if (recEl) recEl.textContent = SR ? 'ready' : 'not supported';
+}
+
+// ── Refresh ──
+function hermesRefresh() {
+  hermesCheckHealth();
+  hermesLoadVoices();
+}
+
+// ── Tab init (called by showView) ──
+function hermesInit() {
+  _hermesActive = true;
+  hermesLoadSettings();
+  hermesLoadVoices();
+  hermesCheckHealth();
+  // Auto-check health every 10s while active
+  if (!window._hermesHealthInterval) {
+    window._hermesHealthInterval = setInterval(() => {
+      if (_hermesActive && !document.hidden) hermesCheckHealth();
+    }, 10000);
+  }
+}
+
+// ── Global voice API (shared with Carbon + Vectos) ──
+window.K9Voice = {
+  // Speak text with TTS + avatar sync
+  speak(text, opts = {}) {
+    hermesTTS(text, opts);
+  },
+  // Start voice recognition, call cb with transcript
+  listen(cb) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { cb(null, 'not supported'); return; }
+    const r = new SR();
+    r.continuous = false;
+    r.interimResults = false;
+    r.lang = 'en-US';
+    r.onresult = (e) => { cb(e.results[0][0].transcript, null); };
+    r.onerror = (e) => { cb(null, e.error); };
+    r.start();
+  },
+  // Get available voices
+  getVoices() { return _hermesVoices; },
+  // Check support
+  supported() {
+    return {
+      recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      synthesis: !!window.speechSynthesis
+    };
+  }
+};
+
+// ── Enhance Carbon speak with TTS + LLM ──
+const _origCarbonSpeak = carbonSpeak;
+carbonSpeak = function() {
+  const input = document.getElementById('carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Show in avatar
+  if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
+  input.value = '';
+
+  // TTS the input
+  hermesTTS(text);
+
+  // Send to LLM and speak the response
+  hermesSendText(text).then(() => {
+    // Response is already added to chat and spoken by hermesSendText
+  });
+};
+
+// ── Enhance agCarbonSpeak with TTS + LLM ──
+const _origAgCarbonSpeak = agCarbonSpeak;
+agCarbonSpeak = function() {
+  const input = document.getElementById('ag-carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Show in avatar
+  agCarbonUpdateExpression(text);
+  input.value = '';
+
+  // TTS
+  hermesTTS(text);
+
+  // Send to LLM
+  hermesSendText(text);
+};
+
 
 // Monitor polling — 5s interval when tab is active
 setInterval(() => {
