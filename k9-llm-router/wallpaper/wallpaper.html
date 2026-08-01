@@ -738,6 +738,260 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 }
 .latency-fill{height:100%;border-radius:2px;transition:width .4s ease}
 .lf-good{background:var(--green)}.lf-ok{background:var(--cyan)}.lf-warn{background:var(--amber)}.lf-bad{background:var(--red)}
+
+/* ── MONITOR VIEW (CB-8) ──────────────────────────────────────────────────── */
+.view[data-layout="monitor"].active {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr 1fr 40px;
+  gap: 1px;
+  background: var(--border);
+}
+.mon-approval-panel {
+  grid-column: 1/-1;
+  background: var(--bg);
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.mon-stat-grid {
+  grid-column: 1/-1;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.mon-stat {
+  background: var(--bg2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mon-stat-label {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--dim);
+}
+.mon-stat-value {
+  font-family: var(--font-hd);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+}
+.mon-stat-value.green { color: var(--green) }
+.mon-stat-value.amber { color: var(--amber) }
+.mon-stat-value.red { color: var(--red) }
+.mon-stat-value.cyan { color: var(--cyan) }
+.mon-stat-value.purple { color: var(--purple) }
+.mon-stat-sub {
+  font-size: 8.5px;
+  color: var(--muted);
+}
+.mon-cb-card {
+  background: var(--bg2);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.mon-cb-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.mon-cb-indicator.ok {
+  background: rgba(74,222,128,.06);
+  border-color: rgba(74,222,128,.2);
+}
+.mon-cb-indicator.tripped {
+  background: rgba(248,113,113,.1);
+  border-color: rgba(248,113,113,.3);
+  animation: mon-pulse 1.5s ease-in-out infinite;
+}
+@keyframes mon-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,.2) }
+  50% { box-shadow: 0 0 0 4px rgba(248,113,113,.05) }
+}
+.mon-cb-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mon-cb-dot.ok { background: var(--green); box-shadow: 0 0 6px rgba(74,222,128,.4) }
+.mon-cb-dot.tripped { background: var(--red); box-shadow: 0 0 8px rgba(248,113,113,.5) }
+.mon-cb-text {
+  font-size: 10px;
+  flex: 1;
+}
+.mon-cb-reason {
+  font-size: 8.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.mon-cb-reset-btn {
+  font-size: 9px;
+  padding: 5px 10px;
+  border: 1px solid rgba(248,113,113,.4);
+  border-radius: 3px;
+  background: rgba(248,113,113,.1);
+  color: var(--red);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  transition: background .15s;
+}
+.mon-cb-reset-btn:hover { background: rgba(248,113,113,.2) }
+.mon-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.mon-alert-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 3px;
+  border-left: 2px solid var(--border);
+  background: var(--bg3);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+.mon-alert-row.warning { border-left-color: var(--amber); background: rgba(245,158,11,.04) }
+.mon-alert-row.critical { border-left-color: var(--red); background: rgba(248,113,113,.05) }
+.mon-alert-row.emergency { border-left-color: var(--red); background: rgba(248,113,113,.08) }
+.mon-alert-row.info { border-left-color: var(--cyan); background: rgba(34,211,238,.04) }
+.mon-alert-badge {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.mon-alert-badge.warning { background: rgba(245,158,11,.15); color: var(--amber) }
+.mon-alert-badge.critical { background: rgba(248,113,113,.15); color: var(--red) }
+.mon-alert-badge.emergency { background: rgba(248,113,113,.25); color: var(--red) }
+.mon-alert-badge.info { background: rgba(34,211,238,.15); color: var(--cyan) }
+.mon-alert-msg { color: var(--text); flex: 1 }
+.mon-alert-time { color: var(--dim); font-size: 8px; margin-top: 2px }
+.mon-journal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.mon-journal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--bg3);
+  border-radius: 2px;
+  font-size: 9px;
+}
+.mon-journal-badge {
+  font-size: 7.5px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  flex-shrink: 0;
+}
+.mon-journal-badge.auto { background: rgba(74,222,128,.12); color: var(--green) }
+.mon-journal-badge.human { background: rgba(245,158,11,.12); color: var(--amber) }
+.mon-journal-badge.reject { background: rgba(248,113,113,.12); color: var(--red) }
+.mon-journal-text {
+  color: var(--muted);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mon-journal-meta {
+  font-size: 8px;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.mon-empty {
+  color: var(--dim);
+  font-size: 9px;
+  text-align: center;
+  padding: 20px 0;
+}
+.mon-approval-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 3px;
+  background: var(--bg3);
+  border-left: 2px solid var(--amber);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+.mon-approval-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.mon-approve-btn, .mon-reject-btn {
+  font-size: 8px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border: 1px solid;
+  font-family: var(--font-mono);
+}
+.mon-approve-btn {
+  border-color: rgba(74,222,128,.4);
+  background: rgba(74,222,128,.08);
+  color: var(--green);
+}
+.mon-approve-btn:hover { background: rgba(74,222,128,.18) }
+.mon-reject-btn {
+  border-color: rgba(248,113,113,.4);
+  background: rgba(248,113,113,.08);
+  color: var(--red);
+}
+.mon-reject-btn:hover { background: rgba(248,113,113,.18) }
+.mon-approval-meta {
+  font-size: 8px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+.mon-reset-btn {
+  font-size: 9px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.mon-reset-btn:hover { color: var(--text); border-color: var(--cyan) }
+
 </style>
 </head>
 <body>
@@ -757,6 +1011,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <div class="tab" data-view="security">⬡ SECURITY</div>
     <div class="tab" data-view="grid">⊕ GRID</div>
     <div class="tab" data-view="agent">⊛ AGENT</div>
+    <div class="tab" data-view="monitor">⊞ MONITOR</div>
     <div class="tab" data-view="terminal">⊚ TERMINAL</div>
   </div>
   <div class="hdr-right">
@@ -2417,6 +2672,113 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   </div>
 </div>
 
+<!-- MONITOR (CB-8) -->
+<div class="view" id="v-monitor" data-layout="monitor">
+
+  <!-- ══ Stat strip ════════════════════════════════ -->
+  <div class="mon-stat-grid">
+    <div class="mon-stat">
+      <div class="mon-stat-label">Auto-Execute</div>
+      <div class="mon-stat-value green" id="mon-auto-count">—</div>
+      <div class="mon-stat-sub" id="mon-auto-sub">decisions</div>
+    </div>
+    <div class="mon-stat">
+      <div class="mon-stat-label">Human Review</div>
+      <div class="mon-stat-value amber" id="mon-human-count">—</div>
+      <div class="mon-stat-sub" id="mon-human-sub">pending</div>
+    </div>
+    <div class="mon-stat">
+      <div class="mon-stat-label">Rejected</div>
+      <div class="mon-stat-value red" id="mon-reject-count">—</div>
+      <div class="mon-stat-sub" id="mon-reject-sub">decisions</div>
+    </div>
+    <div class="mon-stat">
+      <div class="mon-stat-label">Error Rate</div>
+      <div class="mon-stat-value cyan" id="mon-error-rate">—</div>
+      <div class="mon-stat-sub" id="mon-error-sub">dispatch errors</div>
+    </div>
+    <div class="mon-stat">
+      <div class="mon-stat-label">Avg Confidence</div>
+      <div class="mon-stat-value purple" id="mon-conf-baseline">—</div>
+      <div class="mon-stat-sub" id="mon-conf-sub">baseline</div>
+    </div>
+    <div class="mon-stat">
+      <div class="mon-stat-label">Total Alerts</div>
+      <div class="mon-stat-value" id="mon-alert-count">—</div>
+      <div class="mon-stat-sub" id="mon-alert-sub">active</div>
+    </div>
+  </div>
+
+  <!-- ══ Circuit Breaker ═══════════════════════════ -->
+  <div class="cell" style="display:flex;flex-direction:column">
+    <div class="lbl">⬡ Circuit Breaker</div>
+    <div class="mon-cb-card">
+      <div class="mon-cb-indicator ok" id="mon-cb-indicator">
+        <div class="mon-cb-dot ok" id="mon-cb-dot"></div>
+        <div style="flex:1">
+          <div class="mon-cb-text" id="mon-cb-text">Operational — auto-execution active</div>
+          <div class="mon-cb-reason" id="mon-cb-reason">No errors detected</div>
+        </div>
+      </div>
+      <div id="mon-cb-reset-wrap" style="display:none">
+        <button class="mon-cb-reset-btn" onclick="monResetCircuitBreaker()">↻ Reset Circuit Breaker</button>
+      </div>
+      <div style="margin-top:auto">
+        <div class="lbl" style="margin-bottom:6px">Breaker Stats</div>
+        <div style="font-size:9px;color:var(--muted);line-height:1.6">
+          <div>Consecutive errors: <span id="mon-cb-streak" style="color:var(--text)">0</span></div>
+          <div>Threshold: <span id="mon-cb-threshold" style="color:var(--text)">10</span></div>
+          <div>Total trips: <span id="mon-cb-trips" style="color:var(--text)">0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Active Alerts ═════════════════════════════ -->
+  <div class="cell" style="display:flex;flex-direction:column">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⚠ Active Alerts</span>
+      <button class="mon-reset-btn" onclick="monLoadAlerts()">↻ Refresh</button>
+    </div>
+    <div class="mon-alerts-list" id="mon-alerts-list">
+      <div class="mon-empty">No alerts — system nominal</div>
+    </div>
+  </div>
+
+  <!-- ══ Recent Decisions ═══════════════════════════ -->
+  <div class="cell" style="display:flex;flex-direction:column">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⊛ Decision Journal</span>
+      <button class="mon-reset-btn" onclick="monLoadJournal()">↻ Refresh</button>
+    </div>
+    <div class="mon-journal-list" id="mon-journal-list">
+      <div class="mon-empty">No decisions recorded yet</div>
+    </div>
+  </div>
+
+  <!-- ══ Approval Queue (CB-9) ═══════════════════════ -->
+  <div class="mon-approval-panel" id="mon-approval-panel">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <span>⚠ Pending Approvals <span id="mon-approval-count" style="color:var(--amber)">0</span></span>
+      <span style="font-size:8px;color:var(--dim)">Approve → auto-dispatch · Reject → negative feedback to encoder</span>
+    </div>
+    <div id="mon-approval-list" style="display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:140px">
+      <div class="mon-empty">No pending approvals — all clear</div>
+    </div>
+  </div>
+
+  <!-- ══ Footer ═════════════════════════════════════ -->
+  <div class="cell-footer">
+    <span style="font-size:9px;color:var(--muted)">CB-8/9 Monitoring · poll 5s</span>
+    <span style="font-size:9px;color:var(--dim)">Last update: <span id="mon-last-update">never</span></span>
+    <span style="flex:1"></span>
+    <a class="act-btn" href="http://localhost:8765/reason/monitor/status" target="_blank" style="font-size:9px;padding:4px 8px">
+      <span><b>API</b><span class="act-sub">/reason/monitor/*</span></span>
+    </a>
+  </div>
+
+</div>
+
 <!-- ═══════════════════════════════════════
      TERMINAL TAB
 ═══════════════════════════════════════ -->
@@ -3118,6 +3480,255 @@ async function runHomeStackPoll() {
 // Boot poll + 30s recurring
 runHomeStackPoll();
 setInterval(runHomeStackPoll, 30000);
+
+/* ════════════════════════════════════════════════════════
+   CB-8 MONITOR — real-time monitoring dashboard polling
+   Polls /reason/monitor/* endpoints on the k9-llm-router
+   ═══════════════════════════════════════════════════════ */
+const MON_BASE = 'http://localhost:8765';
+let _monActive = false;
+
+async function monFetch(path) {
+  try {
+    const r = await fetch(`${MON_BASE}${path}`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) {
+    return null;
+  }
+}
+
+function monTimeAgo(ts) {
+  if (!ts) return '';
+  const s = Math.floor((Date.now()/1000) - ts);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+async function monPollStatus() {
+  if (!_monActive || document.hidden) return;
+  const s = await monFetch('/reason/monitor/status');
+  if (!s) {
+    // Show offline state
+    const el = document.getElementById('mon-last-update');
+    if (el) el.textContent = 'offline — k9-llm-router :8765 not reachable';
+    return;
+  }
+
+  // Decision counts
+  const dc = s.decision_counts || {};
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setVal('mon-auto-count', dc.auto_execute || 0);
+  setVal('mon-human-count', dc.human_review || 0);
+  setVal('mon-reject-count', dc.reject || 0);
+  setVal('mon-auto-sub', `${dc.total || 0} total decisions`);
+  setVal('mon-human-sub', `${dc.human_review || 0} pending review`);
+  setVal('mon-reject-sub', `${dc.reject || 0} below threshold`);
+
+  // Error rate
+  const ds = s.dispatch_stats || {};
+  const errRate = (ds.error_rate || 0) * 100;
+  const errEl = document.getElementById('mon-error-rate');
+  if (errEl) {
+    errEl.textContent = errRate.toFixed(1) + '%';
+    errEl.className = 'mon-stat-value ' + (errRate > 30 ? 'red' : errRate > 10 ? 'amber' : 'green');
+  }
+  setVal('mon-error-sub', `${ds.error || 0} / ${ds.success + (ds.error||0)} dispatches`);
+
+  // Confidence baseline
+  const cf = s.confidence || {};
+  const confEl = document.getElementById('mon-conf-baseline');
+  if (confEl) {
+    confEl.textContent = (cf.baseline || 0).toFixed(3);
+  }
+  setVal('mon-conf-sub', `${cf.baseline_samples || 0} samples`);
+
+  // Alerts count
+  setVal('mon-alert-count', s.active_alerts || 0);
+  setVal('mon-alert-sub', `${s.total_alerts || 0} total logged`);
+
+  // Circuit breaker
+  const cb = s.circuit_breaker || {};
+  const cbInd = document.getElementById('mon-cb-indicator');
+  const cbDot = document.getElementById('mon-cb-dot');
+  const cbText = document.getElementById('mon-cb-text');
+  const cbReason = document.getElementById('mon-cb-reason');
+  const cbResetWrap = document.getElementById('mon-cb-reset-wrap');
+
+  if (cb.tripped) {
+    if (cbInd) cbInd.className = 'mon-cb-indicator tripped';
+    if (cbDot) cbDot.className = 'mon-cb-dot tripped';
+    if (cbText) cbText.textContent = 'TRIPPED — auto-execution halted';
+    if (cbReason) cbReason.textContent = cb.trip_reason || 'consecutive dispatch errors';
+    if (cbResetWrap) cbResetWrap.style.display = 'block';
+  } else {
+    if (cbInd) cbInd.className = 'mon-cb-indicator ok';
+    if (cbDot) cbDot.className = 'mon-cb-dot ok';
+    if (cbText) cbText.textContent = 'Operational — auto-execution active';
+    if (cbReason) cbReason.textContent = `Consecutive errors: ${cb.consecutive_errors || 0}`;
+    if (cbResetWrap) cbResetWrap.style.display = 'none';
+  }
+  setVal('mon-cb-streak', cb.consecutive_errors || 0);
+  setVal('mon-cb-threshold', cb.threshold || 10);
+  setVal('mon-cb-trips', cb.total_trips || 0);
+
+  // Last update
+  setVal('mon-last-update', new Date().toLocaleTimeString());
+}
+
+async function monLoadAlerts() {
+  const data = await monFetch('/reason/monitor/alerts?limit=20');
+  const list = document.getElementById('mon-alerts-list');
+  if (!list) return;
+  if (!data || !data.alerts || data.alerts.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No alerts — system nominal</div>';
+    return;
+  }
+  list.innerHTML = data.alerts.map(a => {
+    const level = a.level || 'info';
+    const type = (a.alert_type || '').replace(/_/g, ' ');
+    const time = monTimeAgo(a.timestamp);
+    return `<div class="mon-alert-row ${level}">
+      <span class="mon-alert-badge ${level}">${level}</span>
+      <div style="flex:1">
+        <div class="mon-alert-msg">${a.message || 'Unknown alert'}</div>
+        <div class="mon-alert-time">${type} · ${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function monLoadJournal() {
+  const data = await monFetch('/reason/journal?limit=15');
+  const list = document.getElementById('mon-journal-list');
+  if (!list) return;
+  if (!data || !data.entries || data.entries.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No decisions recorded yet</div>';
+    return;
+  }
+  list.innerHTML = data.entries.map(e => {
+    const badge = e.decision === 'auto_execute' ? 'auto'
+      : e.decision === 'human_review' ? 'human'
+      : 'reject';
+    const disp = e.dispatch_result === 'executed' && e.dispatch_service
+      ? ` → ${e.dispatch_service}`
+      : e.dispatch_result === 'circuit_breaker_tripped'
+      ? ' → BLOCKED'
+      : '';
+    const text = (e.question || '').substring(0, 50) + disp;
+    const conf = (e.confidence || 0).toFixed(2);
+    return `<div class="mon-journal-row">
+      <span class="mon-journal-badge ${badge}">${badge}</span>
+      <span class="mon-journal-text">${text}</span>
+      <span class="mon-journal-meta">conf=${conf}</span>
+    </div>`;
+  }).join('');
+}
+
+async function monResetCircuitBreaker() {
+  try {
+    await fetch(`${MON_BASE}/reason/monitor/circuit-breaker/reset`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(monPollStatus, 500);
+  } catch(e) {
+    console.error('Circuit breaker reset failed:', e);
+  }
+}
+
+// Monitor polling — 5s interval when tab is active
+setInterval(() => {
+  if (_monActive && !document.hidden) {
+    monPollStatus();
+    monLoadAlerts();
+    monLoadJournal();
+    monLoadApprovals();
+  }
+}, 5000);
+
+async function monLoadApprovals() {
+  const data = await monFetch('/reason/approvals?limit=10');
+  const list = document.getElementById('mon-approval-list');
+  const countEl = document.getElementById('mon-approval-count');
+  if (!list) return;
+  if (!data || !data.pending || data.pending.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No pending approvals — all clear</div>';
+    if (countEl) countEl.textContent = '0';
+    return;
+  }
+  if (countEl) countEl.textContent = data.count;
+  list.innerHTML = data.pending.map(a => {
+    const age = Math.floor((Date.now()/1000) - a.timestamp);
+    const expires = Math.floor(a.expires_at - (Date.now()/1000));
+    return '<div class="mon-approval-row">' +
+      '<div style="flex:1">' +
+        '<div style="color:var(--text)">' + (a.question||'').substring(0,60) + '</div>' +
+        '<div class="mon-approval-meta">' + a.task_class + '/' + a.risk_level +
+        ' · conf=' + (a.confidence||0).toFixed(2) +
+        ' · ' + a.handover_reason.substring(0,40) +
+        ' · expires in ' + expires + 's</div>' +
+        '<div class="mon-approval-actions">' +
+          '<button class="mon-approve-btn" onclick="monApprove(\''+a.approval_id+'\')">✓ Approve</button>' +
+          '<button class="mon-reject-btn" onclick="monReject(\''+a.approval_id+'\')">✕ Reject</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function monApprove(approvalId) {
+  try {
+    const r = await fetch(`${MON_BASE}/reason/approvals/${approvalId}/approve`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'approved_by=wallpaper&note=approved+from+command+surface',
+      signal: AbortSignal.timeout(10000)
+    });
+    const result = await r.json();
+    if (result.dispatch && result.dispatch.result === 'executed') {
+      console.log('[MONITOR] Approval executed:', result.dispatch.service);
+    } else if (result.dispatch && result.dispatch.result === 'circuit_breaker_tripped') {
+      alert('Circuit breaker is tripped — reset it first before approving dispatches');
+    }
+    setTimeout(monLoadApprovals, 500);
+  } catch(e) {
+    console.error('Approve failed:', e);
+  }
+}
+
+async function monReject(approvalId) {
+  try {
+    await fetch(`${MON_BASE}/reason/approvals/${approvalId}/reject`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'approved_by=wallpaper&note=rejected+from+command+surface',
+      signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(monLoadApprovals, 500);
+  } catch(e) {
+    console.error('Reject failed:', e);
+  }
+}
+
+// Monitor tab activation — start/stop polling when tab is shown
+const _origShowView = window.showView;
+if (typeof _origShowView === 'function') {
+  window.showView = function(view) {
+    _origShowView(view);
+    if (view === 'monitor') {
+      _monActive = true;
+      monPollStatus();
+      monLoadAlerts();
+      monLoadJournal();
+      monLoadApprovals();
+    } else {
+      _monActive = false;
+    }
+  };
+}
 
 /* ══════════════════════════════════════
    STACK LAUNCH HELPERS
