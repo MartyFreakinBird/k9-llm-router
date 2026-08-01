@@ -5369,7 +5369,8 @@ function showView(id) {
   if (id === 'arch')       setTimeout(archTabInit, 150);
   if (id === 'setup')      setTimeout(setupTabInit, 200);
   if (id === 'openclaw')   setTimeout(openclawInit, 200);
-  if (id === 'monitor')    setTimeout(monTabInit, 100);
+  if (id === 'monitor') { _monActive = true; setTimeout(monTabInit, 100); }
+  else { _monActive = false; }
   if (id === 'sw4') {
     setTimeout(() => {
       const tab = document.querySelector('.rt-tab[data-rtab="sw4"]');
@@ -11087,18 +11088,12 @@ function monTabInit() {
   monLoadJournal();
   monLoadApprovals();
 }
-// Stop polling when leaving monitor tab
-const _origShowView_mon = window.showView;
-window.showView = function(view) {
-  if (view !== 'monitor') _monActive = false;
-  _origShowView_mon(view);
-};
+// Stop polling when leaving monitor tab — handled in showView above
 
-CB-8 MONITOR — real-time monitoring dashboard polling
+/* CB-8 MONITOR — real-time monitoring dashboard polling
    Polls /reason/monitor/* endpoints on the k9-llm-router
    ═══════════════════════════════════════════════════════ */
 const MON_BASE = 'http://localhost:8765';
-let _monActive = false;
 
 async function monFetch(path) {
   try {
