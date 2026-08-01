@@ -34,6 +34,7 @@ import httpx
 from .tree import MCTSNode, MCTSTree
 from .jepa_target_encoder import get_target_encoder, OutcomeRecord
 from .handover_engine import get_handover_engine, HandoverDecision, classify_task
+from .execution_dispatcher import get_dispatcher, DispatchResult
 
 logger = logging.getLogger("k9.mcts")
 
@@ -95,6 +96,7 @@ class K9MCTSOrchestrator:
         self.timeout = httpx.Timeout(timeout_s)
         self.encoder = get_target_encoder()
         self.handover = get_handover_engine()
+        self.dispatcher = get_dispatcher()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -196,8 +198,20 @@ class K9MCTSOrchestrator:
         # Publish to Orbitron bus (fire-and-forget)
         asyncio.create_task(self._publish_cb(result, trace_id))
 
-        # CB-6: Also publish handover envelope if auto-execute
+        # CB-6: Dispatch to downstream service if auto-execute
         if handover_result.decision == HandoverDecision.AUTO_EXECUTE:
+            dispatch_outcome = await self.dispatcher.dispatch(
+                handover=handover_result,
+                question=question,
+                answer=result["answer"],
+                trace_id=trace_id,
+            )
+            result["dispatch"] = {
+                "result": dispatch_outcome.dispatch_result.value,
+                "service": dispatch_outcome.service_called,
+                "latency_ms": round(dispatch_outcome.latency_ms, 1),
+                "error": dispatch_outcome.error,
+            }
             asyncio.create_task(self._publish_envelope(handover_result.execution_envelope))
 
         return result
