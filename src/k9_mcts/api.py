@@ -13,6 +13,7 @@ import asyncio
 from .orchestrator import K9MCTSOrchestrator
 from .jepa_target_encoder import get_target_encoder
 from .handover_engine import get_handover_engine, HandoverDecision
+from .execution_dispatcher import get_dispatcher, DispatchResult
 
 router = APIRouter(prefix="/reason", tags=["MCTS Reasoning"])
 
@@ -107,3 +108,9 @@ async def jepa_stats():
 async def jepa_classes():
     """CB-6: Per-task-class statistics from the target encoder."""
     return get_target_encoder().get_class_stats()
+
+
+@router.get("/dispatch/stats")
+async def dispatch_stats():
+    """CB-6: Execution dispatcher statistics (dispatch count, latency)."""
+    return get_dispatcher().stats()
