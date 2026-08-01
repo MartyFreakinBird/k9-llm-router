@@ -60,3 +60,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+.npm/
+.cache/
+blobs/
