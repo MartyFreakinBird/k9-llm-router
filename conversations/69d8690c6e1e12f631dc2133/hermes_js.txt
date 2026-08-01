@@ -1,0 +1,463 @@
+/* ═══════════════════════════════════════════════════════════════
+   HERMES (CB-10) — Voice/Chat Gateway + Web Speech Integration
+   Connects to k9-llm-router :8765 /route for LLM responses
+   Web Speech API: SpeechRecognition (input) + speechSynthesis (TTS)
+   Shared voice module: used by Hermes, Carbon, and Vectos avatar
+   ═══════════════════════════════════════════════════════════════ */
+
+const HERMES_BASE = 'http://localhost:8765';
+let _hermesActive = false;
+let _hermesMode = 'chat';
+let _hermesRecognizing = false;
+let _hermesRecognition = null;
+let _hermesVoices = [];
+let _hermesMsgCount = 0;
+let _hermesSettings = {
+  voice: '', rate: 1, pitch: 1, volume: 1,
+  autoTTS: true, vectosSync: true, carbonRelay: true
+};
+
+// ── Load settings from localStorage ──
+function hermesLoadSettings() {
+  try {
+    const saved = localStorage.getItem('hermes_settings');
+    if (saved) _hermesSettings = { ..._hermesSettings, ...JSON.parse(saved) };
+  } catch(e) {}
+}
+function hermesSaveSettings() {
+  _hermesSettings.voice = document.getElementById('hermes-voice-select')?.value || '';
+  _hermesSettings.rate = parseFloat(document.getElementById('hermes-rate')?.value || 1);
+  _hermesSettings.pitch = parseFloat(document.getElementById('hermes-pitch')?.value || 1);
+  _hermesSettings.volume = parseFloat(document.getElementById('hermes-volume')?.value || 1);
+  _hermesSettings.autoTTS = document.getElementById('hermes-auto-tts')?.checked ?? true;
+  _hermesSettings.vectosSync = document.getElementById('hermes-vectos-sync')?.checked ?? true;
+  _hermesSettings.carbonRelay = document.getElementById('hermes-carbon-relay')?.checked ?? true;
+  try { localStorage.setItem('hermes_settings', JSON.stringify(_hermesSettings)); } catch(e) {}
+}
+
+// ── Update range display ──
+function hermesUpdateRange(input, valId) {
+  document.getElementById(valId).textContent = parseFloat(input.value).toFixed(1);
+  hermesSaveSettings();
+}
+
+// ── Shared TTS engine ──
+function hermesTTS(text, opts = {}) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = opts.rate ?? _hermesSettings.rate;
+  u.pitch = opts.pitch ?? _hermesSettings.pitch;
+  u.volume = opts.volume ?? _hermesSettings.volume;
+  if (_hermesVoices.length > 0) {
+    const v = _hermesVoices.find(x => x.name === _hermesSettings.voice) || _hermesVoices[0];
+    if (v) u.voice = v;
+  }
+  u.onstart = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression(text);
+      CarbonTab.updateFX(text);
+    }
+  };
+  u.onend = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression('neutral');
+    }
+  };
+  window.speechSynthesis.speak(u);
+  // Also run lip-sync stub
+  if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+    CarbonTab.speak(text, null);
+  }
+}
+
+// ── Shared SpeechRecognition engine ──
+function hermesInitRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    const recEl = document.getElementById('hermes-rec-status');
+    if (recEl) recEl.textContent = 'not supported';
+    return null;
+  }
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.onstart = () => {
+    _hermesRecognizing = true;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.add('recording');
+    const wf = document.getElementById('hermes-waveform');
+    if (wf) wf.classList.add('active');
+    const wfl = document.getElementById('hermes-waveform-large');
+    if (wfl) wfl.classList.add('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'LISTENING…';
+    const vs = document.getElementById('hermes-voice-status');
+    if (vs) vs.textContent = 'Listening…';
+  };
+  r.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const tr = document.getElementById('hermes-transcript');
+    if (tr) tr.textContent = interim || final || '—';
+    const input = document.getElementById('hermes-input');
+    if (input && (interim || final)) input.value = final || interim;
+    if (final) {
+      hermesSendText(final.trim());
+    }
+  };
+  r.onerror = (e) => {
+    console.warn('SpeechRecognition error:', e.error);
+    if (e.error === 'not-allowed') {
+      hermesAddMsg('error', 'Microphone access denied. Check browser permissions.');
+    }
+  };
+  r.onend = () => {
+    _hermesRecognizing = false;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.remove('recording');
+    const wf = document.getElementById('hermes-waveform');
+    if (wf) wf.classList.remove('active');
+    const wfl = document.getElementById('hermes-waveform-large');
+    if (wfl) wfl.classList.remove('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'TAP MIC TO START';
+    const vs = document.getElementById('hermes-voice-status');
+    if (vs) vs.textContent = 'Idle';
+  };
+  return r;
+}
+
+function hermesToggleVoice() {
+  if (!_hermesRecognition) _hermesRecognition = hermesInitRecognition();
+  if (!_hermesRecognition) {
+    hermesAddMsg('error', 'Voice recognition not supported in this browser.');
+    return;
+  }
+  if (_hermesRecognizing) {
+    _hermesRecognition.stop();
+  } else {
+    try { _hermesRecognition.start(); } catch(e) { console.warn(e); }
+  }
+}
+
+// ── Load voices ──
+function hermesLoadVoices() {
+  if (!window.speechSynthesis) return;
+  _hermesVoices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('hermes-voice-select');
+  if (!sel) return;
+  // Keep first option (default)
+  while (sel.options.length > 1) sel.remove(1);
+  _hermesVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+  if (_hermesSettings.voice) sel.value = _hermesSettings.voice;
+  const vc = document.getElementById('hermes-voice-count');
+  if (vc) vc.textContent = _hermesVoices.length + ' available';
+  const ts = document.getElementById('hermes-tts-status');
+  if (ts) ts.textContent = _hermesVoices.length > 0 ? 'ready' : 'no voices';
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = hermesLoadVoices;
+}
+
+// ── Chat message helpers ──
+function hermesAddMsg(role, text, target = 'both') {
+  const msg = `<div class="hermes-msg ${role}"><div class="msg-role">${role.toUpperCase()}</div>${text}</div>`;
+  if (target === 'both' || target === 'chat') {
+    const c1 = document.getElementById('hermes-messages');
+    if (c1) { c1.insertAdjacentHTML('beforeend', msg); c1.scrollTop = c1.scrollHeight; }
+  }
+  if (target === 'both' || target === 'conversation') {
+    const c2 = document.getElementById('hermes-conversation-messages');
+    if (c2) { c2.insertAdjacentHTML('beforeend', msg); c2.scrollTop = c2.scrollHeight; }
+  }
+  _hermesMsgCount++;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = _hermesMsgCount + ' messages';
+}
+
+function hermesClearChat() {
+  ['hermes-messages', 'hermes-conversation-messages'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
+  });
+  _hermesMsgCount = 0;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = '0 messages';
+}
+
+// ── Send text to LLM ──
+async function hermesSendText(text) {
+  if (!text || !text.trim()) return;
+  text = text.trim();
+
+  hermesAddMsg('user', text);
+  const input = document.getElementById('hermes-input');
+  if (input) input.value = '';
+
+  // Show thinking indicator
+  hermesAddMsg('system', 'Vectos is thinking…', 'conversation');
+
+  // Send to k9-llm-router /route
+  try {
+    const r = await fetch(`${HERMES_BASE}/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: text }],
+        temperature: 0.7,
+        max_tokens: 500
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    // Extract response — handle various response formats
+    let response = '';
+    if (data.response) response = data.response;
+    else if (data.content) response = data.content;
+    else if (data.choices?.[0]?.message?.content) response = data.choices[0].message.content;
+    else if (data.message?.content) response = data.message.content;
+    else if (data.text) response = data.text;
+    else response = JSON.stringify(data).slice(0, 200);
+
+    // Remove thinking indicator
+    const conv = document.getElementById('hermes-conversation-messages');
+    if (conv) {
+      const sys = conv.querySelector('.hermes-msg.system:last-child');
+      if (sys && sys.textContent.includes('thinking')) sys.remove();
+    }
+
+    hermesAddMsg('assistant', response);
+
+    // TTS if enabled
+    if (_hermesSettings.autoTTS) {
+      hermesTTS(response);
+    }
+
+    // Relay to Carbon chat if enabled
+    if (_hermesSettings.carbonRelay) {
+      try {
+        await fetch('http://localhost:8744/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, response: response }),
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch(e) { /* Carbon may be offline — silent fail */ }
+    }
+
+  } catch(err) {
+    // Fallback: try a simple echo if router is offline
+    const fallback = `Router offline (${err.message}). Make sure K-9 LLM Router is running on :8765. Start it with: ./launch-economic-stack.sh start`;
+    hermesAddMsg('error', fallback);
+
+    // If router is down, still provide a basic response
+    const local = `[OFFLINE MODE] I received: "${text}" — but the K-9 LLM Router (:8765) is not responding. Check that the router service is running.`;
+    hermesAddMsg('assistant', local);
+    if (_hermesSettings.autoTTS) hermesTTS(local);
+  }
+}
+
+function hermesSend() {
+  const input = document.getElementById('hermes-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  hermesSendText(text);
+}
+
+// ── Voice commands ──
+function hermesVoiceCommand(cmd) {
+  const commands = {
+    'status': 'Give me a system status report. What services are running?',
+    'time': `The current time is ${new Date().toLocaleTimeString()}.`,
+  };
+  if (cmd === 'time') {
+    hermesAddMsg('assistant', commands[cmd]);
+    if (_hermesSettings.autoTTS) hermesTTS(commands[cmd]);
+  } else {
+    hermesSendText(commands[cmd]);
+  }
+}
+
+// ── Test voice ──
+function hermesTestVoice() {
+  hermesTTS('Hermes voice gateway test. Voice synthesis is working.');
+}
+
+// ── Mode switcher ──
+function setHermesMode(mode) {
+  _hermesMode = mode;
+  document.querySelectorAll('#v-hermes .mode-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`hermes-btn-${mode}`);
+  if (btn) btn.classList.add('active');
+
+  const chatPanel = document.getElementById('hermes-chat-panel');
+  const settingsPanel = document.getElementById('hermes-settings-panel');
+  const conversation = document.getElementById('hermes-conversation');
+  const voiceViz = document.getElementById('hermes-voice-viz');
+
+  if (mode === 'settings') {
+    if (chatPanel) chatPanel.style.display = 'none';
+    if (settingsPanel) settingsPanel.style.display = 'flex';
+    if (conversation) conversation.style.display = 'none';
+    if (voiceViz) voiceViz.style.display = 'none';
+  } else if (mode === 'voice') {
+    if (chatPanel) chatPanel.style.display = 'flex';
+    if (settingsPanel) settingsPanel.style.display = 'none';
+    if (conversation) conversation.style.display = 'none';
+    if (voiceViz) voiceViz.style.display = 'flex';
+    // Auto-start listening
+    if (!_hermesRecognizing) hermesToggleVoice();
+  } else {
+    // chat mode
+    if (chatPanel) chatPanel.style.display = 'flex';
+    if (settingsPanel) settingsPanel.style.display = 'none';
+    if (conversation) conversation.style.display = 'flex';
+    if (voiceViz) voiceViz.style.display = 'none';
+  }
+}
+
+// ── Service health check ──
+async function hermesCheckHealth() {
+  const services = [
+    { id: 'hermes-h-llmr', port: 8765, name: 'LLM Router' },
+    { id: 'hermes-h-orch', port: 8080, name: 'Orchestrator' },
+    { id: 'hermes-h-ollama', port: 11434, name: 'Ollama' },
+    { id: 'hermes-h-cb', port: 8744, name: 'Carbon' },
+  ];
+  for (const svc of services) {
+    try {
+      const r = await fetch(`http://localhost:${svc.port}/health`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      const dot = document.getElementById(svc.id);
+      if (dot) {
+        dot.classList.remove('dd');
+        dot.classList.add(r.ok ? 'dg' : 'dr');
+      }
+    } catch(e) {
+      const dot = document.getElementById(svc.id);
+      if (dot) { dot.classList.remove('dd','dg'); dot.classList.add('dr'); }
+    }
+  }
+  // Update connection chip
+  try {
+    const r = await fetch(`${HERMES_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) {
+      chip.textContent = r.ok ? ':8765 · online' : ':8765 · offline';
+      chip.style.color = r.ok ? 'var(--green)' : 'var(--red)';
+    }
+  } catch(e) {
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) { chip.textContent = ':8765 · offline'; chip.style.color = 'var(--red)'; }
+  }
+  // Check SpeechRecognition support
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recEl = document.getElementById('hermes-rec-status');
+  if (recEl) recEl.textContent = SR ? 'ready' : 'not supported';
+}
+
+// ── Refresh ──
+function hermesRefresh() {
+  hermesCheckHealth();
+  hermesLoadVoices();
+}
+
+// ── Tab init (called by showView) ──
+function hermesInit() {
+  _hermesActive = true;
+  hermesLoadSettings();
+  hermesLoadVoices();
+  hermesCheckHealth();
+  // Auto-check health every 10s while active
+  if (!window._hermesHealthInterval) {
+    window._hermesHealthInterval = setInterval(() => {
+      if (_hermesActive && !document.hidden) hermesCheckHealth();
+    }, 10000);
+  }
+}
+
+// ── Global voice API (shared with Carbon + Vectos) ──
+window.K9Voice = {
+  // Speak text with TTS + avatar sync
+  speak(text, opts = {}) {
+    hermesTTS(text, opts);
+  },
+  // Start voice recognition, call cb with transcript
+  listen(cb) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { cb(null, 'not supported'); return; }
+    const r = new SR();
+    r.continuous = false;
+    r.interimResults = false;
+    r.lang = 'en-US';
+    r.onresult = (e) => { cb(e.results[0][0].transcript, null); };
+    r.onerror = (e) => { cb(null, e.error); };
+    r.start();
+  },
+  // Get available voices
+  getVoices() { return _hermesVoices; },
+  // Check support
+  supported() {
+    return {
+      recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      synthesis: !!window.speechSynthesis
+    };
+  }
+};
+
+// ── Enhance Carbon speak with TTS + LLM ──
+const _origCarbonSpeak = carbonSpeak;
+carbonSpeak = function() {
+  const input = document.getElementById('carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Show in avatar
+  if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
+  input.value = '';
+
+  // TTS the input
+  hermesTTS(text);
+
+  // Send to LLM and speak the response
+  hermesSendText(text).then(() => {
+    // Response is already added to chat and spoken by hermesSendText
+  });
+};
+
+// ── Enhance agCarbonSpeak with TTS + LLM ──
+const _origAgCarbonSpeak = agCarbonSpeak;
+agCarbonSpeak = function() {
+  const input = document.getElementById('ag-carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Show in avatar
+  agCarbonUpdateExpression(text);
+  input.value = '';
+
+  // TTS
+  hermesTTS(text);
+
+  // Send to LLM
+  hermesSendText(text);
+};
