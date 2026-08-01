@@ -37,6 +37,7 @@ from .handover_engine import get_handover_engine, HandoverDecision, classify_tas
 from .execution_dispatcher import get_dispatcher, DispatchResult
 from .observability import get_journal, JournalEntry
 from .monitoring import get_monitor
+from .approval_workflow import get_approval_workflow, ApprovalState
 
 logger = logging.getLogger("k9.mcts")
 
@@ -101,6 +102,7 @@ class K9MCTSOrchestrator:
         self.dispatcher = get_dispatcher()
         self.journal = get_journal()
         self.monitor = get_monitor()
+        self.approvals = get_approval_workflow()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -261,6 +263,22 @@ class K9MCTSOrchestrator:
         if alerts:
             result["alerts"] = [a.to_dict() for a in alerts]
         result["circuit_breaker_tripped"] = self.monitor._circuit_breaker.tripped
+
+        # CB-9: Create approval task for human-review decisions
+        if handover_result.decision == HandoverDecision.HUMAN_REVIEW:
+            approval = self.approvals.create_task(
+                trace_id=trace_id,
+                question=question,
+                answer=result["answer"],
+                confidence=result["confidence"],
+                task_class=task_class,
+                risk_level=result["handover"]["risk_level"],
+                handover_reason=result["handover"]["reason"],
+                reasoning_trace=result.get("reasoning_trace", []),
+                evidence=result.get("evidence", []),
+            )
+            result["approval_id"] = approval.approval_id
+            result["approval_expires_at"] = approval.expires_at
 
         return result
 
