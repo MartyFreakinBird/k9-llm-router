@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-9 CB-8 Monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c10;--bg2:#0d1117;--bg3:#111820;
+  --border:rgba(255,255,255,0.06);--border-hi:rgba(255,255,255,0.14);
+  --text:#e2e8f0;--muted:#64748b;--dim:#334155;
+  --cyan:#22d3ee;--green:#4ade80;--amber:#f59e0b;--red:#f87171;--purple:#a78bfa;
+  --mono:'JetBrains Mono',monospace;--hd:'Syne',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;min-height:100vh}
+.mw{padding:14px;display:flex;flex-direction:column;gap:10px;min-height:100vh}
+.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.stat-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim)}
+.stat-val{font-family:var(--hd);font-weight:700;font-size:18px;color:var(--text)}
+.stat-sub{font-size:8.5px;color:var(--muted)}
+.main-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;flex:1;min-height:300px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.panel-hd{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:4px}
+.cb-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:3px;border:1px solid var(--border)}
+.cb-card.ok{background:rgba(74,222,128,.06);border-color:rgba(74,222,128,.2)}
+.cb-card.tripped{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);animation:cbpulse 1.5s ease-in-out infinite}
+@keyframes cbpulse{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.2)}50%{box-shadow:0 0 0 4px rgba(248,113,113,.05)}}
+.cb-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cb-dot.ok{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,.4)}
+.cb-dot.tripped{background:var(--red);box-shadow:0 0 8px rgba(248,113,113,.5)}
+.cb-text{font-size:10px;flex:1}
+.cb-reason{font-size:8.5px;color:var(--muted);margin-top:2px}
+.cb-btn{font-size:9px;padding:5px 10px;border:1px solid rgba(248,113,113,.4);border-radius:3px;background:rgba(248,113,113,.1);color:var(--red);cursor:pointer;text-transform:uppercase;letter-spacing:.08em}
+.cb-btn:hover{background:rgba(248,113,113,.2)}
+.cb-stats{margin-top:auto;font-size:9px;color:var(--muted);line-height:1.6}
+.alerts-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;min-height:0}
+.alert-row{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:3px;border-left:2px solid var(--border);background:var(--bg3);font-size:9.5px;line-height:1.4}
+.alert-row.warning{border-left-color:var(--amber);background:rgba(245,158,11,.04)}
+.alert-row.critical{border-left-color:var(--red);background:rgba(248,113,113,.05)}
+.alert-row.emergency{border-left-color:var(--red);background:rgba(248,113,113,.08)}
+.alert-row.info{border-left-color:var(--cyan);background:rgba(34,211,238,.04)}
+.alert-badge{font-size:8px;text-transform:uppercase;letter-spacing:.08em;padding:1px 5px;border-radius:2px;flex-shrink:0;margin-top:1px}
+.alert-badge.warning{background:rgba(245,158,11,.15);color:var(--amber)}
+.alert-badge.critical{background:rgba(248,113,113,.15);color:var(--red)}
+.alert-badge.emergency{background:rgba(248,113,113,.25);color:var(--red)}
+.alert-badge.info{background:rgba(34,211,238,.15);color:var(--cyan)}
+.journal-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;min-height:0}
+.journal-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg3);border-radius:2px;font-size:9px}
+.j-badge{font-size:7.5px;padding:1px 4px;border-radius:2px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.j-badge.auto{background:rgba(74,222,128,.12);color:var(--green)}
+.j-badge.human{background:rgba(245,158,11,.12);color:var(--amber)}
+.j-badge.reject{background:rgba(248,113,113,.12);color:var(--red)}
+.j-text{color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.j-meta{font-size:8px;color:var(--dim);flex-shrink:0}
+.empty{color:var(--dim);font-size:9px;text-align:center;padding:20px 0}
+.footer{font-size:9px;color:var(--dim);display:flex;align-items:center;gap:16px;border-top:1px solid var(--border);padding-top:8px}
+</style>
+</head>
+<body>
+<div class="mw">
+  <div class="stat-grid" id="stat-grid">
+    <div class="stat"><div class="stat-lbl">Auto-Execute</div><div class="stat-val" id="s-auto" style="color:var(--green)">—</div><div class="stat-sub" id="s-auto-sub">decisions</div></div>
+    <div class="stat"><div class="stat-lbl">Human Review</div><div class="stat-val" id="s-human" style="color:var(--amber)">—</div><div class="stat-sub" id="s-human-sub">pending</div></div>
+    <div class="stat"><div class="stat-lbl">Rejected</div><div class="stat-val" id="s-reject" style="color:var(--red)">—</div><div class="stat-sub" id="s-reject-sub">decisions</div></div>
+    <div class="stat"><div class="stat-lbl">Error Rate</div><div class="stat-val" id="s-err" style="color:var(--cyan)">—</div><div class="stat-sub" id="s-err-sub">dispatch</div></div>
+    <div class="stat"><div class="stat-lbl">Confidence</div><div class="stat-val" id="s-conf" style="color:var(--purple)">—</div><div class="stat-sub" id="s-conf-sub">baseline</div></div>
+    <div class="stat"><div class="stat-lbl">Alerts</div><div class="stat-val" id="s-alerts">—</div><div class="stat-sub" id="s-alerts-sub">active</div></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-hd">⬡ Circuit Breaker</div>
+      <div class="cb-card ok" id="cb-card">
+        <div class="cb-dot ok" id="cb-dot"></div>
+        <div style="flex:1">
+          <div class="cb-text" id="cb-text">Operational — auto-execution active</div>
+          <div class="cb-reason" id="cb-reason">No errors detected</div>
+        </div>
+      </div>
+      <div id="cb-reset-wrap" style="display:none">
+        <button class="cb-btn" onclick="resetCB()">↻ Reset Circuit Breaker</button>
+      </div>
+      <div class="cb-stats">
+        <div>Consecutive errors: <span id="cb-streak" style="color:var(--text)">0</span></div>
+        <div>Threshold: <span id="cb-threshold" style="color:var(--text)">10</span></div>
+        <div>Total trips: <span id="cb-trips" style="color:var(--text)">0</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd">⚠ Active Alerts</div>
+      <div class="alerts-list" id="alerts-list">
+        <div class="empty">No alerts — system nominal</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd">⊛ Decision Journal</div>
+      <div class="journal-list" id="journal-list">
+        <div class="empty">No decisions recorded yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>CB-8 Monitoring · poll 5s</span>
+    <span>Last update: <span id="last-update">never</span></span>
+    <span id="error-msg" style="color:var(--red);display:none">⚠ Connection error</span>
+  </div>
+</div>
+
+<script>
+const BASE = new URLSearchParams(location.search).get('router') || 'http://localhost:8765';
+const REFRESH = 5000;
+
+async function api(path) {
+  try {
+    const r = await fetch(`${BASE}${path}`, {signal: AbortSignal.timeout(5000)});
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const s = Math.floor((Date.now()/1000) - ts);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  return Math.floor(s/3600) + 'h ago';
+}
+
+async function pollStatus() {
+  const s = await api('/reason/monitor/status');
+  const errEl = document.getElementById('error-msg');
+  if (!s) {
+    if (errEl) errEl.style.display = 'inline';
+    document.getElementById('last-update').textContent = 'offline';
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
+
+  const dc = s.decision_counts || {};
+  document.getElementById('s-auto').textContent = dc.auto_execute || 0;
+  document.getElementById('s-auto-sub').textContent = (dc.total||0) + ' total';
+  document.getElementById('s-human').textContent = dc.human_review || 0;
+  document.getElementById('s-reject').textContent = dc.reject || 0;
+
+  const ds = s.dispatch_stats || {};
+  const rate = (ds.error_rate||0)*100;
+  const errEl2 = document.getElementById('s-err');
+  errEl2.textContent = rate.toFixed(1)+'%';
+  errEl2.style.color = rate>30?'var(--red)':rate>10?'var(--amber)':'var(--green)';
+  document.getElementById('s-err-sub').textContent = (ds.error||0)+' errors';
+
+  const cf = s.confidence || {};
+  document.getElementById('s-conf').textContent = (cf.baseline||0).toFixed(3);
+  document.getElementById('s-conf-sub').textContent = (cf.baseline_samples||0)+' samples';
+
+  document.getElementById('s-alerts').textContent = s.active_alerts||0;
+  document.getElementById('s-alerts-sub').textContent = (s.total_alerts||0)+' total';
+
+  const cb = s.circuit_breaker || {};
+  const card = document.getElementById('cb-card');
+  const dot = document.getElementById('cb-dot');
+  if (cb.tripped) {
+    card.className = 'cb-card tripped';
+    dot.className = 'cb-dot tripped';
+    document.getElementById('cb-text').textContent = 'TRIPPED — auto-execution halted';
+    document.getElementById('cb-reason').textContent = cb.trip_reason || 'consecutive dispatch errors';
+    document.getElementById('cb-reset-wrap').style.display = 'block';
+  } else {
+    card.className = 'cb-card ok';
+    dot.className = 'cb-dot ok';
+    document.getElementById('cb-text').textContent = 'Operational — auto-execution active';
+    document.getElementById('cb-reason').textContent = 'Consecutive errors: '+(cb.consecutive_errors||0);
+    document.getElementById('cb-reset-wrap').style.display = 'none';
+  }
+  document.getElementById('cb-streak').textContent = cb.consecutive_errors||0;
+  document.getElementById('cb-threshold').textContent = cb.threshold||10;
+  document.getElementById('cb-trips').textContent = cb.total_trips||0;
+
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+}
+
+async function pollAlerts() {
+  const data = await api('/reason/monitor/alerts?limit=15');
+  const list = document.getElementById('alerts-list');
+  if (!data || !data.alerts || data.alerts.length === 0) {
+    list.innerHTML = '<div class="empty">No alerts — system nominal</div>';
+    return;
+  }
+  list.innerHTML = data.alerts.map(a => {
+    const lv = a.level||'info';
+    const tp = (a.alert_type||'').replace(/_/g,' ');
+    const tm = timeAgo(a.timestamp);
+    return '<div class="alert-row '+lv+'">' +
+      '<span class="alert-badge '+lv+'">'+lv+'</span>' +
+      '<div style="flex:1"><div style="color:var(--text)">'+(a.message||'')+'</div>' +
+      '<div style="color:var(--dim);font-size:8px;margin-top:2px">'+tp+' · '+tm+'</div></div></div>';
+  }).join('');
+}
+
+async function pollJournal() {
+  const data = await api('/reason/journal?limit=10');
+  const list = document.getElementById('journal-list');
+  if (!data || !data.entries || data.entries.length === 0) {
+    list.innerHTML = '<div class="empty">No decisions recorded yet</div>';
+    return;
+  }
+  list.innerHTML = data.entries.map(e => {
+    const badge = e.decision==='auto_execute'?'auto':e.decision==='human_review'?'human':'reject';
+    const disp = e.dispatch_result==='executed'&&e.dispatch_service?' → '+e.dispatch_service:'';
+    const text = (e.question||'').substring(0,40)+disp;
+    const conf = (e.confidence||0).toFixed(2);
+    return '<div class="journal-row">' +
+      '<span class="j-badge '+badge+'">'+badge+'</span>' +
+      '<span class="j-text">'+text+'</span>' +
+      '<span class="j-meta">conf='+conf+'</span></div>';
+  }).join('');
+}
+
+async function resetCB() {
+  try {
+    await fetch(`${BASE}/reason/monitor/circuit-breaker/reset`,{method:'POST',signal:AbortSignal.timeout(5000)});
+    setTimeout(pollStatus, 500);
+  } catch(e) { console.error(e); }
+}
+
+function pollAll() { pollStatus(); pollAlerts(); pollJournal(); }
+pollAll();
+setInterval(pollAll, REFRESH);
+</script>
+</body>
+</html>
