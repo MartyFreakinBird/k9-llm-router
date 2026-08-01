@@ -140,6 +140,13 @@ class DecisionJournal:
 
         logger.info(f"[JOURNAL] {entry.summary}")
 
+        # CB-7.5: Enqueue for Supabase persistence (non-blocking)
+        try:
+            from .journal_persistence import get_persistence
+            get_persistence().enqueue(entry)
+        except Exception as e:
+            logger.debug(f"[JOURNAL] persistence enqueue failed (non-fatal): {e}")
+
     def get(self, trace_id: str) -> Optional[JournalEntry]:
         """Retrieve a single entry by trace ID."""
         return self._index.get(trace_id)

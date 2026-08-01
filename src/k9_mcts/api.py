@@ -15,6 +15,8 @@ from .jepa_target_encoder import get_target_encoder
 from .handover_engine import get_handover_engine, HandoverDecision
 from .execution_dispatcher import get_dispatcher, DispatchResult
 from .observability import get_journal
+from .journal_persistence import get_persistence
+from .monitoring import get_monitor
 
 router = APIRouter(prefix="/reason", tags=["MCTS Reasoning"])
 
@@ -166,6 +168,49 @@ async def journal_human(limit: int = 50):
 async def journal_export():
     """CB-7: Export full journal as JSON array (for backup/analysis)."""
     return get_journal().export()
+
+
+@router.get("/persistence/stats")
+async def persistence_stats():
+    """CB-7.5: Supabase persistence statistics (persisted count, queue, errors)."""
+    return get_persistence().stats()
+
+
+@router.post("/persistence/flush")
+async def persistence_flush():
+    """CB-7.5: Manually trigger a flush of queued entries to Supabase."""
+    p = get_persistence()
+    await p._flush()
+    return p.stats()
+
+
+# ── CB-8: Real-time Monitoring & Alerting ────────────────────────────────────
+
+@router.get("/monitor/status")
+async def monitor_status():
+    """CB-8: Full monitoring state — decision counts, error rate, alerts, circuit breaker."""
+    return get_monitor().status()
+
+
+@router.get("/monitor/alerts")
+async def monitor_alerts(level: str = "", limit: int = 50):
+    """CB-8: Recent alerts, optionally filtered by level (info/warning/critical/emergency)."""
+    return {
+        "count": len(get_monitor().alerts(level=level, limit=limit)),
+        "alerts": get_monitor().alerts(level=level, limit=limit),
+    }
+
+
+@router.get("/monitor/circuit-breaker")
+async def circuit_breaker_status():
+    """CB-8: Circuit breaker state (tripped/consecutive_errors/total_trips)."""
+    return get_monitor()._circuit_breaker.to_dict()
+
+
+@router.post("/monitor/circuit-breaker/reset")
+async def circuit_breaker_reset():
+    """CB-8: Manually reset the circuit breaker to resume auto-execution."""
+    return get_monitor().reset_circuit_breaker()
 
 
 @router.get("/journal/{trace_id}")

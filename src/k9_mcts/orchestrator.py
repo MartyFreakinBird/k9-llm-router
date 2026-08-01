@@ -36,6 +36,7 @@ from .jepa_target_encoder import get_target_encoder, OutcomeRecord
 from .handover_engine import get_handover_engine, HandoverDecision, classify_task
 from .execution_dispatcher import get_dispatcher, DispatchResult
 from .observability import get_journal, JournalEntry
+from .monitoring import get_monitor
 
 logger = logging.getLogger("k9.mcts")
 
@@ -99,6 +100,7 @@ class K9MCTSOrchestrator:
         self.handover = get_handover_engine()
         self.dispatcher = get_dispatcher()
         self.journal = get_journal()
+        self.monitor = get_monitor()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -201,7 +203,17 @@ class K9MCTSOrchestrator:
         asyncio.create_task(self._publish_cb(result, trace_id))
 
         # CB-6: Dispatch to downstream service if auto-execute
-        if handover_result.decision == HandoverDecision.AUTO_EXECUTE:
+        # CB-8: Circuit breaker gate — halt dispatch if tripped
+        if (handover_result.decision == HandoverDecision.AUTO_EXECUTE
+                and not self.monitor.can_auto_execute()):
+            result["dispatch"] = {
+                "result": "circuit_breaker_tripped",
+                "service": "none",
+                "latency_ms": 0.0,
+                "error": "auto-execution halted by circuit breaker — manual reset required",
+            }
+            logger.warning(f"[MCTS:{trace_id}] Dispatch blocked by circuit breaker")
+        elif handover_result.decision == HandoverDecision.AUTO_EXECUTE:
             dispatch_outcome = await self.dispatcher.dispatch(
                 handover=handover_result,
                 question=question,
@@ -217,7 +229,7 @@ class K9MCTSOrchestrator:
             asyncio.create_task(self._publish_envelope(handover_result.execution_envelope))
 
         # CB-7: Record decision in the observability journal
-        self.journal.record(JournalEntry(
+        journal_entry = JournalEntry(
             trace_id=trace_id,
             timestamp=time.time(),
             question=question,
@@ -241,7 +253,14 @@ class K9MCTSOrchestrator:
             jepa_proven_classes=list(self.encoder.proven_classes),
             jepa_class_success_rate=self.encoder.get_class_stats(task_class).get("successes", 0) / max(1, self.encoder.get_class_stats(task_class).get("total", 1)),
             envelope_id=handover_result.execution_envelope.get("message_id", ""),
-        ))
+        )
+        self.journal.record(journal_entry)
+
+        # CB-8: Real-time monitoring evaluation
+        alerts = self.monitor.evaluate(journal_entry)
+        if alerts:
+            result["alerts"] = [a.to_dict() for a in alerts]
+        result["circuit_breaker_tripped"] = self.monitor._circuit_breaker.tripped
 
         return result
 
