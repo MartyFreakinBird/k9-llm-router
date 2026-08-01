@@ -17,6 +17,9 @@ from .execution_dispatcher import get_dispatcher, DispatchResult
 from .observability import get_journal
 from .journal_persistence import get_persistence
 from .monitoring import get_monitor
+from .approval_workflow import get_approval_workflow, ApprovalState
+from .handover_engine import HandoverDecision
+from .execution_dispatcher import get_dispatcher
 
 router = APIRouter(prefix="/reason", tags=["MCTS Reasoning"])
 
@@ -213,6 +216,34 @@ async def circuit_breaker_reset():
     return get_monitor().reset_circuit_breaker()
 
 
+# ── CB-9: Human-in-the-Loop Approval Workflow ──────────────────────────────
+
+@router.get("/approvals")
+async def approvals_pending(limit: int = 20):
+    """CB-9: Pending human-review approval tasks awaiting operator action."""
+    tasks = get_approval_workflow().pending(limit=limit)
+    return {
+        "count": len(tasks),
+        "pending": [t.to_dict() for t in tasks],
+    }
+
+
+@router.get("/approvals/recent")
+async def approvals_recent(limit: int = 50, state: str = ""):
+    """CB-9: Recent approval tasks, optionally filtered by state."""
+    tasks = get_approval_workflow().recent(limit=limit, state=state)
+    return {
+        "count": len(tasks),
+        "tasks": [t.to_dict() for t in tasks],
+    }
+
+
+@router.get("/approvals/stats")
+async def approval_stats():
+    """CB-9: Aggregate approval statistics."""
+    return get_approval_workflow().stats()
+
+
 @router.get("/journal/{trace_id}")
 async def journal_entry(trace_id: str):
     """CB-7: Full decision detail by trace ID."""
@@ -220,3 +251,82 @@ async def journal_entry(trace_id: str):
     if not entry:
         raise HTTPException(status_code=404, detail=f"trace_id {trace_id} not found")
     return entry.to_dict()
+
+
+@router.post("/approvals/{approval_id}/approve")
+async def approval_approve(approval_id: str, approved_by: str = "operator", note: str = ""):
+    """
+    CB-9: Approve a pending human-review task.
+    If the circuit breaker is NOT tripped, immediately dispatches via the executor.
+    """
+    wf = get_approval_workflow()
+    task = wf.approve(approval_id, approved_by=approved_by, note=note)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"approval {approval_id} not found or not pending")
+
+    # Attempt dispatch if circuit breaker allows
+    monitor = get_monitor()
+    if not monitor.can_auto_execute():
+        return {
+            "approval": task.to_dict(),
+            "dispatch": {"result": "circuit_breaker_tripped", "error": "circuit breaker active — manual reset required"},
+        }
+
+    # Dispatch via the execution dispatcher
+    from .handover_engine import get_handover_engine, HandoverDecision, RiskLevel, HandoverResult
+    handover = get_handover_engine()
+
+    # Reconstruct a minimal HandoverResult for the dispatcher
+    risk = RiskLevel(task.risk_level)
+    hr = HandoverResult(
+        decision=HandoverDecision.AUTO_EXECUTE,
+        risk_level=risk,
+        task_class=task.task_class,
+        confidence=task.confidence,
+        reason="human-approved",
+    )
+
+    dispatcher = get_dispatcher()
+    outcome = await dispatcher.dispatch(
+        handover=hr,
+        question=task.question,
+        answer=task.answer,
+        trace_id=task.trace_id,
+    )
+
+    # Record the dispatch result
+    wf.mark_executed(
+        approval_id,
+        dispatch_result=outcome.dispatch_result.value,
+        dispatch_service=outcome.service_called,
+        dispatch_latency_ms=outcome.latency_ms,
+        dispatch_error=outcome.error,
+    )
+
+    return {
+        "approval": wf.get(approval_id).to_dict(),
+        "dispatch": {
+            "result": outcome.dispatch_result.value,
+            "service": outcome.service_called,
+            "latency_ms": round(outcome.latency_ms, 1),
+            "error": outcome.error,
+        },
+    }
+
+
+@router.post("/approvals/{approval_id}/reject")
+async def approval_reject(approval_id: str, approved_by: str = "operator", note: str = ""):
+    """CB-9: Reject a pending human-review task. Feeds negative outcome to JEPA encoder."""
+    task = get_approval_workflow().reject(approval_id, approved_by=approved_by, note=note)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"approval {approval_id} not found or not pending")
+    return task.to_dict()
+
+
+@router.get("/approvals/{approval_id}")
+async def approval_detail(approval_id: str):
+    """CB-9: Full approval task detail by ID."""
+    task = get_approval_workflow().get(approval_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"approval {approval_id} not found")
+    return task.to_dict()

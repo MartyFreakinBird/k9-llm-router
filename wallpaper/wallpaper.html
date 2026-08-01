@@ -747,6 +747,17 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   gap: 1px;
   background: var(--border);
 }
+.mon-approval-panel {
+  grid-column: 1/-1;
+  background: var(--bg);
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
 .mon-stat-grid {
   grid-column: 1/-1;
   display: grid;
@@ -924,6 +935,49 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   font-size: 9px;
   text-align: center;
   padding: 20px 0;
+}
+.mon-approval-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 3px;
+  background: var(--bg3);
+  border-left: 2px solid var(--amber);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+.mon-approval-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.mon-approve-btn, .mon-reject-btn {
+  font-size: 8px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border: 1px solid;
+  font-family: var(--font-mono);
+}
+.mon-approve-btn {
+  border-color: rgba(74,222,128,.4);
+  background: rgba(74,222,128,.08);
+  color: var(--green);
+}
+.mon-approve-btn:hover { background: rgba(74,222,128,.18) }
+.mon-reject-btn {
+  border-color: rgba(248,113,113,.4);
+  background: rgba(248,113,113,.08);
+  color: var(--red);
+}
+.mon-reject-btn:hover { background: rgba(248,113,113,.18) }
+.mon-approval-meta {
+  font-size: 8px;
+  color: var(--dim);
+  margin-top: 2px;
 }
 .mon-reset-btn {
   font-size: 9px;
@@ -3484,8 +3538,73 @@ setInterval(() => {
     monPollStatus();
     monLoadAlerts();
     monLoadJournal();
+    monLoadApprovals();
   }
 }, 5000);
+
+async function monLoadApprovals() {
+  const data = await monFetch('/reason/approvals?limit=10');
+  const list = document.getElementById('mon-approval-list');
+  const countEl = document.getElementById('mon-approval-count');
+  if (!list) return;
+  if (!data || !data.pending || data.pending.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No pending approvals — all clear</div>';
+    if (countEl) countEl.textContent = '0';
+    return;
+  }
+  if (countEl) countEl.textContent = data.count;
+  list.innerHTML = data.pending.map(a => {
+    const age = Math.floor((Date.now()/1000) - a.timestamp);
+    const expires = Math.floor(a.expires_at - (Date.now()/1000));
+    return '<div class="mon-approval-row">' +
+      '<div style="flex:1">' +
+        '<div style="color:var(--text)">' + (a.question||'').substring(0,60) + '</div>' +
+        '<div class="mon-approval-meta">' + a.task_class + '/' + a.risk_level +
+        ' · conf=' + (a.confidence||0).toFixed(2) +
+        ' · ' + a.handover_reason.substring(0,40) +
+        ' · expires in ' + expires + 's</div>' +
+        '<div class="mon-approval-actions">' +
+          '<button class="mon-approve-btn" onclick="monApprove(\''+a.approval_id+'\')">✓ Approve</button>' +
+          '<button class="mon-reject-btn" onclick="monReject(\''+a.approval_id+'\')">✕ Reject</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function monApprove(approvalId) {
+  try {
+    const r = await fetch(`${MON_BASE}/reason/approvals/${approvalId}/approve`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'approved_by=wallpaper&note=approved+from+command+surface',
+      signal: AbortSignal.timeout(10000)
+    });
+    const result = await r.json();
+    if (result.dispatch && result.dispatch.result === 'executed') {
+      console.log('[MONITOR] Approval executed:', result.dispatch.service);
+    } else if (result.dispatch && result.dispatch.result === 'circuit_breaker_tripped') {
+      alert('Circuit breaker is tripped — reset it first before approving dispatches');
+    }
+    setTimeout(monLoadApprovals, 500);
+  } catch(e) {
+    console.error('Approve failed:', e);
+  }
+}
+
+async function monReject(approvalId) {
+  try {
+    await fetch(`${MON_BASE}/reason/approvals/${approvalId}/reject`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'approved_by=wallpaper&note=rejected+from+command+surface',
+      signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(monLoadApprovals, 500);
+  } catch(e) {
+    console.error('Reject failed:', e);
+  }
+}
 
 // Monitor tab activation — start/stop polling when tab is shown
 const _origShowView = window.showView;
@@ -3497,6 +3616,7 @@ if (typeof _origShowView === 'function') {
       monPollStatus();
       monLoadAlerts();
       monLoadJournal();
+      monLoadApprovals();
     } else {
       _monActive = false;
     }
