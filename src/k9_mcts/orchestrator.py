@@ -35,6 +35,7 @@ from .tree import MCTSNode, MCTSTree
 from .jepa_target_encoder import get_target_encoder, OutcomeRecord
 from .handover_engine import get_handover_engine, HandoverDecision, classify_task
 from .execution_dispatcher import get_dispatcher, DispatchResult
+from .observability import get_journal, JournalEntry
 
 logger = logging.getLogger("k9.mcts")
 
@@ -97,6 +98,7 @@ class K9MCTSOrchestrator:
         self.encoder = get_target_encoder()
         self.handover = get_handover_engine()
         self.dispatcher = get_dispatcher()
+        self.journal = get_journal()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -213,6 +215,33 @@ class K9MCTSOrchestrator:
                 "error": dispatch_outcome.error,
             }
             asyncio.create_task(self._publish_envelope(handover_result.execution_envelope))
+
+        # CB-7: Record decision in the observability journal
+        self.journal.record(JournalEntry(
+            trace_id=trace_id,
+            timestamp=time.time(),
+            question=question,
+            context=ctx,
+            answer=result["answer"],
+            confidence=result["confidence"],
+            iterations=result["iterations"],
+            elapsed_ms=result["elapsed_ms"],
+            reasoning_trace=result.get("reasoning_trace", []),
+            evidence=result.get("evidence", []),
+            task_class=task_class,
+            decision=result["handover"]["decision"],
+            risk_level=result["handover"]["risk_level"],
+            handover_reason=result["handover"]["reason"],
+            cooldown_seconds=result["handover"]["cooldown_seconds"],
+            dispatch_result=result.get("dispatch", {}).get("result", ""),
+            dispatch_service=result.get("dispatch", {}).get("service", ""),
+            dispatch_latency_ms=result.get("dispatch", {}).get("latency_ms", 0.0),
+            dispatch_error=result.get("dispatch", {}).get("error", ""),
+            jepa_total_updates=self.encoder.total_updates,
+            jepa_proven_classes=list(self.encoder.proven_classes),
+            jepa_class_success_rate=self.encoder.get_class_stats(task_class).get("successes", 0) / max(1, self.encoder.get_class_stats(task_class).get("total", 1)),
+            envelope_id=handover_result.execution_envelope.get("message_id", ""),
+        ))
 
         return result
 
