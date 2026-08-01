@@ -4,6 +4,14 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/monitor-panel",
+      "destination": "/monitor-panel.html"
+    },
+    {
+      "source": "/monitor-panel.html",
+      "destination": "/monitor-panel.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/wallpaper.html"
     }
