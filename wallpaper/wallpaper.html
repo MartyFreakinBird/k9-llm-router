@@ -2134,8 +2134,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
         <div class="nav-dd-item" data-view="claude" onclick="showView('claude')">⊚ Terminal · Claude Code</div>
         <div class="nav-dd-item" data-view="sw4" onclick="showView('sw4')">🛠 SW4.0 prompt generator</div>
         <div class="nav-dd-item" data-view="openclaw" onclick="showView('openclaw')">🦞 OpenClaw · WSL2</div>
-        <div class="nav-dd-item" data-view="hermes" onclick="showView('hermes')">✦ Hermes · Voice/Chat</div>
-        <div class="nav-dd-sep"></div>
+                <div class="nav-dd-sep"></div>
         <div class="nav-dd-label">Swarm</div>
         <div class="nav-dd-item" data-view="agent" onclick="showView('agent')">⊛ Agent Swarm</div>
         <div class="nav-dd-item" data-view="arch" onclick="showView('arch')">⊞ Architecture</div>
@@ -2182,7 +2181,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
         <div class="nav-dd-item" data-view="packai" onclick="showView('packai')">◉ PackNet SCOUT</div>
         <div class="nav-dd-sep"></div>
         <div class="nav-dd-label">Carbon</div>
-        <div class="nav-dd-item" data-view="carbon" onclick="showView('carbon')">⬡ Jarvis · Voice/Chat</div>
+        <div class="nav-dd-item" data-view="carbon" onclick="showView('carbon')">⬡ Vectos · Voice/Chat</div>
       </div>
     </div>
 
@@ -3790,7 +3789,7 @@ Verify the following script against K-9 SW4.0 constraints.
   <!-- ── TOP BAR ── -->
   <div class="cell cell-dark" style="grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 16px">
     <div class="pulse" style="width:7px;height:7px;flex-shrink:0"></div>
-    <span style="font-size:10px;letter-spacing:.18em;color:var(--green)">⬡ JARVIS · UNIFIED AI</span>
+    <span style="font-size:10px;letter-spacing:.18em;color:var(--green)">⬡ VECTOS · UNIFIED AI</span>
     <span style="font-size:9px;color:var(--dim)">localhost:8744 · K-9 LLM Router :8888</span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
       <!-- Sprint-9 status chips -->
@@ -3799,7 +3798,11 @@ Verify the following script against K-9 SW4.0 constraints.
         <span style="font-size:9px;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.15);color:var(--green);padding:2px 7px;border-radius:3px" id="carbon-status-chip">:8744 · checking…</span>
         <span style="font-size:9px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.15);color:var(--amber);padding:2px 7px;border-radius:3px">LAN-native · local-only</span>
       </div>
-      <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="carbonRefresh()">↺ Reload</button>
+      <div class="mode-switcher">
+        <div class="mode-btn active" id="vectos-btn-chat" onclick="setVectosMode('chat')">◎ CHAT</div>
+        <div class="mode-btn" id="vectos-btn-install" onclick="setVectosMode('install')">⚙ INSTALL</div>
+        <div class="mode-btn" id="vectos-btn-hermes" onclick="setVectosMode('hermes')">✦ HERMES</div>
+      </div>
       <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="window.open('http://localhost:8744/chat','_blank')">↗ Popout</button>
     </div>
   </div>
@@ -3845,22 +3848,22 @@ Verify the following script against K-9 SW4.0 constraints.
     <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="showView('kypro')">◈ Go to KyPro</button>
   </div>
 
-  <!-- ── CENTER: Unified Jarvis Chat + Avatar ── -->
+  <!-- ── CENTER: Unified Vectos Chat + Avatar ── -->
 <div class="cell cell-dark" style="grid-column:2;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden;padding:0;position:relative">
 
   <!-- Avatar bar (compact) -->
   <div style="display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2)">
     <!-- Mini avatar -->
     <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;position:relative;background:var(--bg2);border:1px solid rgba(167,139,250,.2)">
-      <img id="jarvis-avatar-img" src="assets/img/vectos_expression_neutral.png" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
-      <div style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--green);border:1px solid var(--bg2)" id="jarvis-avatar-dot"></div>
+      <img id="vectos-avatar-img" src="assets/img/vectos_expression_neutral.png" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+      <div style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--green);border:1px solid var(--bg2)" id="vectos-avatar-dot"></div>
     </div>
     <div style="flex:1">
-      <div style="font-size:11px;color:var(--green);font-weight:600">JARVIS</div>
-      <div style="font-size:8px;color:var(--dim)" id="jarvis-source-label">Awaiting query…</div>
+      <div style="font-size:11px;color:var(--green);font-weight:600">VECTOS</div>
+      <div style="font-size:8px;color:var(--dim)" id="vectos-source-label">Awaiting query…</div>
     </div>
     <!-- Source indicator -->
-    <select id="jarvis-source-select" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 6px;border-radius:4px;outline:none" onchange="jarvisSetSource(this.value)">
+    <select id="vectos-source-select" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 6px;border-radius:4px;outline:none" onchange="vectosSetSource(this.value)">
       <option value="auto">⚡ Auto-route</option>
       <option value="hermes">✦ Hermes :8642</option>
       <option value="router">⬡ LLM Router :8765</option>
@@ -3868,30 +3871,30 @@ Verify the following script against K-9 SW4.0 constraints.
       <option value="carbon">⬡ Carbon :8744</option>
     </select>
     <div style="display:flex;gap:4px">
-      <button class="kp-btn" style="padding:3px 8px;font-size:9px" onclick="jarvisToggleVoice()" id="jarvis-mic-btn" title="Voice input">🎤</button>
-      <button class="kp-btn" style="padding:3px 8px;font-size:9px" onclick="jarvisToggleTTS()" id="jarvis-tts-btn" title="Toggle TTS">🔊</button>
+      <button class="kp-btn" style="padding:3px 8px;font-size:9px" onclick="vectosToggleVoice()" id="vectos-mic-btn" title="Voice input">🎤</button>
+      <button class="kp-btn" style="padding:3px 8px;font-size:9px" onclick="vectosToggleTTS()" id="vectos-tts-btn" title="Toggle TTS">🔊</button>
     </div>
   </div>
 
   <!-- Chat messages -->
-  <div id="jarvis-messages" style="flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin">
+  <div id="vectos-messages" style="flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin">
     <div class="hermes-msg assistant">
-      <div class="msg-role">JARVIS</div>
-      Good day. I'm Jarvis — your unified AI interface. I can route to Hermes Agent, K-9 LLM Router, or Ollama. Tap the mic to speak, or type below. I can check service status, run queries, relay commands, and more.
+      <div class="msg-role">VECTOS</div>
+      Good day. I'm Vectos — your unified AI interface. I can route to Hermes Agent, K-9 LLM Router, or Ollama. Tap the mic to speak, or type below. I can check service status, run queries, relay commands, and more.
     </div>
   </div>
 
   <!-- Voice waveform (hidden) -->
-  <div class="hermes-waveform" id="jarvis-waveform" style="padding:4px 14px">
+  <div class="hermes-waveform" id="vectos-waveform" style="padding:4px 14px">
     <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-    <span style="font-size:9px;color:var(--muted);margin-left:8px" id="jarvis-voice-status">Listening…</span>
+    <span style="font-size:9px;color:var(--muted);margin-left:8px" id="vectos-voice-status">Listening…</span>
   </div>
 
   <!-- Input bar -->
   <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid var(--border);background:var(--bg3)">
-    <button id="jarvis-mic-btn2" class="hermes-mic-btn" onclick="jarvisToggleVoice()" title="Voice input" style="width:34px;height:34px;font-size:14px">🎤</button>
-    <input type="text" id="jarvis-input" class="hermes-input" placeholder="Ask Jarvis anything…" onkeydown="if(event.key==='Enter')jarvisSend()" style="flex:1">
-    <button class="hermes-send-btn" onclick="jarvisSend()">SEND</button>
+    <button id="vectos-mic-btn2" class="hermes-mic-btn" onclick="vectosToggleVoice()" title="Voice input" style="width:34px;height:34px;font-size:14px">🎤</button>
+    <input type="text" id="vectos-input" class="hermes-input" placeholder="Ask Vectos anything…" onkeydown="if(event.key==='Enter')vectosSend()" style="flex:1">
+    <button class="hermes-send-btn" onclick="vectosSend()">SEND</button>
   </div>
 
 </div>
@@ -3903,26 +3906,26 @@ Verify the following script against K-9 SW4.0 constraints.
   <!-- Routing status -->
   <div style="padding:8px 10px;flex-shrink:0">
     <div style="font-size:8px;color:var(--dim);margin-bottom:4px">ACTIVE SOURCE</div>
-    <div id="jarvis-active-source" style="font-size:10px;color:var(--green);font-weight:600">Auto-route</div>
-    <div id="jarvis-source-detail" style="font-size:9px;color:var(--dim);margin-top:2px">Will try: Hermes → Router → Ollama</div>
+    <div id="vectos-active-source" style="font-size:10px;color:var(--green);font-weight:600">Auto-route</div>
+    <div id="vectos-source-detail" style="font-size:9px;color:var(--dim);margin-top:2px">Will try: Hermes → Router → Ollama</div>
   </div>
 
   <!-- Latency -->
   <div style="padding:6px 10px;flex-shrink:0;border-top:1px solid var(--border)">
     <div style="font-size:8px;color:var(--dim)">LAST RESPONSE</div>
-    <div style="font-size:10px;color:var(--text)" id="jarvis-latency">— ms</div>
+    <div style="font-size:10px;color:var(--text)" id="vectos-latency">— ms</div>
   </div>
 
   <!-- Voice settings -->
   <div style="padding:8px 10px;flex-shrink:0;border-top:1px solid var(--border)">
     <div style="font-size:8px;color:var(--dim);margin-bottom:4px">VOICE</div>
-    <select id="jarvis-voice-select" style="width:100%;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 4px;border-radius:3px;outline:none" onchange="jarvisSaveSettings()">
+    <select id="vectos-voice-select" style="width:100%;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 4px;border-radius:3px;outline:none" onchange="vectosSaveSettings()">
       <option value="">Default voice</option>
     </select>
     <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
       <span style="font-size:8px;color:var(--dim)">Rate:</span>
-      <input type="range" id="jarvis-rate" min="0.5" max="2" step="0.1" value="1" style="flex:1;height:14px" oninput="jarvisSaveSettings()">
-      <span style="font-size:8px;color:var(--muted)" id="jarvis-rate-val">1.0</span>
+      <input type="range" id="vectos-rate" min="0.5" max="2" step="0.1" value="1" style="flex:1;height:14px" oninput="vectosSaveSettings()">
+      <span style="font-size:8px;color:var(--muted)" id="vectos-rate-val">1.0</span>
     </div>
   </div>
 </div>
@@ -3931,16 +3934,16 @@ Verify the following script against K-9 SW4.0 constraints.
   <div style="padding:6px 10px;font-size:9px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--border);flex-shrink:0">Quick Commands</div>
 
   <div style="flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:4px">
-    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('status')">📊 System Status</button>
-    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('services')">🔗 Service Health</button>
-    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('time')">⏰ What time is it?</button>
-    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('models')">🧠 List AI Models</button>
-    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('help')">❓ What can you do?</button>
+    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('status')">📊 System Status</button>
+    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('services')">🔗 Service Health</button>
+    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('time')">⏰ What time is it?</button>
+    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('models')">🧠 List AI Models</button>
+    <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('help')">❓ What can you do?</button>
 
     <div style="border-top:1px solid var(--border);margin:4px 0;padding-top:4px">
       <div style="font-size:8px;color:var(--dim);margin-bottom:3px">K-9 CONTROL</div>
-      <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('stack status')">▶ Stack Status</button>
-      <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="jarvisQuickCmd('monitor')">⊞ Monitor Decisions</button>
+      <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('stack status')">▶ Stack Status</button>
+      <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="vectosQuickCmd('monitor')">⊞ Monitor Decisions</button>
       <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="showView('hermes')">✦ Hermes Install</button>
       <button class="kp-btn" style="width:100%;justify-content:flex-start;font-size:9px;padding:5px 8px" onclick="showView('monitor')">⊞ Monitor Tab</button>
     </div>
@@ -3948,9 +3951,137 @@ Verify the following script against K-9 SW4.0 constraints.
 </div>
 
 
+
+  <!-- ── INSTALL panel (from Hermes tab) — hidden by default ── -->
+  <div id="vectos-install-panel" style="grid-column:1/-1;grid-row:2/4;display:none;flex-direction:column;overflow-y:auto;padding:16px">
+<!-- ── INSTALL panel (installation instructions, like OpenClaw miniSWE) ── -->
+  <div id="vectos-install-panel-content" style="grid-column:1/-1;grid-row:2/3;display:none;flex-direction:column;overflow-y:auto;padding:16px">
+
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:700px;margin:0 auto">
+
+      <!-- What is Hermes -->
+      <div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.12);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--purple);letter-spacing:.12em;margin-bottom:8px">✦ HERMES AGENT · NOUS RESEARCH</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.7">
+          Self-improving AI agent with built-in learning loop. Creates skills from experience, searches its own past conversations,
+          and builds a deepening model of who you are across sessions. Supports terminal, messaging platforms, and voice.
+          <br><br>
+          <span style="color:var(--cyan)">GitHub:</span> <a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--cyan)">github.com/NousResearch/hermes-agent</a>
+          <br><span style="color:var(--cyan)">Docs:</span> <a href="https://hermes-agent.nousresearch.com/docs" target="_blank" style="color:var(--cyan)">hermes-agent.nousresearch.com/docs</a>
+          <br><span style="color:var(--cyan)">Stars:</span> 224k · <span style="color:var(--cyan)">License:</span> MIT
+        </div>
+      </div>
+
+      <!-- Step 1: Install -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 1 · INSTALL (WSL2)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Install Hermes Agent in WSL2</span><br>
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash<br>
+          <br>
+          <span style="color:var(--muted)"># Reload shell</span><br>
+          source ~/.bashrc<br>
+          <br>
+          <span style="color:var(--muted)"># Verify installation</span><br>
+          hermes --version
+        </div>
+        <div style="font-size:9px;color:var(--dim);margin-top:6px">Installs: Python 3.11, Node.js, ripgrep, ffmpeg, uv, and the hermes CLI. No admin required.</div>
+      </div>
+
+      <!-- Step 2: Configure Provider -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--amber);margin-bottom:8px">STEP 2 · CHOOSE PROVIDER</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Option A: Use local Ollama (already running on :11434)</span><br>
+          hermes model<br>
+          <span style="color:var(--muted)"># → Select "Custom Endpoint" → http://localhost:11434/v1</span><br>
+          <span style="color:var(--muted)"># → Model: llama3.1:8b (or your installed model)</span><br>
+          <span style="color:var(--muted)"># → Context: 65536 (required minimum 64K)</span><br>
+          <br>
+          <span style="color:var(--muted)"># Option B: Use Nous Portal (300+ models, OAuth)</span><br>
+          hermes setup --portal<br>
+          <br>
+          <span style="color:var(--muted)"># Option C: Use OpenRouter / OpenAI / Anthropic</span><br>
+          hermes model <span style="color:var(--muted)"># interactive picker</span>
+        </div>
+      </div>
+
+      <!-- Step 3: Enable API Server -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--cyan);margin-bottom:8px">STEP 3 · ENABLE API SERVER</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Add to ~/.hermes/.env</span><br>
+          echo 'API_SERVER_ENABLED=true' >> ~/.hermes/.env<br>
+          echo 'API_SERVER_KEY=k9-hermes-local' >> ~/.hermes/.env<br>
+          <br>
+          <span style="color:var(--muted)"># Optional: allow CORS from wallpaper</span><br>
+          echo 'API_SERVER_CORS_ORIGINS=http://localhost:*' >> ~/.hermes/.env<br>
+          <br>
+          <span style="color:var(--muted)"># Start the gateway (API server + messaging)</span><br>
+          hermes gateway
+        </div>
+        <div style="font-size:9px;color:var(--dim);margin-top:6px">API server listens on http://127.0.0.1:8642 — OpenAI-compatible at /v1/chat/completions</div>
+      </div>
+
+      <!-- Step 4: Verify -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 4 · VERIFY</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Test the API</span><br>
+          curl http://localhost:8642/v1/chat/completions \<br>
+          &nbsp;&nbsp;-H "Authorization: Bearer k9-hermes-local" \<br>
+          &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+          &nbsp;&nbsp;-d '{"model":"hermes-agent","messages":[{"role":"user","content":"Hello!"}]}'<br>
+          <br>
+          <span style="color:var(--muted)"># Check available models</span><br>
+          curl http://localhost:8642/v1/models -H "Authorization: Bearer k9-hermes-local"<br>
+          <br>
+          <span style="color:var(--muted)"># Start a TUI chat session</span><br>
+          hermes --tui
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div class="ql-btn" onclick="k9Action({label:'Hermes Health',method:'GET',port:8642,path:'/v1/models',logId:'termOut',copyFallback:'curl http://localhost:8642/v1/models'})">
+          <span class="ql-ico">✦</span>Check API<span class="ql-port">:8642</span>
+        </div>
+        <div class="ql-btn" onclick="k9Action({label:'Hermes Gateway Start',method:'POST',port:8080,path:'/run',payload:{cmd:'wsl -e bash -c \"source ~/.bashrc && hermes gateway &\"'},logId:'termOut',copyFallback:'hermes gateway'})">
+          <span class="ql-ico">⟳</span>Start Gateway<span class="ql-port">WSL</span>
+        </div>
+        <div class="ql-btn" onclick="k9Action({label:'Ollama Models',method:'GET',port:11434,path:'/api/tags',logId:'termOut',copyFallback:'ollama list'})">
+          <span class="ql-ico">🦙</span>Ollama Models<span class="ql-port">:11434</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  </div>
+
+  <!-- ── HERMES DASHBOARD panel — hidden by default ── -->
+  <div id="vectos-hermes-panel" style="grid-column:1/-1;grid-row:2/4;display:none;flex-direction:column;overflow:hidden">
+<!-- ── DASHBOARD panel (iframe to Hermes API server) ── -->
+  <div id="vectos-hermes-content" class="iframe-live-panel" style="grid-column:1/-1;grid-row:2/3">
+    <iframe id="hermes-iframe"
+      src="http://localhost:8642"
+      style="width:100%;height:100%;border:none;opacity:0;transition:opacity .5s"
+      allow="clipboard-read;clipboard-write;microphone"
+      loading="lazy"
+      title="Hermes Agent Dashboard"
+      onload="this.style.opacity='1';const l=document.getElementById('hermes-loading');if(l)l.style.display='none';"
+      onerror="const l=document.getElementById('hermes-loading');if(l)l.querySelector('.load-label').textContent='Hermes offline — run: hermes gateway (WSL)';">
+    </iframe>
+    <div id="hermes-loading" class="iframe-loader">
+      <div class="spinner"></div>
+      <span class="load-label">Connecting to Hermes API server…</span>
+      <span class="load-url">http://localhost:8642</span>
+    </div>
+  </div>
+  </div>
+
   <!-- ── FOOTER ── -->
   <div class="cell cell-dark" style="grid-column:1/-1;grid-row:4;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:9px;color:var(--dim)">
-    <span>⬡ JARVIS</span>
+    <span>⬡ VECTOS</span>
     <span>Voice/Chat</span>
     <span>LLM Router :8888</span>
     <span>Orchestrator :8080</span>
@@ -5412,198 +5543,6 @@ Verify the following script against K-9 SW4.0 constraints.
      Install: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
      API: http://localhost:8642/v1 (OpenAI-compatible)
      ═══════════════════════════════════════════════════════════════ -->
-<div class="view" id="v-hermes" data-layout="hermes">
-
-  <!-- ── TOP BAR ── -->
-  <div class="cell cell-dark" style="grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 16px">
-    <div class="pulse" style="width:7px;height:7px;flex-shrink:0"></div>
-    <span style="font-size:10px;letter-spacing:.18em;color:var(--purple)">✦ HERMES · NOUS RESEARCH</span>
-    <span style="font-size:9px;color:var(--dim)">localhost:8642 · OpenAI-compatible API</span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-      <span style="font-size:9px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.15);color:var(--purple);padding:2px 7px;border-radius:3px" id="hermes-conn-chip">checking…</span>
-      <div class="mode-switcher">
-        <div class="mode-btn active" id="hermes-btn-ui" onclick="setHermesMode('ui')">◎ DASHBOARD</div>
-        <div class="mode-btn" id="hermes-btn-install" onclick="setHermesMode('install')">⚙ INSTALL</div>
-      </div>
-      <div class="mode-action-btn" onclick="hermesRefresh()">⟳ refresh</div>
-      <div class="mode-action-btn" onclick="window.open('http://localhost:8642','_blank')">⬡ popout</div>
-    </div>
-  </div>
-
-  <!-- ── DASHBOARD panel (iframe to Hermes API server) ── -->
-  <div id="hermes-ui-panel" class="iframe-live-panel" style="grid-column:1/-1;grid-row:2/3">
-    <iframe id="hermes-iframe"
-      src="http://localhost:8642"
-      style="width:100%;height:100%;border:none;opacity:0;transition:opacity .5s"
-      allow="clipboard-read;clipboard-write;microphone"
-      loading="lazy"
-      title="Hermes Agent Dashboard"
-      onload="this.style.opacity='1';const l=document.getElementById('hermes-loading');if(l)l.style.display='none';"
-      onerror="const l=document.getElementById('hermes-loading');if(l)l.querySelector('.load-label').textContent='Hermes offline — run: hermes gateway (WSL)';">
-    </iframe>
-    <div id="hermes-loading" class="iframe-loader">
-      <div class="spinner"></div>
-      <span class="load-label">Connecting to Hermes API server…</span>
-      <span class="load-url">http://localhost:8642</span>
-    </div>
-  </div>
-
-  <!-- ── INSTALL panel (installation instructions, like OpenClaw miniSWE) ── -->
-  <div id="hermes-install-panel" style="grid-column:1/-1;grid-row:2/3;display:none;flex-direction:column;overflow-y:auto;padding:16px">
-
-    <div style="display:flex;flex-direction:column;gap:16px;max-width:700px;margin:0 auto">
-
-      <!-- What is Hermes -->
-      <div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.12);border-radius:6px;padding:14px">
-        <div style="font-size:11px;color:var(--purple);letter-spacing:.12em;margin-bottom:8px">✦ HERMES AGENT · NOUS RESEARCH</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.7">
-          Self-improving AI agent with built-in learning loop. Creates skills from experience, searches its own past conversations,
-          and builds a deepening model of who you are across sessions. Supports terminal, messaging platforms, and voice.
-          <br><br>
-          <span style="color:var(--cyan)">GitHub:</span> <a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--cyan)">github.com/NousResearch/hermes-agent</a>
-          <br><span style="color:var(--cyan)">Docs:</span> <a href="https://hermes-agent.nousresearch.com/docs" target="_blank" style="color:var(--cyan)">hermes-agent.nousresearch.com/docs</a>
-          <br><span style="color:var(--cyan)">Stars:</span> 224k · <span style="color:var(--cyan)">License:</span> MIT
-        </div>
-      </div>
-
-      <!-- Step 1: Install -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
-        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 1 · INSTALL (WSL2)</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
-          <span style="color:var(--muted)"># Install Hermes Agent in WSL2</span><br>
-          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash<br>
-          <br>
-          <span style="color:var(--muted)"># Reload shell</span><br>
-          source ~/.bashrc<br>
-          <br>
-          <span style="color:var(--muted)"># Verify installation</span><br>
-          hermes --version
-        </div>
-        <div style="font-size:9px;color:var(--dim);margin-top:6px">Installs: Python 3.11, Node.js, ripgrep, ffmpeg, uv, and the hermes CLI. No admin required.</div>
-      </div>
-
-      <!-- Step 2: Configure Provider -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
-        <div style="font-size:11px;color:var(--amber);margin-bottom:8px">STEP 2 · CHOOSE PROVIDER</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
-          <span style="color:var(--muted)"># Option A: Use local Ollama (already running on :11434)</span><br>
-          hermes model<br>
-          <span style="color:var(--muted)"># → Select "Custom Endpoint" → http://localhost:11434/v1</span><br>
-          <span style="color:var(--muted)"># → Model: llama3.1:8b (or your installed model)</span><br>
-          <span style="color:var(--muted)"># → Context: 65536 (required minimum 64K)</span><br>
-          <br>
-          <span style="color:var(--muted)"># Option B: Use Nous Portal (300+ models, OAuth)</span><br>
-          hermes setup --portal<br>
-          <br>
-          <span style="color:var(--muted)"># Option C: Use OpenRouter / OpenAI / Anthropic</span><br>
-          hermes model <span style="color:var(--muted)"># interactive picker</span>
-        </div>
-      </div>
-
-      <!-- Step 3: Enable API Server -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
-        <div style="font-size:11px;color:var(--cyan);margin-bottom:8px">STEP 3 · ENABLE API SERVER</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
-          <span style="color:var(--muted)"># Add to ~/.hermes/.env</span><br>
-          echo 'API_SERVER_ENABLED=true' >> ~/.hermes/.env<br>
-          echo 'API_SERVER_KEY=k9-hermes-local' >> ~/.hermes/.env<br>
-          <br>
-          <span style="color:var(--muted)"># Optional: allow CORS from wallpaper</span><br>
-          echo 'API_SERVER_CORS_ORIGINS=http://localhost:*' >> ~/.hermes/.env<br>
-          <br>
-          <span style="color:var(--muted)"># Start the gateway (API server + messaging)</span><br>
-          hermes gateway
-        </div>
-        <div style="font-size:9px;color:var(--dim);margin-top:6px">API server listens on http://127.0.0.1:8642 — OpenAI-compatible at /v1/chat/completions</div>
-      </div>
-
-      <!-- Step 4: Verify -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
-        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 4 · VERIFY</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
-          <span style="color:var(--muted)"># Test the API</span><br>
-          curl http://localhost:8642/v1/chat/completions \<br>
-          &nbsp;&nbsp;-H "Authorization: Bearer k9-hermes-local" \<br>
-          &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-          &nbsp;&nbsp;-d '{"model":"hermes-agent","messages":[{"role":"user","content":"Hello!"}]}'<br>
-          <br>
-          <span style="color:var(--muted)"># Check available models</span><br>
-          curl http://localhost:8642/v1/models -H "Authorization: Bearer k9-hermes-local"<br>
-          <br>
-          <span style="color:var(--muted)"># Start a TUI chat session</span><br>
-          hermes --tui
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <div class="ql-btn" onclick="k9Action({label:'Hermes Health',method:'GET',port:8642,path:'/v1/models',logId:'termOut',copyFallback:'curl http://localhost:8642/v1/models'})">
-          <span class="ql-ico">✦</span>Check API<span class="ql-port">:8642</span>
-        </div>
-        <div class="ql-btn" onclick="k9Action({label:'Hermes Gateway Start',method:'POST',port:8080,path:'/run',payload:{cmd:'wsl -e bash -c \"source ~/.bashrc && hermes gateway &\"'},logId:'termOut',copyFallback:'hermes gateway'})">
-          <span class="ql-ico">⟳</span>Start Gateway<span class="ql-port">WSL</span>
-        </div>
-        <div class="ql-btn" onclick="k9Action({label:'Ollama Models',method:'GET',port:11434,path:'/api/tags',logId:'termOut',copyFallback:'ollama list'})">
-          <span class="ql-ico">🦙</span>Ollama Models<span class="ql-port">:11434</span>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ── VOICE panel (voice chat via Hermes API + Web Speech) ── -->
-  <div id="hermes-voice-panel" style="grid-column:1/-1;grid-row:2/3;display:none;flex-direction:column;overflow:hidden">
-    <div style="display:flex;flex-direction:column;height:100%;padding:16px;gap:12px">
-
-      <!-- Voice viz -->
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;flex:1">
-        <div style="width:100px;height:100px;border-radius:50%;border:2px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:40px;background:rgba(167,139,250,.04)" id="hermes-orb">✦</div>
-        <div style="font-size:11px;color:var(--muted);letter-spacing:.15em" id="hermes-voice-mode-label">TAP MIC TO START</div>
-        <div class="hermes-waveform" id="hermes-waveform-large" style="height:40px">
-          <div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div>
-        </div>
-        <div style="font-size:10px;color:var(--dim);max-width:400px;text-align:center" id="hermes-transcript">—</div>
-      </div>
-
-      <!-- Chat messages (voice + text) -->
-      <div id="hermes-messages" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin">
-        <div class="hermes-msg system">Hermes voice gateway · tap mic or type to speak with Hermes Agent</div>
-      </div>
-
-      <!-- Input bar -->
-      <div class="hermes-input-bar">
-        <button class="hermes-mic-btn" id="hermes-mic-btn" onclick="hermesToggleVoice()" title="Voice input">🎤</button>
-        <input type="text" class="hermes-input" id="hermes-input" placeholder="Talk to Hermes…" onkeydown="if(event.key==='Enter')hermesSend()">
-        <button class="hermes-send-btn" id="hermes-send-btn" onclick="hermesSend()">SEND</button>
-      </div>
-
-      <!-- Settings row -->
-      <div style="display:flex;align-items:center;gap:12px;font-size:9px;color:var(--dim)">
-        <label class="hermes-toggle" style="font-size:9px">
-          <input type="checkbox" id="hermes-auto-tts" checked>
-          <span>Auto-speak</span>
-        </label>
-        <label class="hermes-toggle" style="font-size:9px">
-          <input type="checkbox" id="hermes-vectos-sync" checked>
-          <span>Avatar sync</span>
-        </label>
-        <select id="hermes-voice-select" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:2px 4px;border-radius:3px">
-          <option value="">Default voice</option>
-        </select>
-        <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesTestVoice()">🔊 Test</button>
-        <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesClearChat()">🗑 Clear</button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ── FOOTER ── -->
-  <div class="cell cell-dark" style="grid-column:1/-1;grid-row:3;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
-    <span style="font-size:9px;color:var(--dim)" id="hermes-footer">Hermes Agent · NousResearch · localhost:8642</span>
-    <span style="font-size:9px;color:var(--dim)" id="hermes-msg-count">0 messages</span>
-  </div>
-
-</div>
 
 
 <div class="view" id="v-setup" data-layout="panel">
@@ -5872,10 +5811,8 @@ function showView(id) {
   if (id === 'arch')       setTimeout(archTabInit, 150);
   if (id === 'setup')      setTimeout(setupTabInit, 200);
   if (id === 'openclaw')   setTimeout(openclawInit, 200);
-  if (id === 'hermes')    setTimeout(hermesInit, 200);
   if (id === 'monitor') { _monActive = true; setTimeout(monTabInit, 100); }
   else { _monActive = false; }
-  if (id !== 'hermes') _hermesActive = false;
   if (id === 'sw4') {
     setTimeout(() => {
       const tab = document.querySelector('.rt-tab[data-rtab="sw4"]');
@@ -9862,7 +9799,8 @@ window.showView = function(id) {
   }
   // Carbon: ping + service check on first visit
   if (id === 'carbon') {
-    if (typeof jarvisInit === 'function') jarvisInit();
+    if (typeof vectosUnifiedInit === 'function') vectosUnifiedInit();
+    if (typeof carbonCheckServices === 'function') carbonCheckServices();
     if (typeof carbonCheckServices === 'function') carbonCheckServices();
   }
   // Grid: check webapp availability then load iframe or fall back to native
@@ -11738,25 +11676,61 @@ async function monResetCircuitBreaker() {
   }
 }
 
+
+// ── Vectos unified tab mode switcher ──
+function setVectosMode(mode) {
+  document.querySelectorAll('#v-carbon .mode-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`vectos-btn-${mode}`);
+  if (btn) btn.classList.add('active');
+
+  // Hide all panels
+  const chatCenter = document.querySelector('#v-carbon .cell[style*="grid-column:2"]');
+  const chatRight1 = document.querySelector('#v-carbon .cell[style*="grid-column:3;grid-row:2"]');
+  const chatRight2 = document.querySelector('#v-carbon .cell[style*="grid-column:3;grid-row:3"]');
+  const installPanel = document.getElementById('vectos-install-panel');
+  const hermesPanel = document.getElementById('vectos-hermes-panel');
+
+  if (mode === 'install') {
+    if (chatCenter) chatCenter.style.display = 'none';
+    if (chatRight1) chatRight1.style.display = 'none';
+    if (chatRight2) chatRight2.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'flex';
+    if (hermesPanel) hermesPanel.style.display = 'none';
+  } else if (mode === 'hermes') {
+    if (chatCenter) chatCenter.style.display = 'none';
+    if (chatRight1) chatRight1.style.display = 'none';
+    if (chatRight2) chatRight2.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'none';
+    if (hermesPanel) hermesPanel.style.display = 'flex';
+  } else {
+    // chat mode
+    if (chatCenter) chatCenter.style.display = 'flex';
+    if (chatRight1) chatRight1.style.display = 'flex';
+    if (chatRight2) chatRight2.style.display = 'flex';
+    if (installPanel) installPanel.style.display = 'none';
+    if (hermesPanel) hermesPanel.style.display = 'none';
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   JARVIS — Unified Voice/Chat AI Agent (CB-10)
+   VECTOS — Unified Voice/Chat AI Agent (CB-10)
    Consolidates Hermes + Carbon + Vectos avatar into ONE interface.
    Smart routing: Hermes :8642 → k9-llm-router :8765 → Ollama :11434
    Voice: Web Speech API (SpeechRecognition + speechSynthesis)
    Avatar: Vectos expressions synced to response content
    ═══════════════════════════════════════════════════════════════ */
 
-let _jarvisActive = false;
-let _jarvisRecognizing = false;
-let _jarvisRecognition = null;
-let _jarvisVoices = [];
-let _jarvisTTSenabled = true;
-let _jarvisSource = 'auto'; // auto | hermes | router | ollama | carbon
-let _jarvisMsgCount = 0;
-let _jarvisSettings = { voice: '', rate: 1, tts: true };
+let _vectosActive = false;
+let _vectosRecognizing = false;
+let _vectosRecognition = null;
+let _vectosVoices = [];
+let _vectosTTSenabled = true;
+let _vectosSource = 'auto'; // auto | hermes | router | ollama | carbon
+let _vectosMsgCount = 0;
+let _vectosSettings = { voice: '', rate: 1, tts: true };
 
 // ── Endpoint definitions ──
-const JARVIS_ENDPOINTS = {
+const VECTOS_ENDPOINTS = {
   hermes: {
     name: 'Hermes Agent',
     url: 'http://localhost:8642/v1/chat/completions',
@@ -11792,68 +11766,68 @@ const JARVIS_ENDPOINTS = {
 };
 
 // ── Source selection ──
-function jarvisSetSource(src) {
-  _jarvisSource = src;
-  const label = document.getElementById('jarvis-active-source');
-  const detail = document.getElementById('jarvis-source-detail');
+function vectosSetSource(src) {
+  _vectosSource = src;
+  const label = document.getElementById('vectos-active-source');
+  const detail = document.getElementById('vectos-source-detail');
   if (src === 'auto') {
     if (label) label.textContent = 'Auto-route';
     if (detail) detail.textContent = 'Will try: Hermes → Router → Ollama';
   } else {
-    const ep = JARVIS_ENDPOINTS[src];
+    const ep = VECTOS_ENDPOINTS[src];
     if (label) label.textContent = ep.name;
     if (detail) detail.textContent = ep.label + ' (fixed)';
   }
 }
 
 // ── Settings ──
-function jarvisSaveSettings() {
-  _jarvisSettings.voice = document.getElementById('jarvis-voice-select')?.value || '';
-  _jarvisSettings.rate = parseFloat(document.getElementById('jarvis-rate')?.value || 1);
-  _jarvisSettings.tts = _jarvisTTSenabled;
-  const rv = document.getElementById('jarvis-rate-val');
-  if (rv) rv.textContent = _jarvisSettings.rate.toFixed(1);
-  try { localStorage.setItem('jarvis_settings', JSON.stringify(_jarvisSettings)); } catch(e) {}
+function vectosSaveSettings() {
+  _vectosSettings.voice = document.getElementById('vectos-voice-select')?.value || '';
+  _vectosSettings.rate = parseFloat(document.getElementById('vectos-rate')?.value || 1);
+  _vectosSettings.tts = _vectosTTSenabled;
+  const rv = document.getElementById('vectos-rate-val');
+  if (rv) rv.textContent = _vectosSettings.rate.toFixed(1);
+  try { localStorage.setItem('vectos_settings', JSON.stringify(_vectosSettings)); } catch(e) {}
 }
-function jarvisLoadSettings() {
+function vectosLoadSettings() {
   try {
-    const s = localStorage.getItem('jarvis_settings');
-    if (s) _jarvisSettings = { ..._jarvisSettings, ...JSON.parse(s) };
+    const s = localStorage.getItem('vectos_settings');
+    if (s) _vectosSettings = { ..._vectosSettings, ...JSON.parse(s) };
   } catch(e) {}
-  _jarvisTTSenabled = _jarvisSettings.tts;
+  _vectosTTSenabled = _vectosSettings.tts;
 }
 
 // ── TTS ──
-function jarvisTTS(text) {
-  if (!_jarvisTTSenabled || !window.speechSynthesis) return;
+function vectosTTS(text) {
+  if (!_vectosTTSenabled || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = _jarvisSettings.rate || 1;
+  u.rate = _vectosSettings.rate || 1;
   u.pitch = 1;
   u.volume = 1;
-  if (_jarvisVoices.length > 0) {
-    const v = _jarvisVoices.find(x => x.name === _jarvisSettings.voice) || _jarvisVoices[0];
+  if (_vectosVoices.length > 0) {
+    const v = _vectosVoices.find(x => x.name === _vectosSettings.voice) || _vectosVoices[0];
     if (v) u.voice = v;
   }
   // Avatar expression sync
-  u.onstart = () => jarvisUpdateAvatar(text);
-  u.onend = () => jarvisUpdateAvatar('neutral');
+  u.onstart = () => vectosUpdateAvatar(text);
+  u.onend = () => vectosUpdateAvatar('neutral');
   window.speechSynthesis.speak(u);
 }
 
-function jarvisToggleTTS() {
-  _jarvisTTSenabled = !_jarvisTTSenabled;
-  const btn = document.getElementById('jarvis-tts-btn');
+function vectosToggleTTS() {
+  _vectosTTSenabled = !_vectosTTSenabled;
+  const btn = document.getElementById('vectos-tts-btn');
   if (btn) {
-    btn.style.opacity = _jarvisTTSenabled ? '1' : '0.4';
-    btn.textContent = _jarvisTTSenabled ? '🔊' : '🔇';
+    btn.style.opacity = _vectosTTSenabled ? '1' : '0.4';
+    btn.textContent = _vectosTTSenabled ? '🔊' : '🔇';
   }
-  jarvisSaveSettings();
+  vectosSaveSettings();
 }
 
 // ── Avatar expression ──
-function jarvisUpdateAvatar(text) {
-  const img = document.getElementById('jarvis-avatar-img');
+function vectosUpdateAvatar(text) {
+  const img = document.getElementById('vectos-avatar-img');
   if (!img) return;
   const t = (text || '').toLowerCase();
   let src = 'assets/img/vectos_expression_neutral.png';
@@ -11877,10 +11851,10 @@ function jarvisUpdateAvatar(text) {
 }
 
 // ── Speech Recognition ──
-function jarvisInitRecognition() {
+function vectosInitRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    jarvisAddMsg('error', 'Voice recognition not supported. Use Chrome/Edge on localhost.');
+    vectosAddMsg('error', 'Voice recognition not supported. Use Chrome/Edge on localhost.');
     return null;
   }
   const r = new SR();
@@ -11888,11 +11862,11 @@ function jarvisInitRecognition() {
   r.interimResults = true;
   r.lang = 'en-US';
   r.onstart = () => {
-    _jarvisRecognizing = true;
-    document.querySelectorAll('#jarvis-mic-btn, #jarvis-mic-btn2').forEach(b => b.classList.add('recording'));
-    const wf = document.getElementById('jarvis-waveform');
+    _vectosRecognizing = true;
+    document.querySelectorAll('#vectos-mic-btn, #vectos-mic-btn2').forEach(b => b.classList.add('recording'));
+    const wf = document.getElementById('vectos-waveform');
     if (wf) wf.classList.add('active');
-    jarvisUpdateAvatar('listening');
+    vectosUpdateAvatar('listening');
   };
   r.onresult = (e) => {
     let interim = '', final = '';
@@ -11901,78 +11875,78 @@ function jarvisInitRecognition() {
       if (e.results[i].isFinal) final += t;
       else interim += t;
     }
-    const input = document.getElementById('jarvis-input');
+    const input = document.getElementById('vectos-input');
     if (input && (interim || final)) input.value = final || interim;
-    if (final) jarvisSendText(final.trim());
+    if (final) vectosSendText(final.trim());
   };
   r.onerror = (e) => {
-    if (e.error === 'not-allowed') jarvisAddMsg('error', 'Microphone access denied. Requires localhost or HTTPS.');
+    if (e.error === 'not-allowed') vectosAddMsg('error', 'Microphone access denied. Requires localhost or HTTPS.');
   };
   r.onend = () => {
-    _jarvisRecognizing = false;
-    document.querySelectorAll('#jarvis-mic-btn, #jarvis-mic-btn2').forEach(b => b.classList.remove('recording'));
-    const wf = document.getElementById('jarvis-waveform');
+    _vectosRecognizing = false;
+    document.querySelectorAll('#vectos-mic-btn, #vectos-mic-btn2').forEach(b => b.classList.remove('recording'));
+    const wf = document.getElementById('vectos-waveform');
     if (wf) wf.classList.remove('active');
-    jarvisUpdateAvatar('neutral');
+    vectosUpdateAvatar('neutral');
   };
   return r;
 }
 
-function jarvisToggleVoice() {
-  if (!_jarvisRecognition) _jarvisRecognition = jarvisInitRecognition();
-  if (!_jarvisRecognition) return;
-  if (_jarvisRecognizing) _jarvisRecognition.stop();
-  else { try { _jarvisRecognition.start(); } catch(e) {} }
+function vectosToggleVoice() {
+  if (!_vectosRecognition) _vectosRecognition = vectosInitRecognition();
+  if (!_vectosRecognition) return;
+  if (_vectosRecognizing) _vectosRecognition.stop();
+  else { try { _vectosRecognition.start(); } catch(e) {} }
 }
 
 // ── Load voices ──
-function jarvisLoadVoices() {
+function vectosLoadVoices() {
   if (!window.speechSynthesis) return;
-  _jarvisVoices = window.speechSynthesis.getVoices();
-  const sel = document.getElementById('jarvis-voice-select');
+  _vectosVoices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('vectos-voice-select');
   if (!sel) return;
   while (sel.options.length > 1) sel.remove(1);
-  _jarvisVoices.forEach(v => {
+  _vectosVoices.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.name;
     opt.textContent = `${v.name} (${v.lang})`;
     sel.appendChild(opt);
   });
-  if (_jarvisSettings.voice) sel.value = _jarvisSettings.voice;
+  if (_vectosSettings.voice) sel.value = _vectosSettings.voice;
 }
 if (window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = jarvisLoadVoices;
+  window.speechSynthesis.onvoiceschanged = vectosLoadVoices;
 }
 
 // ── Chat messages ──
-function jarvisAddMsg(role, text) {
-  const c = document.getElementById('jarvis-messages');
+function vectosAddMsg(role, text) {
+  const c = document.getElementById('vectos-messages');
   if (!c) return;
   const msg = document.createElement('div');
   msg.className = `hermes-msg ${role}`;
-  const roleLabel = role === 'assistant' ? 'JARVIS' : role.toUpperCase();
+  const roleLabel = role === 'assistant' ? 'VECTOS' : role.toUpperCase();
   msg.innerHTML = `<div class="msg-role">${roleLabel}</div>${text}`;
   c.appendChild(msg);
   c.scrollTop = c.scrollHeight;
-  _jarvisMsgCount++;
+  _vectosMsgCount++;
 }
 
-function jarvisClearChat() {
-  const c = document.getElementById('jarvis-messages');
+function vectosClearChat() {
+  const c = document.getElementById('vectos-messages');
   if (c) c.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
-  _jarvisMsgCount = 0;
+  _vectosMsgCount = 0;
 }
 
 // ── Build conversation history from messages ──
-function jarvisGetHistory() {
-  const msgs = document.querySelectorAll('#jarvis-messages .hermes-msg');
+function vectosGetHistory() {
+  const msgs = document.querySelectorAll('#vectos-messages .hermes-msg');
   const hist = [];
   msgs.forEach(m => {
     if (m.classList.contains('user')) {
       const text = m.textContent.replace(/^USER\s*/, '').trim();
       if (text) hist.push({ role: 'user', content: text });
     } else if (m.classList.contains('assistant')) {
-      const text = m.textContent.replace(/^JARVIS\s*/, '').trim();
+      const text = m.textContent.replace(/^VECTOS\s*/, '').trim();
       if (text) hist.push({ role: 'assistant', content: text });
     }
   });
@@ -11980,8 +11954,8 @@ function jarvisGetHistory() {
 }
 
 // ── Smart routing: try endpoints in order ──
-async function jarvisTryEndpoint(key, text, history) {
-  const ep = JARVIS_ENDPOINTS[key];
+async function vectosTryEndpoint(key, text, history) {
+  const ep = VECTOS_ENDPOINTS[key];
   if (!ep) return null;
   try {
     const start = performance.now();
@@ -12002,54 +11976,54 @@ async function jarvisTryEndpoint(key, text, history) {
 }
 
 // ── Send text with smart routing ──
-async function jarvisSendText(text) {
+async function vectosSendText(text) {
   if (!text || !text.trim()) return;
   text = text.trim();
 
-  jarvisAddMsg('user', text);
-  const input = document.getElementById('jarvis-input');
+  vectosAddMsg('user', text);
+  const input = document.getElementById('vectos-input');
   if (input) input.value = '';
 
-  jarvisAddMsg('system', 'Routing query…');
-  jarvisUpdateAvatar('thinking processing');
+  vectosAddMsg('system', 'Routing query…');
+  vectosUpdateAvatar('thinking processing');
 
-  const history = jarvisGetHistory();
-  const sourceLabel = document.getElementById('jarvis-source-label');
+  const history = vectosGetHistory();
+  const sourceLabel = document.getElementById('vectos-source-label');
   if (sourceLabel) sourceLabel.textContent = 'Processing…';
 
   let result = null;
 
-  if (_jarvisSource === 'auto') {
+  if (_vectosSource === 'auto') {
     // Try in order: Hermes → Router → Ollama → Carbon
     const order = ['hermes', 'router', 'ollama', 'carbon'];
     for (const key of order) {
-      result = await jarvisTryEndpoint(key, text, history);
+      result = await vectosTryEndpoint(key, text, history);
       if (result) break;
     }
   } else {
-    result = await jarvisTryEndpoint(_jarvisSource, text, history);
+    result = await vectosTryEndpoint(_vectosSource, text, history);
   }
 
   // Remove "Routing query…" system message
-  const msgs = document.getElementById('jarvis-messages');
+  const msgs = document.getElementById('vectos-messages');
   if (msgs) {
     const sys = [...msgs.querySelectorAll('.hermes-msg.system')].pop();
     if (sys && (sys.textContent.includes('Routing') || sys.textContent.includes('Processing'))) sys.remove();
   }
 
   if (result) {
-    jarvisAddMsg('assistant', result.response);
-    jarvisUpdateAvatar(result.response);
+    vectosAddMsg('assistant', result.response);
+    vectosUpdateAvatar(result.response);
 
     // Update source indicator
     if (sourceLabel) sourceLabel.textContent = `Responded via ${result.label}`;
-    const as = document.getElementById('jarvis-active-source');
+    const as = document.getElementById('vectos-active-source');
     if (as) as.textContent = result.label;
-    const lat = document.getElementById('jarvis-latency');
+    const lat = document.getElementById('vectos-latency');
     if (lat) lat.textContent = `${result.latency} ms · ${result.label}`;
 
     // TTS
-    if (_jarvisTTSenabled) jarvisTTS(result.response);
+    if (_vectosTTSenabled) vectosTTS(result.response);
 
     // Relay to Carbon chat (fire and forget)
     try {
@@ -12062,37 +12036,37 @@ async function jarvisSendText(text) {
     } catch(e) { /* silent */ }
 
   } else {
-    jarvisAddMsg('error', 'All AI endpoints offline. Start Hermes (hermes gateway), K-9 LLM Router, or Ollama.');
-    jarvisUpdateAvatar('error offline');
+    vectosAddMsg('error', 'All AI endpoints offline. Start Hermes (hermes gateway), K-9 LLM Router, or Ollama.');
+    vectosUpdateAvatar('error offline');
     if (sourceLabel) sourceLabel.textContent = 'All endpoints offline';
-    const lat = document.getElementById('jarvis-latency');
+    const lat = document.getElementById('vectos-latency');
     if (lat) lat.textContent = 'No response';
   }
 }
 
-function jarvisSend() {
-  const input = document.getElementById('jarvis-input');
+function vectosSend() {
+  const input = document.getElementById('vectos-input');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  jarvisSendText(text);
+  vectosSendText(text);
 }
 
 // ── Quick commands ──
-async function jarvisQuickCmd(cmd) {
+async function vectosQuickCmd(cmd) {
   // Handle local-only commands directly
   if (cmd === 'time') {
     const t = new Date().toLocaleString();
-    jarvisAddMsg('user', `What time is it?`);
-    jarvisAddMsg('assistant', `The current date and time is ${t}.`);
-    jarvisUpdateAvatar('hello ready');
-    if (_jarvisTTSenabled) jarvisTTS(`It is ${t}`);
+    vectosAddMsg('user', `What time is it?`);
+    vectosAddMsg('assistant', `The current date and time is ${t}.`);
+    vectosUpdateAvatar('hello ready');
+    if (_vectosTTSenabled) vectosTTS(`It is ${t}`);
     return;
   }
 
   if (cmd === 'services' || cmd === 'status') {
-    jarvisAddMsg('user', cmd === 'services' ? 'Show service health' : 'System status report');
-    jarvisAddMsg('system', 'Checking K-9 services…');
+    vectosAddMsg('user', cmd === 'services' ? 'Show service health' : 'System status report');
+    vectosAddMsg('system', 'Checking K-9 services…');
 
     const services = [
       { port: 8642, name: 'Hermes Agent' },
@@ -12115,50 +12089,50 @@ async function jarvisQuickCmd(cmd) {
     }
 
     // Remove system message
-    const msgs = document.getElementById('jarvis-messages');
+    const msgs = document.getElementById('vectos-messages');
     if (msgs) {
       const sys = [...msgs.querySelectorAll('.hermes-msg.system')].pop();
       if (sys) sys.remove();
     }
 
     const report = results.join('\n');
-    jarvisAddMsg('assistant', report);
-    jarvisUpdateAvatar('complete success');
-    if (_jarvisTTSenabled) jarvisTTS(`Service check complete. ${results.filter(r => r.includes('✓')).length} online, ${results.filter(r => r.includes('✗')).length} offline.`);
+    vectosAddMsg('assistant', report);
+    vectosUpdateAvatar('complete success');
+    if (_vectosTTSenabled) vectosTTS(`Service check complete. ${results.filter(r => r.includes('✓')).length} online, ${results.filter(r => r.includes('✗')).length} offline.`);
     return;
   }
 
   // For everything else, route through the AI
   const prompts = {
     'models': 'List all available AI models and which providers are configured.',
-    'help': 'What can you do? List your capabilities as the Jarvis interface for the K-9 system.',
+    'help': 'What can you do? List your capabilities as the Vectos interface for the K-9 system.',
     'stack status': 'Give me a full K-9 stack status report. Which services are running, which are offline?',
     'monitor': 'What are the latest autonomous decisions from the K-9 monitor? Show any pending approvals.',
   };
-  jarvisSendText(prompts[cmd] || cmd);
+  vectosSendText(prompts[cmd] || cmd);
 }
 
 // ── Tab init ──
-function jarvisInit() {
-  _jarvisActive = true;
-  jarvisLoadSettings();
-  jarvisLoadVoices();
-  jarvisCheckHealth();
-  if (!window._jarvisHealthInterval) {
-    window._jarvisHealthInterval = setInterval(() => {
-      if (_jarvisActive && !document.hidden) jarvisCheckHealth();
+function vectosUnifiedInit() {
+  _vectosActive = true;
+  vectosLoadSettings();
+  vectosLoadVoices();
+  vectosCheckHealth();
+  if (!window._vectosHealthInterval) {
+    window._vectosHealthInterval = setInterval(() => {
+      if (_vectosActive && !document.hidden) vectosCheckHealth();
     }, 10000);
   }
   // Update TTS button state
-  const btn = document.getElementById('jarvis-tts-btn');
+  const btn = document.getElementById('vectos-tts-btn');
   if (btn) {
-    btn.style.opacity = _jarvisTTSenabled ? '1' : '0.4';
-    btn.textContent = _jarvisTTSenabled ? '🔊' : '🔇';
+    btn.style.opacity = _vectosTTSenabled ? '1' : '0.4';
+    btn.textContent = _vectosTTSenabled ? '🔊' : '🔇';
   }
 }
 
 // ── Health check ──
-async function jarvisCheckHealth() {
+async function vectosCheckHealth() {
   const services = [
     { port: 8642, dot: 'cb-h-hermes', name: 'Hermes' },
     { port: 8765, dot: 'cb-h-llmr', name: 'LLM Router' },
@@ -12195,7 +12169,7 @@ async function jarvisCheckHealth() {
   }
 }
 
-// ── Override carbonSpeak and agCarbonSpeak to route through Jarvis ──
+// ── Override carbonSpeak and agCarbonSpeak to route through Vectos ──
 carbonSpeak = function() {
   const input = document.getElementById('carbon-speak-input');
   if (!input) return;
@@ -12203,8 +12177,8 @@ carbonSpeak = function() {
   if (!text) return;
   if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
   input.value = '';
-  jarvisTTS(text);
-  jarvisSendText(text);
+  vectosTTS(text);
+  vectosSendText(text);
 };
 
 agCarbonSpeak = function() {
@@ -12214,13 +12188,13 @@ agCarbonSpeak = function() {
   if (!text) return;
   if (typeof agCarbonUpdateExpression === 'function') agCarbonUpdateExpression(text);
   input.value = '';
-  jarvisTTS(text);
-  jarvisSendText(text);
+  vectosTTS(text);
+  vectosSendText(text);
 };
 
 // ── Global API for other tabs ──
 window.K9Voice = {
-  speak(text, opts = {}) { jarvisTTS(text); },
+  speak(text, opts = {}) { vectosTTS(text); },
   listen(cb) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { cb(null, 'not supported'); return; }
@@ -12232,15 +12206,15 @@ window.K9Voice = {
     r.onerror = (e) => { cb(null, e.error); };
     r.start();
   },
-  getVoices() { return _jarvisVoices; },
+  getVoices() { return _vectosVoices; },
   supported() {
     return {
       recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
       synthesis: !!window.speechSynthesis
     };
   },
-  ask(text) { jarvisSendText(text); },
-  source(s) { if (s) { _jarvisSource = s; jarvisSetSource(s); } return _jarvisSource; }
+  ask(text) { vectosSendText(text); },
+  source(s) { if (s) { _vectosSource = s; vectosSetSource(s); } return _vectosSource; }
 };
 
 
