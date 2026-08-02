@@ -1,0 +1,504 @@
+/* ═══════════════════════════════════════════════════════════════
+   JARVIS — Unified Voice/Chat AI Agent (CB-10)
+   Consolidates Hermes + Carbon + Vectos avatar into ONE interface.
+   Smart routing: Hermes :8642 → k9-llm-router :8765 → Ollama :11434
+   Voice: Web Speech API (SpeechRecognition + speechSynthesis)
+   Avatar: Vectos expressions synced to response content
+   ═══════════════════════════════════════════════════════════════ */
+
+let _jarvisActive = false;
+let _jarvisRecognizing = false;
+let _jarvisRecognition = null;
+let _jarvisVoices = [];
+let _jarvisTTSenabled = true;
+let _jarvisSource = 'auto'; // auto | hermes | router | ollama | carbon
+let _jarvisMsgCount = 0;
+let _jarvisSettings = { voice: '', rate: 1, tts: true };
+
+// ── Endpoint definitions ──
+const JARVIS_ENDPOINTS = {
+  hermes: {
+    name: 'Hermes Agent',
+    url: 'http://localhost:8642/v1/chat/completions',
+    headers: (k) => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer k9-hermes-local' }),
+    body: (text, hist) => JSON.stringify({ model: 'hermes-agent', messages: [...(hist || []), { role: 'user', content: text }], stream: false }),
+    parse: (d) => d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.response || 'No response',
+    label: '✦ Hermes :8642'
+  },
+  router: {
+    name: 'K-9 LLM Router',
+    url: 'http://localhost:8765/route',
+    headers: (k) => ({ 'Content-Type': 'application/json' }),
+    body: (text, hist) => JSON.stringify({ messages: [...(hist || []), { role: 'user', content: text }], temperature: 0.7, max_tokens: 500 }),
+    parse: (d) => d.response || d.content || d.choices?.[0]?.message?.content || d.text || 'No response',
+    label: '⬡ LLM Router :8765'
+  },
+  ollama: {
+    name: 'Ollama (Local)',
+    url: 'http://localhost:11434/api/chat',
+    headers: (k) => ({ 'Content-Type': 'application/json' }),
+    body: (text, hist) => JSON.stringify({ model: 'llama3.1:8b', messages: [...(hist || []), { role: 'user', content: text }], stream: false }),
+    parse: (d) => d.message?.content || d.response || 'No response',
+    label: '🦙 Ollama :11434'
+  },
+  carbon: {
+    name: 'Carbon Chat',
+    url: 'http://localhost:8744/chat',
+    headers: (k) => ({ 'Content-Type': 'application/json' }),
+    body: (text, hist) => JSON.stringify({ message: text }),
+    parse: (d) => d.response || d.message || d.text || 'No response from Carbon',
+    label: '⬡ Carbon :8744'
+  }
+};
+
+// ── Source selection ──
+function jarvisSetSource(src) {
+  _jarvisSource = src;
+  const label = document.getElementById('jarvis-active-source');
+  const detail = document.getElementById('jarvis-source-detail');
+  if (src === 'auto') {
+    if (label) label.textContent = 'Auto-route';
+    if (detail) detail.textContent = 'Will try: Hermes → Router → Ollama';
+  } else {
+    const ep = JARVIS_ENDPOINTS[src];
+    if (label) label.textContent = ep.name;
+    if (detail) detail.textContent = ep.label + ' (fixed)';
+  }
+}
+
+// ── Settings ──
+function jarvisSaveSettings() {
+  _jarvisSettings.voice = document.getElementById('jarvis-voice-select')?.value || '';
+  _jarvisSettings.rate = parseFloat(document.getElementById('jarvis-rate')?.value || 1);
+  _jarvisSettings.tts = _jarvisTTSenabled;
+  const rv = document.getElementById('jarvis-rate-val');
+  if (rv) rv.textContent = _jarvisSettings.rate.toFixed(1);
+  try { localStorage.setItem('jarvis_settings', JSON.stringify(_jarvisSettings)); } catch(e) {}
+}
+function jarvisLoadSettings() {
+  try {
+    const s = localStorage.getItem('jarvis_settings');
+    if (s) _jarvisSettings = { ..._jarvisSettings, ...JSON.parse(s) };
+  } catch(e) {}
+  _jarvisTTSenabled = _jarvisSettings.tts;
+}
+
+// ── TTS ──
+function jarvisTTS(text) {
+  if (!_jarvisTTSenabled || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = _jarvisSettings.rate || 1;
+  u.pitch = 1;
+  u.volume = 1;
+  if (_jarvisVoices.length > 0) {
+    const v = _jarvisVoices.find(x => x.name === _jarvisSettings.voice) || _jarvisVoices[0];
+    if (v) u.voice = v;
+  }
+  // Avatar expression sync
+  u.onstart = () => jarvisUpdateAvatar(text);
+  u.onend = () => jarvisUpdateAvatar('neutral');
+  window.speechSynthesis.speak(u);
+}
+
+function jarvisToggleTTS() {
+  _jarvisTTSenabled = !_jarvisTTSenabled;
+  const btn = document.getElementById('jarvis-tts-btn');
+  if (btn) {
+    btn.style.opacity = _jarvisTTSenabled ? '1' : '0.4';
+    btn.textContent = _jarvisTTSenabled ? '🔊' : '🔇';
+  }
+  jarvisSaveSettings();
+}
+
+// ── Avatar expression ──
+function jarvisUpdateAvatar(text) {
+  const img = document.getElementById('jarvis-avatar-img');
+  if (!img) return;
+  const t = (text || '').toLowerCase();
+  let src = 'assets/img/vectos_expression_neutral.png';
+  let name = 'NEUTRAL';
+  if (t.includes('warning') || t.includes('alert') || t.includes('error') || t.includes('offline') || t.includes('fail')) {
+    src = 'assets/img/vectos_expression_alert.png'; name = 'ALERT';
+  } else if (t.includes('thinking') || t.includes('processing') || t.includes('analyzing') || t.includes('searching')) {
+    src = 'assets/img/vectos_expression_think.png'; name = 'THINKING';
+  } else if (t.includes('hello') || t.includes('hi ') || t.includes('ready') || t.includes('complete') || t.includes('success')) {
+    src = 'assets/img/vectos_expression_smile.png'; name = 'SMILE';
+  }
+  if (img.getAttribute('src') !== src) img.src = src;
+
+  // Also sync to CarbonTab if available (agent tab avatar)
+  if (typeof CarbonTab !== 'undefined') {
+    CarbonTab.updateExpression(text);
+  }
+  if (typeof agCarbonUpdateExpression === 'function') {
+    agCarbonUpdateExpression(text);
+  }
+}
+
+// ── Speech Recognition ──
+function jarvisInitRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    jarvisAddMsg('error', 'Voice recognition not supported. Use Chrome/Edge on localhost.');
+    return null;
+  }
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.onstart = () => {
+    _jarvisRecognizing = true;
+    document.querySelectorAll('#jarvis-mic-btn, #jarvis-mic-btn2').forEach(b => b.classList.add('recording'));
+    const wf = document.getElementById('jarvis-waveform');
+    if (wf) wf.classList.add('active');
+    jarvisUpdateAvatar('listening');
+  };
+  r.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const input = document.getElementById('jarvis-input');
+    if (input && (interim || final)) input.value = final || interim;
+    if (final) jarvisSendText(final.trim());
+  };
+  r.onerror = (e) => {
+    if (e.error === 'not-allowed') jarvisAddMsg('error', 'Microphone access denied. Requires localhost or HTTPS.');
+  };
+  r.onend = () => {
+    _jarvisRecognizing = false;
+    document.querySelectorAll('#jarvis-mic-btn, #jarvis-mic-btn2').forEach(b => b.classList.remove('recording'));
+    const wf = document.getElementById('jarvis-waveform');
+    if (wf) wf.classList.remove('active');
+    jarvisUpdateAvatar('neutral');
+  };
+  return r;
+}
+
+function jarvisToggleVoice() {
+  if (!_jarvisRecognition) _jarvisRecognition = jarvisInitRecognition();
+  if (!_jarvisRecognition) return;
+  if (_jarvisRecognizing) _jarvisRecognition.stop();
+  else { try { _jarvisRecognition.start(); } catch(e) {} }
+}
+
+// ── Load voices ──
+function jarvisLoadVoices() {
+  if (!window.speechSynthesis) return;
+  _jarvisVoices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('jarvis-voice-select');
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  _jarvisVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+  if (_jarvisSettings.voice) sel.value = _jarvisSettings.voice;
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = jarvisLoadVoices;
+}
+
+// ── Chat messages ──
+function jarvisAddMsg(role, text) {
+  const c = document.getElementById('jarvis-messages');
+  if (!c) return;
+  const msg = document.createElement('div');
+  msg.className = `hermes-msg ${role}`;
+  const roleLabel = role === 'assistant' ? 'JARVIS' : role.toUpperCase();
+  msg.innerHTML = `<div class="msg-role">${roleLabel}</div>${text}`;
+  c.appendChild(msg);
+  c.scrollTop = c.scrollHeight;
+  _jarvisMsgCount++;
+}
+
+function jarvisClearChat() {
+  const c = document.getElementById('jarvis-messages');
+  if (c) c.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
+  _jarvisMsgCount = 0;
+}
+
+// ── Build conversation history from messages ──
+function jarvisGetHistory() {
+  const msgs = document.querySelectorAll('#jarvis-messages .hermes-msg');
+  const hist = [];
+  msgs.forEach(m => {
+    if (m.classList.contains('user')) {
+      const text = m.textContent.replace(/^USER\s*/, '').trim();
+      if (text) hist.push({ role: 'user', content: text });
+    } else if (m.classList.contains('assistant')) {
+      const text = m.textContent.replace(/^JARVIS\s*/, '').trim();
+      if (text) hist.push({ role: 'assistant', content: text });
+    }
+  });
+  return hist.slice(-6); // Keep last 3 exchanges for context
+}
+
+// ── Smart routing: try endpoints in order ──
+async function jarvisTryEndpoint(key, text, history) {
+  const ep = JARVIS_ENDPOINTS[key];
+  if (!ep) return null;
+  try {
+    const start = performance.now();
+    const r = await fetch(ep.url, {
+      method: 'POST',
+      headers: ep.headers(),
+      body: ep.body(text, history),
+      signal: AbortSignal.timeout(30000)
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const response = ep.parse(data);
+    const latency = Math.round(performance.now() - start);
+    return { response, latency, source: key, label: ep.label };
+  } catch(e) {
+    return null;
+  }
+}
+
+// ── Send text with smart routing ──
+async function jarvisSendText(text) {
+  if (!text || !text.trim()) return;
+  text = text.trim();
+
+  jarvisAddMsg('user', text);
+  const input = document.getElementById('jarvis-input');
+  if (input) input.value = '';
+
+  jarvisAddMsg('system', 'Routing query…');
+  jarvisUpdateAvatar('thinking processing');
+
+  const history = jarvisGetHistory();
+  const sourceLabel = document.getElementById('jarvis-source-label');
+  if (sourceLabel) sourceLabel.textContent = 'Processing…';
+
+  let result = null;
+
+  if (_jarvisSource === 'auto') {
+    // Try in order: Hermes → Router → Ollama → Carbon
+    const order = ['hermes', 'router', 'ollama', 'carbon'];
+    for (const key of order) {
+      result = await jarvisTryEndpoint(key, text, history);
+      if (result) break;
+    }
+  } else {
+    result = await jarvisTryEndpoint(_jarvisSource, text, history);
+  }
+
+  // Remove "Routing query…" system message
+  const msgs = document.getElementById('jarvis-messages');
+  if (msgs) {
+    const sys = [...msgs.querySelectorAll('.hermes-msg.system')].pop();
+    if (sys && (sys.textContent.includes('Routing') || sys.textContent.includes('Processing'))) sys.remove();
+  }
+
+  if (result) {
+    jarvisAddMsg('assistant', result.response);
+    jarvisUpdateAvatar(result.response);
+
+    // Update source indicator
+    if (sourceLabel) sourceLabel.textContent = `Responded via ${result.label}`;
+    const as = document.getElementById('jarvis-active-source');
+    if (as) as.textContent = result.label;
+    const lat = document.getElementById('jarvis-latency');
+    if (lat) lat.textContent = `${result.latency} ms · ${result.label}`;
+
+    // TTS
+    if (_jarvisTTSenabled) jarvisTTS(result.response);
+
+    // Relay to Carbon chat (fire and forget)
+    try {
+      await fetch('http://localhost:8744/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, response: result.response }),
+        signal: AbortSignal.timeout(3000)
+      });
+    } catch(e) { /* silent */ }
+
+  } else {
+    jarvisAddMsg('error', 'All AI endpoints offline. Start Hermes (hermes gateway), K-9 LLM Router, or Ollama.');
+    jarvisUpdateAvatar('error offline');
+    if (sourceLabel) sourceLabel.textContent = 'All endpoints offline';
+    const lat = document.getElementById('jarvis-latency');
+    if (lat) lat.textContent = 'No response';
+  }
+}
+
+function jarvisSend() {
+  const input = document.getElementById('jarvis-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  jarvisSendText(text);
+}
+
+// ── Quick commands ──
+async function jarvisQuickCmd(cmd) {
+  // Handle local-only commands directly
+  if (cmd === 'time') {
+    const t = new Date().toLocaleString();
+    jarvisAddMsg('user', `What time is it?`);
+    jarvisAddMsg('assistant', `The current date and time is ${t}.`);
+    jarvisUpdateAvatar('hello ready');
+    if (_jarvisTTSenabled) jarvisTTS(`It is ${t}`);
+    return;
+  }
+
+  if (cmd === 'services' || cmd === 'status') {
+    jarvisAddMsg('user', cmd === 'services' ? 'Show service health' : 'System status report');
+    jarvisAddMsg('system', 'Checking K-9 services…');
+
+    const services = [
+      { port: 8642, name: 'Hermes Agent' },
+      { port: 8765, name: 'K-9 LLM Router' },
+      { port: 8744, name: 'Carbon Chat' },
+      { port: 11434, name: 'Ollama' },
+      { port: 8080, name: 'K-9 Orchestrator' },
+      { port: 8088, name: 'K-9 Health' },
+    ];
+    const results = [];
+    for (const svc of services) {
+      try {
+        const r = await fetch(`http://localhost:${svc.port}/health`, {
+          signal: AbortSignal.timeout(2000)
+        });
+        results.push(`✓ ${svc.name} (:${svc.port}) — ${r.ok ? 'ONLINE' : 'ERROR'}`);
+      } catch(e) {
+        results.push(`✗ ${svc.name} (:${svc.port}) — offline`);
+      }
+    }
+
+    // Remove system message
+    const msgs = document.getElementById('jarvis-messages');
+    if (msgs) {
+      const sys = [...msgs.querySelectorAll('.hermes-msg.system')].pop();
+      if (sys) sys.remove();
+    }
+
+    const report = results.join('\n');
+    jarvisAddMsg('assistant', report);
+    jarvisUpdateAvatar('complete success');
+    if (_jarvisTTSenabled) jarvisTTS(`Service check complete. ${results.filter(r => r.includes('✓')).length} online, ${results.filter(r => r.includes('✗')).length} offline.`);
+    return;
+  }
+
+  // For everything else, route through the AI
+  const prompts = {
+    'models': 'List all available AI models and which providers are configured.',
+    'help': 'What can you do? List your capabilities as the Jarvis interface for the K-9 system.',
+    'stack status': 'Give me a full K-9 stack status report. Which services are running, which are offline?',
+    'monitor': 'What are the latest autonomous decisions from the K-9 monitor? Show any pending approvals.',
+  };
+  jarvisSendText(prompts[cmd] || cmd);
+}
+
+// ── Tab init ──
+function jarvisInit() {
+  _jarvisActive = true;
+  jarvisLoadSettings();
+  jarvisLoadVoices();
+  jarvisCheckHealth();
+  if (!window._jarvisHealthInterval) {
+    window._jarvisHealthInterval = setInterval(() => {
+      if (_jarvisActive && !document.hidden) jarvisCheckHealth();
+    }, 10000);
+  }
+  // Update TTS button state
+  const btn = document.getElementById('jarvis-tts-btn');
+  if (btn) {
+    btn.style.opacity = _jarvisTTSenabled ? '1' : '0.4';
+    btn.textContent = _jarvisTTSenabled ? '🔊' : '🔇';
+  }
+}
+
+// ── Health check ──
+async function jarvisCheckHealth() {
+  const services = [
+    { port: 8642, dot: 'cb-h-hermes', name: 'Hermes' },
+    { port: 8765, dot: 'cb-h-llmr', name: 'LLM Router' },
+    { port: 8744, dot: 'cb-h-carbon', name: 'Carbon' },
+    { port: 11434, dot: 'cb-h-ollama', name: 'Ollama' },
+    { port: 8080, dot: 'cb-h-orch', name: 'Orchestrator' },
+  ];
+  for (const svc of services) {
+    try {
+      const r = await fetch(`http://localhost:${svc.port}/health`, {
+        signal: AbortSignal.timeout(2000)
+      });
+      const dot = document.getElementById(svc.dot);
+      if (dot) {
+        dot.classList.remove('dd', 'dr');
+        dot.classList.add(r.ok ? 'dg' : 'dr');
+      }
+    } catch(e) {
+      const dot = document.getElementById(svc.dot);
+      if (dot) { dot.classList.remove('dd', 'dg'); dot.classList.add('dr'); }
+    }
+  }
+  // Update status chip
+  try {
+    const r = await fetch('http://localhost:8744/health', { signal: AbortSignal.timeout(2000) });
+    const chip = document.getElementById('carbon-status-chip');
+    if (chip) {
+      chip.textContent = r.ok ? ':8744 · online' : ':8744 · offline';
+      chip.style.color = r.ok ? 'var(--green)' : 'var(--red)';
+    }
+  } catch(e) {
+    const chip = document.getElementById('carbon-status-chip');
+    if (chip) { chip.textContent = ':8744 · offline'; chip.style.color = 'var(--red)'; }
+  }
+}
+
+// ── Override carbonSpeak and agCarbonSpeak to route through Jarvis ──
+carbonSpeak = function() {
+  const input = document.getElementById('carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
+  input.value = '';
+  jarvisTTS(text);
+  jarvisSendText(text);
+};
+
+agCarbonSpeak = function() {
+  const input = document.getElementById('ag-carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (typeof agCarbonUpdateExpression === 'function') agCarbonUpdateExpression(text);
+  input.value = '';
+  jarvisTTS(text);
+  jarvisSendText(text);
+};
+
+// ── Global API for other tabs ──
+window.K9Voice = {
+  speak(text, opts = {}) { jarvisTTS(text); },
+  listen(cb) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { cb(null, 'not supported'); return; }
+    const r = new SR();
+    r.continuous = false;
+    r.interimResults = false;
+    r.lang = 'en-US';
+    r.onresult = (e) => { cb(e.results[0][0].transcript, null); };
+    r.onerror = (e) => { cb(null, e.error); };
+    r.start();
+  },
+  getVoices() { return _jarvisVoices; },
+  supported() {
+    return {
+      recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      synthesis: !!window.speechSynthesis
+    };
+  },
+  ask(text) { jarvisSendText(text); },
+  source(s) { if (s) { _jarvisSource = s; jarvisSetSource(s); } return _jarvisSource; }
+};
