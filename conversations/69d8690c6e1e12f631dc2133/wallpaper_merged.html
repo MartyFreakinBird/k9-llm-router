@@ -1622,7 +1622,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 /* ── HERMES (CB-10) — Voice/Chat gateway ────── */
 .view[data-layout="hermes"].active {
   display: grid;
-  grid-template-columns: 260px 1fr 240px;
+  grid-template-columns: 1fr;
   grid-template-rows: 36px 1fr 40px;
   gap: 1px;
   background: var(--border);
@@ -3029,6 +3029,14 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
       <div class="sc-row"><span class="sc-keys">openclaw status</span><span class="sc-label">Gateway health + agents</span><span class="sc-ctx">wsl</span></div>
       <div class="sc-row"><span class="sc-keys">openclaw tui</span><span class="sc-label">Interactive agent session</span><span class="sc-ctx">wsl</span></div>
       <div class="sc-row"><span class="sc-keys">openclaw logs --follow</span><span class="sc-label">Live gateway logs</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-section">Hermes · NousResearch</div>
+      <div class="sc-row"><span class="sc-keys">hermes</span><span class="sc-label">Start CLI chat session</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">hermes --tui</span><span class="sc-label">Terminal UI with modal overlays</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">hermes gateway</span><span class="sc-label">Start API server (:8642) + messaging</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">hermes model</span><span class="sc-label">Choose LLM provider (Ollama, Portal, etc.)</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">hermes setup --portal</span><span class="sc-label">Quick setup with Nous Portal</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">hermes config set</span><span class="sc-label">Set individual config values</span><span class="sc-ctx">wsl</span></div>
+      <div class="sc-row"><span class="sc-keys">curl http://localhost:8642/v1/models</span><span class="sc-label">Check Hermes API server status</span><span class="sc-ctx">wsl</span></div>
       <div class="sc-row"><span class="sc-keys">k9-audit C:\k9</span><span class="sc-label">miniSWE audit K-9 folder</span><span class="sc-ctx">pwsh</span></div>
       <div class="sc-row"><span class="sc-keys">k9-agent</span><span class="sc-label">Interactive miniSWE session</span><span class="sc-ctx">pwsh</span></div>
       <div class="sc-row"><span class="sc-keys">k9-mini -Task "…"</span><span class="sc-label">Run one-shot task</span><span class="sc-ctx">pwsh</span></div>
@@ -5356,176 +5364,206 @@ Verify the following script against K-9 SW4.0 constraints.
      Connects to k9-llm-router :8765 /route for LLM responses
      Web Speech API for voice input (SpeechRecognition) + TTS (speechSynthesis)
      ═══════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════════
+     HERMES (CB-10) — NousResearch Hermes Agent
+     Source: https://github.com/NousResearch/hermes-agent
+     Install: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+     API: http://localhost:8642/v1 (OpenAI-compatible)
+     ═══════════════════════════════════════════════════════════════ -->
 <div class="view" id="v-hermes" data-layout="hermes">
 
   <!-- ── TOP BAR ── -->
   <div class="cell cell-dark" style="grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 16px">
     <div class="pulse" style="width:7px;height:7px;flex-shrink:0"></div>
-    <span style="font-size:10px;letter-spacing:.18em;color:var(--purple)">✦ HERMES · VOICE/CHAT</span>
-    <span style="font-size:9px;color:var(--dim)" id="hermes-status-text">localhost:8765 · K-9 LLM Router</span>
+    <span style="font-size:10px;letter-spacing:.18em;color:var(--purple)">✦ HERMES · NOUS RESEARCH</span>
+    <span style="font-size:9px;color:var(--dim)">localhost:8642 · OpenAI-compatible API</span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
       <span style="font-size:9px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.15);color:var(--purple);padding:2px 7px;border-radius:3px" id="hermes-conn-chip">checking…</span>
       <div class="mode-switcher">
-        <div class="mode-btn active" id="hermes-btn-chat" onclick="setHermesMode('chat')">◎ CHAT</div>
+        <div class="mode-btn active" id="hermes-btn-ui" onclick="setHermesMode('ui')">◎ DASHBOARD</div>
+        <div class="mode-btn" id="hermes-btn-install" onclick="setHermesMode('install')">⚙ INSTALL</div>
         <div class="mode-btn" id="hermes-btn-voice" onclick="setHermesMode('voice')">🎤 VOICE</div>
-        <div class="mode-btn" id="hermes-btn-settings" onclick="setHermesMode('settings')">⚙ SETTINGS</div>
       </div>
-      <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesRefresh()">⟳ refresh</button>
+      <div class="mode-action-btn" onclick="hermesRefresh()">⟳ refresh</div>
+      <div class="mode-action-btn" onclick="window.open('http://localhost:8642','_blank')">⬡ popout</div>
     </div>
   </div>
 
-  <!-- ── LEFT: Chat/Settings panel ── -->
-  <div class="cell cell-dark" style="grid-column:1;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden">
+  <!-- ── DASHBOARD panel (iframe to Hermes API server) ── -->
+  <div id="hermes-ui-panel" class="iframe-live-panel" style="grid-column:1/-1;grid-row:2/3">
+    <iframe id="hermes-iframe"
+      src="http://localhost:8642"
+      style="width:100%;height:100%;border:none;opacity:0;transition:opacity .5s"
+      allow="clipboard-read;clipboard-write;microphone"
+      loading="lazy"
+      title="Hermes Agent Dashboard"
+      onload="this.style.opacity='1';const l=document.getElementById('hermes-loading');if(l)l.style.display='none';"
+      onerror="const l=document.getElementById('hermes-loading');if(l)l.querySelector('.load-label').textContent='Hermes offline — run: hermes gateway (WSL)';">
+    </iframe>
+    <div id="hermes-loading" class="iframe-loader">
+      <div class="spinner"></div>
+      <span class="load-label">Connecting to Hermes API server…</span>
+      <span class="load-url">http://localhost:8642</span>
+    </div>
+  </div>
 
-    <!-- CHAT panel -->
-    <div id="hermes-chat-panel" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="lbl">CHAT HISTORY</div>
-      <div class="hermes-messages" id="hermes-messages">
-        <div class="hermes-msg system">Hermes ready · type or tap 🎤 to speak</div>
+  <!-- ── INSTALL panel (installation instructions, like OpenClaw miniSWE) ── -->
+  <div id="hermes-install-panel" style="grid-column:1/-1;grid-row:2/3;display:none;flex-direction:column;overflow-y:auto;padding:16px">
+
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:700px;margin:0 auto">
+
+      <!-- What is Hermes -->
+      <div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.12);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--purple);letter-spacing:.12em;margin-bottom:8px">✦ HERMES AGENT · NOUS RESEARCH</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.7">
+          Self-improving AI agent with built-in learning loop. Creates skills from experience, searches its own past conversations,
+          and builds a deepening model of who you are across sessions. Supports terminal, messaging platforms, and voice.
+          <br><br>
+          <span style="color:var(--cyan)">GitHub:</span> <a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--cyan)">github.com/NousResearch/hermes-agent</a>
+          <br><span style="color:var(--cyan)">Docs:</span> <a href="https://hermes-agent.nousresearch.com/docs" target="_blank" style="color:var(--cyan)">hermes-agent.nousresearch.com/docs</a>
+          <br><span style="color:var(--cyan)">Stars:</span> 224k · <span style="color:var(--cyan)">License:</span> MIT
+        </div>
       </div>
+
+      <!-- Step 1: Install -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 1 · INSTALL (WSL2)</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Install Hermes Agent in WSL2</span><br>
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash<br>
+          <br>
+          <span style="color:var(--muted)"># Reload shell</span><br>
+          source ~/.bashrc<br>
+          <br>
+          <span style="color:var(--muted)"># Verify installation</span><br>
+          hermes --version
+        </div>
+        <div style="font-size:9px;color:var(--dim);margin-top:6px">Installs: Python 3.11, Node.js, ripgrep, ffmpeg, uv, and the hermes CLI. No admin required.</div>
+      </div>
+
+      <!-- Step 2: Configure Provider -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--amber);margin-bottom:8px">STEP 2 · CHOOSE PROVIDER</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Option A: Use local Ollama (already running on :11434)</span><br>
+          hermes model<br>
+          <span style="color:var(--muted)"># → Select "Custom Endpoint" → http://localhost:11434/v1</span><br>
+          <span style="color:var(--muted)"># → Model: llama3.1:8b (or your installed model)</span><br>
+          <span style="color:var(--muted)"># → Context: 65536 (required minimum 64K)</span><br>
+          <br>
+          <span style="color:var(--muted)"># Option B: Use Nous Portal (300+ models, OAuth)</span><br>
+          hermes setup --portal<br>
+          <br>
+          <span style="color:var(--muted)"># Option C: Use OpenRouter / OpenAI / Anthropic</span><br>
+          hermes model <span style="color:var(--muted)"># interactive picker</span>
+        </div>
+      </div>
+
+      <!-- Step 3: Enable API Server -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--cyan);margin-bottom:8px">STEP 3 · ENABLE API SERVER</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Add to ~/.hermes/.env</span><br>
+          echo 'API_SERVER_ENABLED=true' >> ~/.hermes/.env<br>
+          echo 'API_SERVER_KEY=k9-hermes-local' >> ~/.hermes/.env<br>
+          <br>
+          <span style="color:var(--muted)"># Optional: allow CORS from wallpaper</span><br>
+          echo 'API_SERVER_CORS_ORIGINS=http://localhost:*' >> ~/.hermes/.env<br>
+          <br>
+          <span style="color:var(--muted)"># Start the gateway (API server + messaging)</span><br>
+          hermes gateway
+        </div>
+        <div style="font-size:9px;color:var(--dim);margin-top:6px">API server listens on http://127.0.0.1:8642 — OpenAI-compatible at /v1/chat/completions</div>
+      </div>
+
+      <!-- Step 4: Verify -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px">STEP 4 · VERIFY</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:10px;color:var(--text);font-family:var(--font-mono);line-height:1.8;overflow-x:auto">
+          <span style="color:var(--muted)"># Test the API</span><br>
+          curl http://localhost:8642/v1/chat/completions \<br>
+          &nbsp;&nbsp;-H "Authorization: Bearer k9-hermes-local" \<br>
+          &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+          &nbsp;&nbsp;-d '{"model":"hermes-agent","messages":[{"role":"user","content":"Hello!"}]}'<br>
+          <br>
+          <span style="color:var(--muted)"># Check available models</span><br>
+          curl http://localhost:8642/v1/models -H "Authorization: Bearer k9-hermes-local"<br>
+          <br>
+          <span style="color:var(--muted)"># Start a TUI chat session</span><br>
+          hermes --tui
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div class="ql-btn" onclick="k9Action({label:'Hermes Health',method:'GET',port:8642,path:'/v1/models',logId:'termOut',copyFallback:'curl http://localhost:8642/v1/models'})">
+          <span class="ql-ico">✦</span>Check API<span class="ql-port">:8642</span>
+        </div>
+        <div class="ql-btn" onclick="k9Action({label:'Hermes Gateway Start',method:'POST',port:8080,path:'/run',payload:{cmd:'wsl -e bash -c \"source ~/.bashrc && hermes gateway &\"'},logId:'termOut',copyFallback:'hermes gateway'})">
+          <span class="ql-ico">⟳</span>Start Gateway<span class="ql-port">WSL</span>
+        </div>
+        <div class="ql-btn" onclick="k9Action({label:'Ollama Models',method:'GET',port:11434,path:'/api/tags',logId:'termOut',copyFallback:'ollama list'})">
+          <span class="ql-ico">🦙</span>Ollama Models<span class="ql-port">:11434</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── VOICE panel (voice chat via Hermes API + Web Speech) ── -->
+  <div id="hermes-voice-panel" style="grid-column:1/-1;grid-row:2/3;display:none;flex-direction:column;overflow:hidden">
+    <div style="display:flex;flex-direction:column;height:100%;padding:16px;gap:12px">
+
+      <!-- Voice viz -->
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;flex:1">
+        <div style="width:100px;height:100px;border-radius:50%;border:2px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:40px;background:rgba(167,139,250,.04)" id="hermes-orb">✦</div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.15em" id="hermes-voice-mode-label">TAP MIC TO START</div>
+        <div class="hermes-waveform" id="hermes-waveform-large" style="height:40px">
+          <div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div><div class="bar" style="width:4px"></div>
+        </div>
+        <div style="font-size:10px;color:var(--dim);max-width:400px;text-align:center" id="hermes-transcript">—</div>
+      </div>
+
+      <!-- Chat messages (voice + text) -->
+      <div id="hermes-messages" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin">
+        <div class="hermes-msg system">Hermes voice gateway · tap mic or type to speak with Hermes Agent</div>
+      </div>
+
+      <!-- Input bar -->
       <div class="hermes-input-bar">
         <button class="hermes-mic-btn" id="hermes-mic-btn" onclick="hermesToggleVoice()" title="Voice input">🎤</button>
-        <input type="text" class="hermes-input" id="hermes-input" placeholder="Speak to Vectos…" onkeydown="if(event.key==='Enter')hermesSend()">
+        <input type="text" class="hermes-input" id="hermes-input" placeholder="Talk to Hermes…" onkeydown="if(event.key==='Enter')hermesSend()">
         <button class="hermes-send-btn" id="hermes-send-btn" onclick="hermesSend()">SEND</button>
       </div>
-      <div class="hermes-waveform" id="hermes-waveform">
-        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        <span style="font-size:9px;color:var(--muted);margin-left:8px" id="hermes-voice-status">Listening…</span>
-      </div>
-    </div>
 
-    <!-- SETTINGS panel (hidden by default) -->
-    <div id="hermes-settings-panel" style="flex:1;display:none;flex-direction:column;overflow-y:auto;padding:12px">
-      <div class="lbl">VOICE SETTINGS</div>
-
-      <div class="hermes-setting">
-        <div class="hermes-setting-label">TTS VOICE</div>
-        <select id="hermes-voice-select" onchange="hermesSaveSettings()">
-          <option value="">System default</option>
+      <!-- Settings row -->
+      <div style="display:flex;align-items:center;gap:12px;font-size:9px;color:var(--dim)">
+        <label class="hermes-toggle" style="font-size:9px">
+          <input type="checkbox" id="hermes-auto-tts" checked>
+          <span>Auto-speak</span>
+        </label>
+        <label class="hermes-toggle" style="font-size:9px">
+          <input type="checkbox" id="hermes-vectos-sync" checked>
+          <span>Avatar sync</span>
+        </label>
+        <select id="hermes-voice-select" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:2px 4px;border-radius:3px">
+          <option value="">Default voice</option>
         </select>
+        <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesTestVoice()">🔊 Test</button>
+        <button class="kp-btn" style="padding:3px 9px;font-size:9px" onclick="hermesClearChat()">🗑 Clear</button>
       </div>
 
-      <div class="hermes-setting">
-        <div class="hermes-setting-label">RATE (SPEED)</div>
-        <div class="hermes-range-row">
-          <input type="range" id="hermes-rate" min="0.5" max="2" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-rate-val')">
-          <span class="hermes-range-val" id="hermes-rate-val">1.0</span>
-        </div>
-      </div>
-
-      <div class="hermes-setting">
-        <div class="hermes-setting-label">PITCH</div>
-        <div class="hermes-range-row">
-          <input type="range" id="hermes-pitch" min="0" max="2" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-pitch-val')">
-          <span class="hermes-range-val" id="hermes-pitch-val">1.0</span>
-        </div>
-      </div>
-
-      <div class="hermes-setting">
-        <div class="hermes-setting-label">VOLUME</div>
-        <div class="hermes-range-row">
-          <input type="range" id="hermes-volume" min="0" max="1" step="0.1" value="1" oninput="hermesUpdateRange(this,'hermes-volume-val')">
-          <span class="hermes-range-val" id="hermes-volume-val">1.0</span>
-        </div>
-      </div>
-
-      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
-        <label class="hermes-toggle">
-          <input type="checkbox" id="hermes-auto-tts" checked onchange="hermesSaveSettings()">
-          <span>Auto-speak responses</span>
-        </label>
-      </div>
-
-      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
-        <label class="hermes-toggle">
-          <input type="checkbox" id="hermes-vectos-sync" checked onchange="hermesSaveSettings()">
-          <span>Sync expressions to Vectos avatar</span>
-        </label>
-      </div>
-
-      <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
-        <label class="hermes-toggle">
-          <input type="checkbox" id="hermes-carbon-relay" checked onchange="hermesSaveSettings()">
-          <span>Relay chat to Carbon (:8744)</span>
-        </label>
-      </div>
-
-      <div style="margin-top:12px">
-        <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="hermesTestVoice()">🔊 Test Voice</button>
-      </div>
-      <div style="margin-top:6px">
-        <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="hermesClearChat()">🗑 Clear Chat</button>
-      </div>
     </div>
-  </div>
-
-  <!-- ── CENTER: Active conversation / voice viz ── -->
-  <div class="cell cell-dark" style="grid-column:2;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden;padding:0;position:relative">
-
-    <!-- Chat conversation view (chat mode) -->
-    <div id="hermes-conversation" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="hermes-messages" id="hermes-conversation-messages" style="flex:1;overflow-y:auto;padding:14px 18px">
-        <div class="hermes-msg assistant">
-          <div class="msg-role">VECTOS</div>
-          Hermes voice gateway initialized. I can hear you and speak back. Tap the mic or type to start.
-        </div>
-      </div>
-    </div>
-
-    <!-- Voice mode viz (hidden by default) -->
-    <div id="hermes-voice-viz" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px">
-      <div style="width:120px;height:120px;border-radius:50%;border:2px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:48px;background:rgba(167,139,250,.04)" id="hermes-orb">✦</div>
-      <div style="font-size:11px;color:var(--muted);letter-spacing:.15em" id="hermes-voice-mode-label">TAP MIC TO START</div>
-      <div class="hermes-waveform" id="hermes-waveform-large" style="height:40px">
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-        <div class="bar" style="width:4px"></div>
-      </div>
-      <div style="font-size:10px;color:var(--dim);max-width:300px;text-align:center" id="hermes-transcript">—</div>
-    </div>
-
-  </div>
-
-  <!-- ── RIGHT: Service health + quick actions ── -->
-  <div class="cell cell-dark" style="grid-column:3;grid-row:2/4;display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:10px">
-    <div class="lbl">SERVICE HEALTH</div>
-    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-llmr"></div><span class="hermes-svc-name">K-9 LLM Router</span><span class="hermes-svc-port">:8765</span></div>
-    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-orch"></div><span class="hermes-svc-name">Orchestrator</span><span class="hermes-svc-port">:8744</span></div>
-    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-ollama"></div><span class="hermes-svc-name">Ollama</span><span class="hermes-svc-port">:11434</span></div>
-    <div class="hermes-svc-row"><div class="dot dd" id="hermes-h-cb"></div><span class="hermes-svc-name">Carbon Chat</span><span class="hermes-svc-port">:8744</span></div>
-
-    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
-      <div class="lbl">VOICE STATUS</div>
-      <div style="font-size:9px;color:var(--muted);line-height:1.8">
-        Recognition: <span id="hermes-rec-status" style="color:var(--dim)">checking</span><br>
-        Synthesis: <span id="hermes-tts-status" style="color:var(--dim)">checking</span><br>
-        Voices: <span id="hermes-voice-count" style="color:var(--dim)">—</span>
-      </div>
-    </div>
-
-    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
-      <div class="lbl">QUICK ACTIONS</div>
-      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="hermesVoiceCommand('status')">📊 System Status</button>
-      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="hermesVoiceCommand('time')">⏰ Current Time</button>
-      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px;margin-bottom:4px" onclick="showView('carbon')">⬡ Go to Carbon</button>
-      <button class="kp-btn" style="width:100%;justify-content:center;font-size:9px" onclick="showView('agent')">⊛ Go to Agent</button>
-    </div>
-
-    <div style="flex:1;min-height:0"></div>
-    <div style="font-size:8px;color:var(--dim);text-align:center">Hermes · CB-10 · Web Speech API</div>
   </div>
 
   <!-- ── FOOTER ── -->
   <div class="cell cell-dark" style="grid-column:1/-1;grid-row:3;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
-    <span style="font-size:9px;color:var(--dim)" id="hermes-footer">Hermes voice gateway · powered by K-9 LLM Router</span>
+    <span style="font-size:9px;color:var(--dim)" id="hermes-footer">Hermes Agent · NousResearch · localhost:8642</span>
     <span style="font-size:9px;color:var(--dim)" id="hermes-msg-count">0 messages</span>
   </div>
 
 </div>
+
 
 <div class="view" id="v-setup" data-layout="panel">
 
@@ -11660,22 +11698,24 @@ async function monResetCircuitBreaker() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   HERMES (CB-10) — Voice/Chat Gateway + Web Speech Integration
-   Connects to k9-llm-router :8765 /route for LLM responses
+   HERMES (CB-10) — NousResearch Hermes Agent Integration
+   Source: https://github.com/NousResearch/hermes-agent
+   API: http://localhost:8642/v1 (OpenAI-compatible)
    Web Speech API: SpeechRecognition (input) + speechSynthesis (TTS)
    Shared voice module: used by Hermes, Carbon, and Vectos avatar
    ═══════════════════════════════════════════════════════════════ */
 
-const HERMES_BASE = 'http://localhost:8765';
+const HERMES_API = 'http://localhost:8642';
+const HERMES_KEY = 'k9-hermes-local'; // matches install instructions
 let _hermesActive = false;
-let _hermesMode = 'chat';
+let _hermesMode = 'ui';
 let _hermesRecognizing = false;
 let _hermesRecognition = null;
 let _hermesVoices = [];
 let _hermesMsgCount = 0;
 let _hermesSettings = {
   voice: '', rate: 1, pitch: 1, volume: 1,
-  autoTTS: true, vectosSync: true, carbonRelay: true
+  autoTTS: true, vectosSync: true
 };
 
 // ── Load settings from localStorage ──
@@ -11686,20 +11726,9 @@ function hermesLoadSettings() {
   } catch(e) {}
 }
 function hermesSaveSettings() {
-  _hermesSettings.voice = document.getElementById('hermes-voice-select')?.value || '';
-  _hermesSettings.rate = parseFloat(document.getElementById('hermes-rate')?.value || 1);
-  _hermesSettings.pitch = parseFloat(document.getElementById('hermes-pitch')?.value || 1);
-  _hermesSettings.volume = parseFloat(document.getElementById('hermes-volume')?.value || 1);
   _hermesSettings.autoTTS = document.getElementById('hermes-auto-tts')?.checked ?? true;
   _hermesSettings.vectosSync = document.getElementById('hermes-vectos-sync')?.checked ?? true;
-  _hermesSettings.carbonRelay = document.getElementById('hermes-carbon-relay')?.checked ?? true;
   try { localStorage.setItem('hermes_settings', JSON.stringify(_hermesSettings)); } catch(e) {}
-}
-
-// ── Update range display ──
-function hermesUpdateRange(input, valId) {
-  document.getElementById(valId).textContent = parseFloat(input.value).toFixed(1);
-  hermesSaveSettings();
 }
 
 // ── Shared TTS engine ──
@@ -11717,7 +11746,6 @@ function hermesTTS(text, opts = {}) {
   u.onstart = () => {
     if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
       CarbonTab.updateExpression(text);
-      CarbonTab.updateFX(text);
     }
   };
   u.onend = () => {
@@ -11726,18 +11754,13 @@ function hermesTTS(text, opts = {}) {
     }
   };
   window.speechSynthesis.speak(u);
-  // Also run lip-sync stub
-  if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
-    CarbonTab.speak(text, null);
-  }
 }
 
 // ── Shared SpeechRecognition engine ──
 function hermesInitRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    const recEl = document.getElementById('hermes-rec-status');
-    if (recEl) recEl.textContent = 'not supported';
+    hermesAddMsg('error', 'Voice recognition not supported in this browser. Use Chrome/Edge on localhost.');
     return null;
   }
   const r = new SR();
@@ -11748,18 +11771,13 @@ function hermesInitRecognition() {
     _hermesRecognizing = true;
     const mic = document.getElementById('hermes-mic-btn');
     if (mic) mic.classList.add('recording');
-    const wf = document.getElementById('hermes-waveform');
+    const wf = document.getElementById('hermes-waveform-large');
     if (wf) wf.classList.add('active');
-    const wfl = document.getElementById('hermes-waveform-large');
-    if (wfl) wfl.classList.add('active');
     const lbl = document.getElementById('hermes-voice-mode-label');
     if (lbl) lbl.textContent = 'LISTENING…';
-    const vs = document.getElementById('hermes-voice-status');
-    if (vs) vs.textContent = 'Listening…';
   };
   r.onresult = (e) => {
-    let interim = '';
-    let final = '';
+    let interim = '', final = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) final += t;
@@ -11769,38 +11787,29 @@ function hermesInitRecognition() {
     if (tr) tr.textContent = interim || final || '—';
     const input = document.getElementById('hermes-input');
     if (input && (interim || final)) input.value = final || interim;
-    if (final) {
-      hermesSendText(final.trim());
-    }
+    if (final) hermesSendText(final.trim());
   };
   r.onerror = (e) => {
     console.warn('SpeechRecognition error:', e.error);
     if (e.error === 'not-allowed') {
-      hermesAddMsg('error', 'Microphone access denied. Check browser permissions.');
+      hermesAddMsg('error', 'Microphone access denied. Requires HTTPS or localhost.');
     }
   };
   r.onend = () => {
     _hermesRecognizing = false;
     const mic = document.getElementById('hermes-mic-btn');
     if (mic) mic.classList.remove('recording');
-    const wf = document.getElementById('hermes-waveform');
+    const wf = document.getElementById('hermes-waveform-large');
     if (wf) wf.classList.remove('active');
-    const wfl = document.getElementById('hermes-waveform-large');
-    if (wfl) wfl.classList.remove('active');
     const lbl = document.getElementById('hermes-voice-mode-label');
     if (lbl) lbl.textContent = 'TAP MIC TO START';
-    const vs = document.getElementById('hermes-voice-status');
-    if (vs) vs.textContent = 'Idle';
   };
   return r;
 }
 
 function hermesToggleVoice() {
   if (!_hermesRecognition) _hermesRecognition = hermesInitRecognition();
-  if (!_hermesRecognition) {
-    hermesAddMsg('error', 'Voice recognition not supported in this browser.');
-    return;
-  }
+  if (!_hermesRecognition) return;
   if (_hermesRecognizing) {
     _hermesRecognition.stop();
   } else {
@@ -11814,7 +11823,6 @@ function hermesLoadVoices() {
   _hermesVoices = window.speechSynthesis.getVoices();
   const sel = document.getElementById('hermes-voice-select');
   if (!sel) return;
-  // Keep first option (default)
   while (sel.options.length > 1) sel.remove(1);
   _hermesVoices.forEach(v => {
     const opt = document.createElement('option');
@@ -11822,43 +11830,30 @@ function hermesLoadVoices() {
     opt.textContent = `${v.name} (${v.lang})`;
     sel.appendChild(opt);
   });
-  if (_hermesSettings.voice) sel.value = _hermesSettings.voice;
-  const vc = document.getElementById('hermes-voice-count');
-  if (vc) vc.textContent = _hermesVoices.length + ' available';
-  const ts = document.getElementById('hermes-tts-status');
-  if (ts) ts.textContent = _hermesVoices.length > 0 ? 'ready' : 'no voices';
 }
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = hermesLoadVoices;
 }
 
 // ── Chat message helpers ──
-function hermesAddMsg(role, text, target = 'both') {
+function hermesAddMsg(role, text) {
   const msg = `<div class="hermes-msg ${role}"><div class="msg-role">${role.toUpperCase()}</div>${text}</div>`;
-  if (target === 'both' || target === 'chat') {
-    const c1 = document.getElementById('hermes-messages');
-    if (c1) { c1.insertAdjacentHTML('beforeend', msg); c1.scrollTop = c1.scrollHeight; }
-  }
-  if (target === 'both' || target === 'conversation') {
-    const c2 = document.getElementById('hermes-conversation-messages');
-    if (c2) { c2.insertAdjacentHTML('beforeend', msg); c2.scrollTop = c2.scrollHeight; }
-  }
+  const c = document.getElementById('hermes-messages');
+  if (c) { c.insertAdjacentHTML('beforeend', msg); c.scrollTop = c.scrollHeight; }
   _hermesMsgCount++;
   const mc = document.getElementById('hermes-msg-count');
   if (mc) mc.textContent = _hermesMsgCount + ' messages';
 }
 
 function hermesClearChat() {
-  ['hermes-messages', 'hermes-conversation-messages'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
-  });
+  const c = document.getElementById('hermes-messages');
+  if (c) c.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
   _hermesMsgCount = 0;
   const mc = document.getElementById('hermes-msg-count');
   if (mc) mc.textContent = '0 messages';
 }
 
-// ── Send text to LLM ──
+// ── Send text to Hermes API (OpenAI-compatible) ──
 async function hermesSendText(text) {
   if (!text || !text.trim()) return;
   text = text.trim();
@@ -11867,38 +11862,35 @@ async function hermesSendText(text) {
   const input = document.getElementById('hermes-input');
   if (input) input.value = '';
 
-  // Show thinking indicator
-  hermesAddMsg('system', 'Vectos is thinking…', 'conversation');
+  hermesAddMsg('system', 'Hermes is thinking…');
 
-  // Send to k9-llm-router /route
   try {
-    const r = await fetch(`${HERMES_BASE}/route`, {
+    const r = await fetch(`${HERMES_API}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${HERMES_KEY}`
+      },
       body: JSON.stringify({
+        model: 'hermes-agent',
         messages: [{ role: 'user', content: text }],
-        temperature: 0.7,
-        max_tokens: 500
+        stream: false
       }),
       signal: AbortSignal.timeout(30000)
     });
 
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
 
-    // Extract response — handle various response formats
-    let response = '';
-    if (data.response) response = data.response;
-    else if (data.content) response = data.content;
-    else if (data.choices?.[0]?.message?.content) response = data.choices[0].message.content;
-    else if (data.message?.content) response = data.message.content;
-    else if (data.text) response = data.text;
-    else response = JSON.stringify(data).slice(0, 200);
+    const data = await r.json();
+    let response = data.choices?.[0]?.message?.content
+      || data.choices?.[0]?.text
+      || data.response
+      || 'No response from Hermes.';
 
     // Remove thinking indicator
-    const conv = document.getElementById('hermes-conversation-messages');
-    if (conv) {
-      const sys = conv.querySelector('.hermes-msg.system:last-child');
+    const msgs = document.getElementById('hermes-messages');
+    if (msgs) {
+      const sys = msgs.querySelector('.hermes-msg.system:last-child');
       if (sys && sys.textContent.includes('thinking')) sys.remove();
     }
 
@@ -11909,27 +11901,38 @@ async function hermesSendText(text) {
       hermesTTS(response);
     }
 
-    // Relay to Carbon chat if enabled
-    if (_hermesSettings.carbonRelay) {
-      try {
-        await fetch('http://localhost:8744/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, response: response }),
-          signal: AbortSignal.timeout(5000)
-        });
-      } catch(e) { /* Carbon may be offline — silent fail */ }
+  } catch(err) {
+    // Remove thinking indicator
+    const msgs = document.getElementById('hermes-messages');
+    if (msgs) {
+      const sys = msgs.querySelector('.hermes-msg.system:last-child');
+      if (sys && sys.textContent.includes('thinking')) sys.remove();
     }
 
-  } catch(err) {
-    // Fallback: try a simple echo if router is offline
-    const fallback = `Router offline (${err.message}). Make sure K-9 LLM Router is running on :8765. Start it with: ./launch-economic-stack.sh start`;
-    hermesAddMsg('error', fallback);
+    const offline = `Hermes API offline (${err.message}). Make sure Hermes gateway is running. Start it with: hermes gateway`;
+    hermesAddMsg('error', offline);
 
-    // If router is down, still provide a basic response
-    const local = `[OFFLINE MODE] I received: "${text}" — but the K-9 LLM Router (:8765) is not responding. Check that the router service is running.`;
-    hermesAddMsg('assistant', local);
-    if (_hermesSettings.autoTTS) hermesTTS(local);
+    // Fallback: try k9-llm-router :8765
+    try {
+      hermesAddMsg('system', 'Falling back to K-9 LLM Router :8765…');
+      const r2 = await fetch('http://localhost:8765/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: text }],
+          temperature: 0.7, max_tokens: 500
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const resp2 = d2.response || d2.content || d2.choices?.[0]?.message?.content || 'Fallback response.';
+        hermesAddMsg('assistant', resp2);
+        if (_hermesSettings.autoTTS) hermesTTS(resp2);
+      }
+    } catch(e2) {
+      hermesAddMsg('error', 'Both Hermes (:8642) and K-9 LLM Router (:8765) are offline.');
+    }
   }
 }
 
@@ -11939,20 +11942,6 @@ function hermesSend() {
   const text = input.value.trim();
   if (!text) return;
   hermesSendText(text);
-}
-
-// ── Voice commands ──
-function hermesVoiceCommand(cmd) {
-  const commands = {
-    'status': 'Give me a system status report. What services are running?',
-    'time': `The current time is ${new Date().toLocaleTimeString()}.`,
-  };
-  if (cmd === 'time') {
-    hermesAddMsg('assistant', commands[cmd]);
-    if (_hermesSettings.autoTTS) hermesTTS(commands[cmd]);
-  } else {
-    hermesSendText(commands[cmd]);
-  }
 }
 
 // ── Test voice ──
@@ -11967,77 +11956,55 @@ function setHermesMode(mode) {
   const btn = document.getElementById(`hermes-btn-${mode}`);
   if (btn) btn.classList.add('active');
 
-  const chatPanel = document.getElementById('hermes-chat-panel');
-  const settingsPanel = document.getElementById('hermes-settings-panel');
-  const conversation = document.getElementById('hermes-conversation');
-  const voiceViz = document.getElementById('hermes-voice-viz');
+  const uiPanel = document.getElementById('hermes-ui-panel');
+  const installPanel = document.getElementById('hermes-install-panel');
+  const voicePanel = document.getElementById('hermes-voice-panel');
 
-  if (mode === 'settings') {
-    if (chatPanel) chatPanel.style.display = 'none';
-    if (settingsPanel) settingsPanel.style.display = 'flex';
-    if (conversation) conversation.style.display = 'none';
-    if (voiceViz) voiceViz.style.display = 'none';
+  if (mode === 'install') {
+    if (uiPanel) uiPanel.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'flex';
+    if (voicePanel) voicePanel.style.display = 'none';
   } else if (mode === 'voice') {
-    if (chatPanel) chatPanel.style.display = 'flex';
-    if (settingsPanel) settingsPanel.style.display = 'none';
-    if (conversation) conversation.style.display = 'none';
-    if (voiceViz) voiceViz.style.display = 'flex';
-    // Auto-start listening
-    if (!_hermesRecognizing) hermesToggleVoice();
+    if (uiPanel) uiPanel.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'none';
+    if (voicePanel) voicePanel.style.display = 'flex';
   } else {
-    // chat mode
-    if (chatPanel) chatPanel.style.display = 'flex';
-    if (settingsPanel) settingsPanel.style.display = 'none';
-    if (conversation) conversation.style.display = 'flex';
-    if (voiceViz) voiceViz.style.display = 'none';
+    // ui mode (dashboard iframe)
+    if (uiPanel) uiPanel.style.display = 'block';
+    if (installPanel) installPanel.style.display = 'none';
+    if (voicePanel) voicePanel.style.display = 'none';
   }
 }
 
 // ── Service health check ──
 async function hermesCheckHealth() {
-  const services = [
-    { id: 'hermes-h-llmr', port: 8765, name: 'LLM Router' },
-    { id: 'hermes-h-orch', port: 8080, name: 'Orchestrator' },
-    { id: 'hermes-h-ollama', port: 11434, name: 'Ollama' },
-    { id: 'hermes-h-cb', port: 8744, name: 'Carbon' },
-  ];
-  for (const svc of services) {
-    try {
-      const r = await fetch(`http://localhost:${svc.port}/health`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      const dot = document.getElementById(svc.id);
-      if (dot) {
-        dot.classList.remove('dd');
-        dot.classList.add(r.ok ? 'dg' : 'dr');
-      }
-    } catch(e) {
-      const dot = document.getElementById(svc.id);
-      if (dot) { dot.classList.remove('dd','dg'); dot.classList.add('dr'); }
-    }
-  }
-  // Update connection chip
   try {
-    const r = await fetch(`${HERMES_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(`${HERMES_API}/v1/models`, {
+      headers: { 'Authorization': `Bearer ${HERMES_KEY}` },
+      signal: AbortSignal.timeout(3000)
+    });
     const chip = document.getElementById('hermes-conn-chip');
     if (chip) {
-      chip.textContent = r.ok ? ':8765 · online' : ':8765 · offline';
+      chip.textContent = r.ok ? ':8642 · online' : ':8642 · error';
       chip.style.color = r.ok ? 'var(--green)' : 'var(--red)';
     }
   } catch(e) {
     const chip = document.getElementById('hermes-conn-chip');
-    if (chip) { chip.textContent = ':8765 · offline'; chip.style.color = 'var(--red)'; }
+    if (chip) { chip.textContent = ':8642 · offline'; chip.style.color = 'var(--red)'; }
   }
-  // Check SpeechRecognition support
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recEl = document.getElementById('hermes-rec-status');
-  if (recEl) recEl.textContent = SR ? 'ready' : 'not supported';
 }
 
 // ── Refresh ──
 function hermesRefresh() {
   hermesCheckHealth();
   hermesLoadVoices();
+  // Reload iframe
+  const iframe = document.getElementById('hermes-iframe');
+  if (iframe) {
+    const src = iframe.src;
+    iframe.src = 'about:blank';
+    setTimeout(() => { iframe.src = src; }, 100);
+  }
 }
 
 // ── Tab init (called by showView) ──
@@ -12046,7 +12013,6 @@ function hermesInit() {
   hermesLoadSettings();
   hermesLoadVoices();
   hermesCheckHealth();
-  // Auto-check health every 10s while active
   if (!window._hermesHealthInterval) {
     window._hermesHealthInterval = setInterval(() => {
       if (_hermesActive && !document.hidden) hermesCheckHealth();
@@ -12056,11 +12022,7 @@ function hermesInit() {
 
 // ── Global voice API (shared with Carbon + Vectos) ──
 window.K9Voice = {
-  // Speak text with TTS + avatar sync
-  speak(text, opts = {}) {
-    hermesTTS(text, opts);
-  },
-  // Start voice recognition, call cb with transcript
+  speak(text, opts = {}) { hermesTTS(text, opts); },
   listen(cb) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { cb(null, 'not supported'); return; }
@@ -12072,9 +12034,7 @@ window.K9Voice = {
     r.onerror = (e) => { cb(null, e.error); };
     r.start();
   },
-  // Get available voices
   getVoices() { return _hermesVoices; },
-  // Check support
   supported() {
     return {
       recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
@@ -12083,43 +12043,30 @@ window.K9Voice = {
   }
 };
 
-// ── Enhance Carbon speak with TTS + LLM ──
+// ── Enhance Carbon speak with TTS + Hermes API ──
 const _origCarbonSpeak = carbonSpeak;
 carbonSpeak = function() {
   const input = document.getElementById('carbon-speak-input');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-
-  // Show in avatar
   if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
   input.value = '';
-
-  // TTS the input
   hermesTTS(text);
-
-  // Send to LLM and speak the response
-  hermesSendText(text).then(() => {
-    // Response is already added to chat and spoken by hermesSendText
-  });
+  // Route through Hermes API, fallback to k9-llm-router
+  hermesSendText(text);
 };
 
-// ── Enhance agCarbonSpeak with TTS + LLM ──
+// ── Enhance agCarbonSpeak with TTS + Hermes API ──
 const _origAgCarbonSpeak = agCarbonSpeak;
 agCarbonSpeak = function() {
   const input = document.getElementById('ag-carbon-speak-input');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-
-  // Show in avatar
   agCarbonUpdateExpression(text);
   input.value = '';
-
-  // TTS
   hermesTTS(text);
-
-  // Send to LLM
   hermesSendText(text);
 };
 

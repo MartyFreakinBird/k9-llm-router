@@ -1,0 +1,372 @@
+/* ═══════════════════════════════════════════════════════════════
+   HERMES (CB-10) — NousResearch Hermes Agent Integration
+   Source: https://github.com/NousResearch/hermes-agent
+   API: http://localhost:8642/v1 (OpenAI-compatible)
+   Web Speech API: SpeechRecognition (input) + speechSynthesis (TTS)
+   Shared voice module: used by Hermes, Carbon, and Vectos avatar
+   ═══════════════════════════════════════════════════════════════ */
+
+const HERMES_API = 'http://localhost:8642';
+const HERMES_KEY = 'k9-hermes-local'; // matches install instructions
+let _hermesActive = false;
+let _hermesMode = 'ui';
+let _hermesRecognizing = false;
+let _hermesRecognition = null;
+let _hermesVoices = [];
+let _hermesMsgCount = 0;
+let _hermesSettings = {
+  voice: '', rate: 1, pitch: 1, volume: 1,
+  autoTTS: true, vectosSync: true
+};
+
+// ── Load settings from localStorage ──
+function hermesLoadSettings() {
+  try {
+    const saved = localStorage.getItem('hermes_settings');
+    if (saved) _hermesSettings = { ..._hermesSettings, ...JSON.parse(saved) };
+  } catch(e) {}
+}
+function hermesSaveSettings() {
+  _hermesSettings.autoTTS = document.getElementById('hermes-auto-tts')?.checked ?? true;
+  _hermesSettings.vectosSync = document.getElementById('hermes-vectos-sync')?.checked ?? true;
+  try { localStorage.setItem('hermes_settings', JSON.stringify(_hermesSettings)); } catch(e) {}
+}
+
+// ── Shared TTS engine ──
+function hermesTTS(text, opts = {}) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = opts.rate ?? _hermesSettings.rate;
+  u.pitch = opts.pitch ?? _hermesSettings.pitch;
+  u.volume = opts.volume ?? _hermesSettings.volume;
+  if (_hermesVoices.length > 0) {
+    const v = _hermesVoices.find(x => x.name === _hermesSettings.voice) || _hermesVoices[0];
+    if (v) u.voice = v;
+  }
+  u.onstart = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression(text);
+    }
+  };
+  u.onend = () => {
+    if (typeof CarbonTab !== 'undefined' && _hermesSettings.vectosSync) {
+      CarbonTab.updateExpression('neutral');
+    }
+  };
+  window.speechSynthesis.speak(u);
+}
+
+// ── Shared SpeechRecognition engine ──
+function hermesInitRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    hermesAddMsg('error', 'Voice recognition not supported in this browser. Use Chrome/Edge on localhost.');
+    return null;
+  }
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = true;
+  r.lang = 'en-US';
+  r.onstart = () => {
+    _hermesRecognizing = true;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.add('recording');
+    const wf = document.getElementById('hermes-waveform-large');
+    if (wf) wf.classList.add('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'LISTENING…';
+  };
+  r.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const tr = document.getElementById('hermes-transcript');
+    if (tr) tr.textContent = interim || final || '—';
+    const input = document.getElementById('hermes-input');
+    if (input && (interim || final)) input.value = final || interim;
+    if (final) hermesSendText(final.trim());
+  };
+  r.onerror = (e) => {
+    console.warn('SpeechRecognition error:', e.error);
+    if (e.error === 'not-allowed') {
+      hermesAddMsg('error', 'Microphone access denied. Requires HTTPS or localhost.');
+    }
+  };
+  r.onend = () => {
+    _hermesRecognizing = false;
+    const mic = document.getElementById('hermes-mic-btn');
+    if (mic) mic.classList.remove('recording');
+    const wf = document.getElementById('hermes-waveform-large');
+    if (wf) wf.classList.remove('active');
+    const lbl = document.getElementById('hermes-voice-mode-label');
+    if (lbl) lbl.textContent = 'TAP MIC TO START';
+  };
+  return r;
+}
+
+function hermesToggleVoice() {
+  if (!_hermesRecognition) _hermesRecognition = hermesInitRecognition();
+  if (!_hermesRecognition) return;
+  if (_hermesRecognizing) {
+    _hermesRecognition.stop();
+  } else {
+    try { _hermesRecognition.start(); } catch(e) { console.warn(e); }
+  }
+}
+
+// ── Load voices ──
+function hermesLoadVoices() {
+  if (!window.speechSynthesis) return;
+  _hermesVoices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('hermes-voice-select');
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  _hermesVoices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = hermesLoadVoices;
+}
+
+// ── Chat message helpers ──
+function hermesAddMsg(role, text) {
+  const msg = `<div class="hermes-msg ${role}"><div class="msg-role">${role.toUpperCase()}</div>${text}</div>`;
+  const c = document.getElementById('hermes-messages');
+  if (c) { c.insertAdjacentHTML('beforeend', msg); c.scrollTop = c.scrollHeight; }
+  _hermesMsgCount++;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = _hermesMsgCount + ' messages';
+}
+
+function hermesClearChat() {
+  const c = document.getElementById('hermes-messages');
+  if (c) c.innerHTML = '<div class="hermes-msg system">Chat cleared</div>';
+  _hermesMsgCount = 0;
+  const mc = document.getElementById('hermes-msg-count');
+  if (mc) mc.textContent = '0 messages';
+}
+
+// ── Send text to Hermes API (OpenAI-compatible) ──
+async function hermesSendText(text) {
+  if (!text || !text.trim()) return;
+  text = text.trim();
+
+  hermesAddMsg('user', text);
+  const input = document.getElementById('hermes-input');
+  if (input) input.value = '';
+
+  hermesAddMsg('system', 'Hermes is thinking…');
+
+  try {
+    const r = await fetch(`${HERMES_API}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${HERMES_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'hermes-agent',
+        messages: [{ role: 'user', content: text }],
+        stream: false
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    const data = await r.json();
+    let response = data.choices?.[0]?.message?.content
+      || data.choices?.[0]?.text
+      || data.response
+      || 'No response from Hermes.';
+
+    // Remove thinking indicator
+    const msgs = document.getElementById('hermes-messages');
+    if (msgs) {
+      const sys = msgs.querySelector('.hermes-msg.system:last-child');
+      if (sys && sys.textContent.includes('thinking')) sys.remove();
+    }
+
+    hermesAddMsg('assistant', response);
+
+    // TTS if enabled
+    if (_hermesSettings.autoTTS) {
+      hermesTTS(response);
+    }
+
+  } catch(err) {
+    // Remove thinking indicator
+    const msgs = document.getElementById('hermes-messages');
+    if (msgs) {
+      const sys = msgs.querySelector('.hermes-msg.system:last-child');
+      if (sys && sys.textContent.includes('thinking')) sys.remove();
+    }
+
+    const offline = `Hermes API offline (${err.message}). Make sure Hermes gateway is running. Start it with: hermes gateway`;
+    hermesAddMsg('error', offline);
+
+    // Fallback: try k9-llm-router :8765
+    try {
+      hermesAddMsg('system', 'Falling back to K-9 LLM Router :8765…');
+      const r2 = await fetch('http://localhost:8765/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: text }],
+          temperature: 0.7, max_tokens: 500
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const resp2 = d2.response || d2.content || d2.choices?.[0]?.message?.content || 'Fallback response.';
+        hermesAddMsg('assistant', resp2);
+        if (_hermesSettings.autoTTS) hermesTTS(resp2);
+      }
+    } catch(e2) {
+      hermesAddMsg('error', 'Both Hermes (:8642) and K-9 LLM Router (:8765) are offline.');
+    }
+  }
+}
+
+function hermesSend() {
+  const input = document.getElementById('hermes-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  hermesSendText(text);
+}
+
+// ── Test voice ──
+function hermesTestVoice() {
+  hermesTTS('Hermes voice gateway test. Voice synthesis is working.');
+}
+
+// ── Mode switcher ──
+function setHermesMode(mode) {
+  _hermesMode = mode;
+  document.querySelectorAll('#v-hermes .mode-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`hermes-btn-${mode}`);
+  if (btn) btn.classList.add('active');
+
+  const uiPanel = document.getElementById('hermes-ui-panel');
+  const installPanel = document.getElementById('hermes-install-panel');
+  const voicePanel = document.getElementById('hermes-voice-panel');
+
+  if (mode === 'install') {
+    if (uiPanel) uiPanel.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'flex';
+    if (voicePanel) voicePanel.style.display = 'none';
+  } else if (mode === 'voice') {
+    if (uiPanel) uiPanel.style.display = 'none';
+    if (installPanel) installPanel.style.display = 'none';
+    if (voicePanel) voicePanel.style.display = 'flex';
+  } else {
+    // ui mode (dashboard iframe)
+    if (uiPanel) uiPanel.style.display = 'block';
+    if (installPanel) installPanel.style.display = 'none';
+    if (voicePanel) voicePanel.style.display = 'none';
+  }
+}
+
+// ── Service health check ──
+async function hermesCheckHealth() {
+  try {
+    const r = await fetch(`${HERMES_API}/v1/models`, {
+      headers: { 'Authorization': `Bearer ${HERMES_KEY}` },
+      signal: AbortSignal.timeout(3000)
+    });
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) {
+      chip.textContent = r.ok ? ':8642 · online' : ':8642 · error';
+      chip.style.color = r.ok ? 'var(--green)' : 'var(--red)';
+    }
+  } catch(e) {
+    const chip = document.getElementById('hermes-conn-chip');
+    if (chip) { chip.textContent = ':8642 · offline'; chip.style.color = 'var(--red)'; }
+  }
+}
+
+// ── Refresh ──
+function hermesRefresh() {
+  hermesCheckHealth();
+  hermesLoadVoices();
+  // Reload iframe
+  const iframe = document.getElementById('hermes-iframe');
+  if (iframe) {
+    const src = iframe.src;
+    iframe.src = 'about:blank';
+    setTimeout(() => { iframe.src = src; }, 100);
+  }
+}
+
+// ── Tab init (called by showView) ──
+function hermesInit() {
+  _hermesActive = true;
+  hermesLoadSettings();
+  hermesLoadVoices();
+  hermesCheckHealth();
+  if (!window._hermesHealthInterval) {
+    window._hermesHealthInterval = setInterval(() => {
+      if (_hermesActive && !document.hidden) hermesCheckHealth();
+    }, 10000);
+  }
+}
+
+// ── Global voice API (shared with Carbon + Vectos) ──
+window.K9Voice = {
+  speak(text, opts = {}) { hermesTTS(text, opts); },
+  listen(cb) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { cb(null, 'not supported'); return; }
+    const r = new SR();
+    r.continuous = false;
+    r.interimResults = false;
+    r.lang = 'en-US';
+    r.onresult = (e) => { cb(e.results[0][0].transcript, null); };
+    r.onerror = (e) => { cb(null, e.error); };
+    r.start();
+  },
+  getVoices() { return _hermesVoices; },
+  supported() {
+    return {
+      recognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      synthesis: !!window.speechSynthesis
+    };
+  }
+};
+
+// ── Enhance Carbon speak with TTS + Hermes API ──
+const _origCarbonSpeak = carbonSpeak;
+carbonSpeak = function() {
+  const input = document.getElementById('carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (typeof CarbonTab !== 'undefined') CarbonTab.speak(text, null);
+  input.value = '';
+  hermesTTS(text);
+  // Route through Hermes API, fallback to k9-llm-router
+  hermesSendText(text);
+};
+
+// ── Enhance agCarbonSpeak with TTS + Hermes API ──
+const _origAgCarbonSpeak = agCarbonSpeak;
+agCarbonSpeak = function() {
+  const input = document.getElementById('ag-carbon-speak-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  agCarbonUpdateExpression(text);
+  input.value = '';
+  hermesTTS(text);
+  hermesSendText(text);
+};
