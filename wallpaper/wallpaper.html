@@ -2997,7 +2997,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     <!-- ttyd iframe -->
     <div id="term-live-panel" style="flex:1;position:relative;overflow:hidden">
       <iframe id="term-iframe"
-        src="http://localhost:7681"
+        data-k9-src="http://localhost:7681"
         style="position:absolute;inset:0;width:100%;height:100%;border:none;opacity:0;transition:opacity .5s"
         allow="clipboard-read;clipboard-write"
         loading="lazy"
@@ -4063,7 +4063,7 @@ Verify the following script against K-9 SW4.0 constraints.
 <!-- ── DASHBOARD panel (iframe to Hermes API server) ── -->
   <div id="vectos-hermes-content" class="iframe-live-panel" style="grid-column:1/-1;grid-row:2/3">
     <iframe id="hermes-iframe"
-      src="http://localhost:8642"
+      data-k9-src="http://localhost:8642"
       style="width:100%;height:100%;border:none;opacity:0;transition:opacity .5s"
       allow="clipboard-read;clipboard-write;microphone"
       loading="lazy"
@@ -4143,7 +4143,7 @@ Verify the following script against K-9 SW4.0 constraints.
            onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">⬡ popout</a>
       </div>
     </div>
-    <iframe id="packai-iframe" src="http://localhost:5000" onload="const l=document.getElementById('packai-iframe-loader');if(l)l.style.display='none'"
+    <iframe id="packai-iframe" data-k9-src="http://localhost:5000" onload="const l=document.getElementById('packai-iframe-loader');if(l)l.style.display='none'"
             onerror="const l=document.getElementById('packai-iframe-loader'); if(l){ const lbl=l.querySelector('.load-label'); if(lbl) lbl.textContent='PackNet offline — run: npm run dev in ~/k9/AlexaMobileWeb'; l.style.display='flex'; }"
             style="flex:1;border:none;width:100%;min-height:0;opacity:1"
             allow="clipboard-read;clipboard-write"
@@ -5768,6 +5768,280 @@ Verify the following script against K-9 SW4.0 constraints.
     </div>
   </div>
 </div>
+
+
+<script id="k9-ecosystem-config">
+/**
+ * K-9 Ecosystem Configuration — Wallpaper Edition
+ *
+ * Injected at the top of wallpaper.html. Provides a global K9_CONFIG object
+ * that all fetch calls, iframe sources, and WebSocket connections reference.
+ *
+ * On the local WSL2 machine, all services are on localhost and this is a no-op.
+ * When deployed as a web app, set K9_CONFIG_OVERRIDE before this script loads
+ * to redirect traffic to cloud deployments.
+ */
+(function() {
+  const DEFAULTS = {
+    // Core Economic Stack
+    'k9-orchestrator': 'http://localhost:8744',
+    'k9-llm-router': 'http://localhost:8765',
+    'k9-mcp-manager': 'http://localhost:3030',
+    'k9-control-plane': 'http://localhost:8769',
+    'k9-wallpaper-ws': 'http://localhost:8790',
+    'lovable-bridge': 'http://localhost:8780',
+    'aeg-node-adapter': 'http://localhost:8768',
+    'aeg-signal-router': 'http://localhost:9004',
+    'k9-paymaster': 'http://localhost:9002',
+    'k9-knowledge-ingestor': 'http://localhost:8767',
+    'k9-gemini-agent': 'http://localhost:8770',
+
+    // Web Apps
+    'orbitron-integrator': 'https://orbitron-integrator.lovable.app',
+    'alexamobileweb': 'http://localhost:5000',
+    'mappackmanager': 'http://localhost:5001',
+    'scalpingtrader': 'http://localhost:5174',
+    'ai-yield-whisperer': 'https://ai-yield-whisperer.lovable.app',
+    'fed-whisperer': 'https://fed-whisperer.lovable.app',
+    'osintcmd': 'https://osintcmd.lovable.app',
+
+    // External Services
+    'ollama': 'http://localhost:11434',
+    'n8n': 'http://localhost:5678',
+    'supabase': '',
+
+    // WebSocket URLs
+    'ws-wallpaper': 'ws://localhost:8790/ws',
+    'ws-events': 'ws://localhost:8080/ws/events',
+
+    // Additional services
+    'packai-scout': 'http://localhost:3000',
+    'flowise': 'http://localhost:3001',
+    'orbitron-diagnostics': 'http://localhost:4000',
+    'ttyd': 'http://localhost:7681',
+    'k9-orchestrator-legacy': 'http://localhost:8080',
+    'k9-service-8081': 'http://localhost:8081',
+    'k9-service-8082': 'http://localhost:8082',
+    'k9-ws-agent': 'http://localhost:8085',
+    'k9-quant-legacy': 'http://localhost:8088',
+    'comfyui': 'http://localhost:8188',
+    'comfy-bridge': 'http://localhost:8189',
+    'packnet-bridge': 'http://localhost:8190',
+    'k9-llm-router-legacy': 'http://localhost:8888',
+    'k9-quant-engine': 'http://localhost:9001',
+    'tor-proxy': 'http://localhost:9050',
+    'k9-bridge-port': 'http://localhost:47990',
+
+    // Auth
+    'claw-url': 'http://127.0.0.1:18789',
+    'claw-token': 'f9a551b75758c3d16a1da8dc5c7bd323acf909d61de94f0c',
+  };
+
+  // Allow overrides via URL params, localStorage, or global var
+  const overrides = {};
+  
+  // 1. Check global var (set before script loads)
+  if (typeof window.K9_CONFIG_OVERRIDE === 'object') {
+    Object.assign(overrides, window.K9_CONFIG_OVERRIDE);
+  }
+
+  // 2. Check localStorage (for persistent overrides)
+  try {
+    const stored = localStorage.getItem('k9_config_overrides');
+    if (stored) Object.assign(overrides, JSON.parse(stored));
+  } catch {}
+
+  // 3. Check URL params (for testing: ?k9_orbitron=https://...)
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, value] of params.entries()) {
+    if (key.startsWith('k9_')) {
+      overrides[key.replace('k9_', '').replace(/_/g, '-')] = value;
+    }
+  }
+
+  // Build final config
+  const config = Object.assign({}, DEFAULTS, overrides);
+
+  // Expose globally
+  window.K9_CONFIG = {
+    _portMap: portMap,
+    _config: config,
+    get: function(id) {
+      return config[id] || '';
+    },
+    getAll: function() {
+      return Object.assign({}, config);
+    },
+    set: function(id, url) {
+      config[id] = url;
+    },
+    save: function() {
+      try {
+        localStorage.setItem('k9_config_overrides', JSON.stringify(config));
+      } catch {}
+    },
+    defaults: DEFAULTS,
+  };
+
+  // Helper: resolve a localhost URL to its ecosystem service ID
+  window.K9_CONFIG.resolveLocalhost = function(url) {
+    if (!url || typeof url !== 'string') return url;
+    // Match localhost:PORT patterns
+    const match = url.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)/);
+    if (!match) return url;
+    const port = parseInt(match[1], 10);
+    
+    // Port to service ID mapping
+    const portMap = {
+      8642: 'hermes-agent',
+      8744: 'k9-orchestrator',
+      8765: 'k9-llm-router',
+      3030: 'k9-mcp-manager',
+      8769: 'k9-control-plane',
+      8790: 'k9-wallpaper-ws',
+      8780: 'lovable-bridge',
+      8768: 'aeg-node-adapter',
+      9004: 'aeg-signal-router',
+      9002: 'k9-paymaster',
+      8767: 'k9-knowledge-ingestor',
+      8770: 'k9-gemini-agent',
+      5000: 'alexamobileweb',
+      5001: 'mappackmanager',
+      5174: 'scalpingtrader',
+      8005: 'ai-yield-whisperer',
+      8004: 'fed-whisperer',
+      5002: 'osintcmd',
+      11434: 'ollama',
+      5678: 'n8n',
+      3000: 'packai-scout',
+      3001: 'flowise',
+      4000: 'orbitron-diagnostics',
+      7681: 'ttyd',
+      8080: 'k9-orchestrator-legacy',
+      8081: 'k9-service-8081',
+      8082: 'k9-service-8082',
+      8085: 'k9-ws-agent',
+      8088: 'k9-quant-legacy',
+      8188: 'comfyui',
+      8189: 'comfy-bridge',
+      8190: 'packnet-bridge',
+      8888: 'k9-llm-router-legacy',
+      9001: 'k9-quant-engine',
+      9050: 'tor-proxy',
+      18789: 'claw-url',
+      47990: 'k9-bridge-port',
+    };
+    
+    const serviceId = portMap[port];
+    if (serviceId && config[serviceId]) {
+      return url.replace(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d+/, config[serviceId]);
+    }
+    return url;
+  };
+})();
+
+</script>
+<script id="k9-fetch-interceptor">
+/**
+ * K-9 Fetch & Window.Open Interceptor
+ *
+ * Monkey-patches window.fetch and window.open to run all URLs through
+ * K9_CONFIG.resolveLocalhost(). This catches ALL JavaScript-level calls
+ * (hardcoded strings, template literals, dynamic URLs) without modifying
+ * each call site individually.
+ *
+ * Must load BEFORE any other script that calls fetch() or window.open().
+ */
+(function() {
+  if (typeof window.K9_CONFIG === 'undefined') return;
+
+  // ── Patch window.fetch ──────────────────────────────────
+  var originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    try {
+      if (typeof input === 'string') {
+        input = window.K9_CONFIG.resolveLocalhost(input);
+      } else if (input instanceof Request) {
+        var resolved = window.K9_CONFIG.resolveLocalhost(input.url);
+        if (resolved !== input.url) {
+          // Reconstruct Request with resolved URL
+          input = new Request(resolved, input);
+        }
+      }
+    } catch(e) { /* if K9_CONFIG fails, use original */ }
+    return originalFetch.call(this, input, init);
+  };
+
+  // ── Patch window.open ───────────────────────────────────
+  var originalOpen = window.open;
+  window.open = function(url, target, features) {
+    try {
+      if (typeof url === 'string') {
+        url = window.K9_CONFIG.resolveLocalhost(url);
+      }
+    } catch(e) {}
+    return originalOpen.call(this, url, target, features);
+  };
+
+  // ── Patch XMLHttpRequest.open ────────────────────────────
+  var originalXhrOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+    try {
+      if (typeof url === 'string') {
+        url = window.K9_CONFIG.resolveLocalhost(url);
+      }
+    } catch(e) {}
+    return originalXhrOpen.call(this, method, url, async, user, password);
+  };
+
+  // ── Patch WebSocket constructor ───────────────────────────
+  var OriginalWebSocket = window.WebSocket;
+  window.WebSocket = function(url, protocols) {
+    try {
+      if (typeof url === 'string') {
+        // Resolve ws://localhost:PORT to ws://host:PORT
+        var httpUrl = url.replace('ws://', 'http://').replace('wss://', 'https://');
+        var resolved = window.K9_CONFIG.resolveLocalhost(httpUrl);
+        if (resolved !== httpUrl) {
+          url = resolved.replace('http://', 'ws://').replace('https://', 'wss://');
+        }
+      }
+    } catch(e) {}
+    return new OriginalWebSocket(url, protocols);
+  };
+  window.WebSocket.prototype = OriginalWebSocket.prototype;
+  window.WebSocket.CONNECTING = OriginalWebSocket.CONNECTING;
+  window.WebSocket.OPEN = OriginalWebSocket.OPEN;
+  window.WebSocket.CLOSING = OriginalWebSocket.CLOSING;
+  window.WebSocket.CLOSED = OriginalWebSocket.CLOSED;
+
+})();
+</script>
+<script id="k9-iframe-resolver">
+/**
+ * Resolve all data-k9-src iframes to their resolved URLs.
+ * Runs after K9_CONFIG is loaded and patches static HTML iframes
+ * that bypass the JS fetch interceptor.
+ */
+(function() {
+  function resolveIframes() {
+    if (typeof window.K9_CONFIG === 'undefined') {
+      setTimeout(resolveIframes, 100);
+      return;
+    }
+    document.querySelectorAll('iframe[data-k9-src]').forEach(function(iframe) {
+      var originalUrl = iframe.getAttribute('data-k9-src');
+      var resolved = window.K9_CONFIG.resolveLocalhost(originalUrl);
+      iframe.src = resolved;
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', resolveIframes);
+  } else {
+    resolveIframes();
+  }
+})();
+</script>
 
 <script>
 /* ══════════════════════════════════════
@@ -11733,7 +12007,7 @@ let _vectosSettings = { voice: '', rate: 1, tts: true };
 const VECTOS_ENDPOINTS = {
   hermes: {
     name: 'Hermes Agent',
-    url: 'http://localhost:8642/v1/chat/completions',
+    url: (window.K9_CONFIG ? window.K9_CONFIG.resolveLocalhost('http://localhost:8642/v1/chat/completions') : 'http://localhost:8642/v1/chat/completions'),
     headers: (k) => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer k9-hermes-local' }),
     body: (text, hist) => JSON.stringify({ model: 'hermes-agent', messages: [...(hist || []), { role: 'user', content: text }], stream: false }),
     parse: (d) => d.choices?.[0]?.message?.content || d.choices?.[0]?.text || d.response || 'No response',
@@ -11741,7 +12015,7 @@ const VECTOS_ENDPOINTS = {
   },
   router: {
     name: 'K-9 LLM Router',
-    url: 'http://localhost:8765/route',
+    url: (window.K9_CONFIG ? window.K9_CONFIG.resolveLocalhost('http://localhost:8765/route') : 'http://localhost:8765/route'),
     headers: (k) => ({ 'Content-Type': 'application/json' }),
     body: (text, hist) => JSON.stringify({ messages: [...(hist || []), { role: 'user', content: text }], temperature: 0.7, max_tokens: 500 }),
     parse: (d) => d.response || d.content || d.choices?.[0]?.message?.content || d.text || 'No response',
@@ -11749,7 +12023,7 @@ const VECTOS_ENDPOINTS = {
   },
   ollama: {
     name: 'Ollama (Local)',
-    url: 'http://localhost:11434/api/chat',
+    url: (window.K9_CONFIG ? window.K9_CONFIG.resolveLocalhost('http://localhost:11434/api/chat') : 'http://localhost:11434/api/chat'),
     headers: (k) => ({ 'Content-Type': 'application/json' }),
     body: (text, hist) => JSON.stringify({ model: 'llama3.1:8b', messages: [...(hist || []), { role: 'user', content: text }], stream: false }),
     parse: (d) => d.message?.content || d.response || 'No response',
@@ -11757,7 +12031,7 @@ const VECTOS_ENDPOINTS = {
   },
   carbon: {
     name: 'Carbon Chat',
-    url: 'http://localhost:8744/chat',
+    url: (window.K9_CONFIG ? window.K9_CONFIG.resolveLocalhost('http://localhost:8744/chat') : 'http://localhost:8744/chat'),
     headers: (k) => ({ 'Content-Type': 'application/json' }),
     body: (text, hist) => JSON.stringify({ message: text }),
     parse: (d) => d.response || d.message || d.text || 'No response from Carbon',
@@ -12303,4 +12577,105 @@ setInterval(() => {
 }, 5000);
 
 </script>
+
+<script id="k9-url-rewriter">
+/**
+ * K-9 URL Rewriter — Automatically rewrites all hardcoded localhost URLs
+ * in the DOM to use the ecosystem-config.js service map.
+ * Runs on DOMContentLoaded + re-runs for dynamic content.
+ */
+(function() {
+  function rewriteUrl(url) {
+    if (typeof window.K9_CONFIG === 'undefined' || !window.K9_CONFIG.resolveLocalhost) return url;
+    return window.K9_CONFIG.resolveLocalhost(url);
+  }
+
+  function rewriteElement(el) {
+    if (el.href && (el.href.includes('localhost') || el.href.includes('127.0.0.1'))) {
+      var newUrl = rewriteUrl(el.href);
+      if (newUrl !== el.href) el.href = newUrl;
+    }
+    if (el.src && (el.src.includes('localhost') || el.src.includes('127.0.0.1'))) {
+      var newUrl = rewriteUrl(el.src);
+      if (newUrl !== el.src) el.src = newUrl;
+    }
+    if (el.hasAttribute && el.hasAttribute('onclick')) {
+      var onclick = el.getAttribute('onclick');
+      if (onclick && (onclick.indexOf('localhost') !== -1 || onclick.indexOf('127.0.0.1') !== -1)) {
+        var rewritten = onclick
+          .replace(/https?:\/\/localhost:\d+/g, function(m) { return rewriteUrl(m); })
+          .replace(/https?:\/\/127\.0\.0\.1:\d+/g, function(m) { return rewriteUrl(m); })
+          .replace(/ws:\/\/127\.0\.0\.1:\d+/g, function(m) { return rewriteUrl(m); })
+          .replace(/ws:\/\/localhost:\d+/g, function(m) { return rewriteUrl(m); });
+        if (rewritten !== onclick) el.setAttribute('onclick', rewritten);
+      }
+    }
+  }
+
+  function portToServiceId(port) {
+    // Delegate to the canonical port map in K9_CONFIG
+    // to avoid duplication
+    if (window.K9_CONFIG && window.K9_CONFIG._portMap) {
+      return window.K9_CONFIG._portMap[port] || null;
+    }
+    // Fallback map (in case K9_CONFIG isn't loaded yet)
+    var map = {
+      8744: 'k9-orchestrator', 8765: 'k9-llm-router', 8769: 'k9-control-plane',
+      8790: 'k9-wallpaper-ws', 8780: 'lovable-bridge', 8768: 'aeg-node-adapter',
+      9004: 'aeg-signal-router', 9002: 'k9-paymaster', 8767: 'k9-knowledge-ingestor',
+      8770: 'k9-gemini-agent', 4000: 'orbitron-diagnostics', 5000: 'alexamobileweb',
+      5001: 'mappackmanager', 5174: 'scalpingtrader', 11434: 'ollama',
+      5678: 'n8n', 3000: 'packai-scout', 3001: 'flowise', 8188: 'comfyui',
+      8189: 'comfy-bridge', 8190: 'packnet-bridge', 7681: 'ttyd',
+      8085: 'k9-ws-agent', 8088: 'k9-quant-legacy', 8888: 'k9-llm-router-legacy',
+      9001: 'k9-quant-engine', 3030: 'k9-mcp-manager', 8004: 'fed-whisperer',
+      8080: 'k9-orchestrator-legacy', 8081: 'k9-service-8081', 8082: 'k9-service-8082',
+      9050: 'tor-proxy', 18789: 'claw-url', 47990: 'k9-bridge-port'
+    };
+    return map[port] || null;
+  }
+
+  function rewriteAll() {
+    document.querySelectorAll('a[href], iframe[src], button[onclick], div[onclick], a[onclick]').forEach(rewriteElement);
+    document.querySelectorAll('span, div').forEach(function(el) {
+      if (el.children.length === 0) {
+        var text = el.textContent;
+        if (text && (text.indexOf('localhost') !== -1 || text.indexOf('127.0.0.1') !== -1)) {
+          el.textContent = text
+            .replace(/https?:\/\/localhost:\d+\/?/g, function(m) { return rewriteUrl(m); })
+            .replace(/https?:\/\/127\.0\.0\.1:\d+\/?/g, function(m) { return rewriteUrl(m); })
+            .replace(/ws:\/\/127\.0\.0\.1:\d+/g, function(m) { return rewriteUrl(m); })
+            .replace(/ws:\/\/localhost:\d+/g, function(m) { return rewriteUrl(m); })
+            .replace(/localhost:\d+/g, function(m) {
+              var port = parseInt(m.split(':')[1], 10);
+              var serviceId = portToServiceId(port);
+              if (serviceId && window.K9_CONFIG) {
+                var resolved = window.K9_CONFIG.get(serviceId);
+                if (resolved) {
+                  try {
+                    var u = new URL(resolved);
+                    return u.hostname + ':' + (u.port || (u.protocol === 'https:' ? '443' : '80'));
+                  } catch(e) { return m; }
+                }
+              }
+              return m;
+            });
+        }
+      }
+    });
+  }
+
+  window.K9_REWRITE_URLS = rewriteAll;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', rewriteAll);
+  } else {
+    rewriteAll();
+  }
+
+  setTimeout(rewriteAll, 500);
+  setTimeout(rewriteAll, 2000);
+})();
+</script>
+
 </html>
