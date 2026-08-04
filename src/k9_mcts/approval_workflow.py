@@ -120,6 +120,7 @@ class ApprovalWorkflow:
         self._tasks: dict[str, ApprovalTask] = {}  # approval_id → task
         self._pending: deque[str] = deque()  # approval_ids in pending order
         self._max_tasks = max_tasks
+        self._supabase_poller: Optional[asyncio.Task] = None
 
         # Stats
         self._stats = {
@@ -325,8 +326,102 @@ class ApprovalWorkflow:
             "pending": pending_count,
             "stats": self._stats,
             "ttl_seconds": APPROVAL_TTL_SECONDS,
-            "max_tasks": self._max_tasks,
         }
+
+    def start_supabase_poller(self, interval: float = 3.0) -> None:
+        """Start a background task that polls Supabase for approval decisions every N seconds."""
+        if self._supabase_poller is not None:
+            return  # Already running
+        
+        async def _poll_loop():
+            while True:
+                try:
+                    await asyncio.sleep(interval)
+                    await self.poll_supabase_decisions()
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.debug(f"[APPROVAL] Supabase poller error: {e}")
+                    await asyncio.sleep(interval)
+        
+        try:
+            self._supabase_poller = asyncio.create_task(_poll_loop())
+            logger.info(f"[APPROVAL] Supabase decision poller started (interval={interval}s)")
+        except RuntimeError:
+            logger.debug("[APPROVAL] No event loop — Supabase poller not started")
+
+    async def poll_supabase_decisions(self) -> int:
+        """
+        CB-9: Poll Supabase cb_messages for approval decisions made from Lovable UI.
+        
+        Looks for messages where source='lovable-approval-ui' and 
+        payload contains an approval_id matching one of our pending tasks.
+        Processes the decision (approve/reject) and removes it from the queue.
+        
+        Returns the number of decisions processed.
+        """
+        if not self._pending:
+            return 0
+        
+        supabase_url = os.getenv("SUPABASE_URL", "https://ziqenqqgnqxqrazmjohs.supabase.co")
+        supabase_key = os.getenv("SUPABASE_SVC_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
+        
+        if not supabase_key:
+            return 0  # No Supabase configured — skip polling
+        
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                # Query for recent lovable-approval-ui decisions
+                res = await client.get(
+                    f"{supabase_url}/rest/v1/cb_messages",
+                    params={
+                        "select": "*",
+                        "source": "eq.lovable-approval-ui",
+                        "order": "created_at.desc",
+                        "limit": "10",
+                    },
+                    headers={
+                        "apikey": supabase_key,
+                        "Authorization": f"Bearer {supabase_key}",
+                    },
+                )
+                if not res.is_success:
+                    return 0
+                
+                rows = res.json()
+                if not rows:
+                    return 0
+                
+                processed = 0
+                for row in rows:
+                    payload = row.get("payload", {})
+                    approval_id = payload.get("approval_id")
+                    action = payload.get("action")
+                    approved_by = payload.get("approved_by", "lovable-ui")
+                    note = payload.get("note", "")
+                    
+                    if not approval_id or not action:
+                        continue
+                    
+                    # Check if we have this task and it's pending
+                    task = self._tasks.get(approval_id)
+                    if not task or task.state != ApprovalState.PENDING:
+                        continue  # Already processed or unknown
+                    
+                    if action == "approve":
+                        self.approve(approval_id, approved_by=approved_by, note=note)
+                        logger.info(f"[APPROVAL] Supabase poll: approved {approval_id} by {approved_by}")
+                        processed += 1
+                    elif action == "reject":
+                        self.reject(approval_id, approved_by=approved_by, note=note)
+                        logger.info(f"[APPROVAL] Supabase poll: rejected {approval_id} by {approved_by}")
+                        processed += 1
+                
+                return processed
+                
+        except Exception as e:
+            logger.debug(f"[APPROVAL] Supabase poll failed (non-fatal): {e}")
+            return 0
 
     async def _emit_envelope(self, task: ApprovalTask, event_type: str) -> None:
         """Emit a CB v1 envelope for approval state changes to Orbitron bus."""

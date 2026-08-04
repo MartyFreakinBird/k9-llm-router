@@ -24,6 +24,18 @@ from .execution_dispatcher import get_dispatcher
 router = APIRouter(prefix="/reason", tags=["MCTS Reasoning"])
 
 
+# ── CB-9: Start Supabase approval decision poller ─────────────────────────────
+@router.on_event("startup")
+async def _start_supabase_poller():
+    """Start background polling of Supabase cb_messages for Lovable UI approval decisions."""
+    try:
+        wf = get_approval_workflow()
+        wf.start_supabase_poller(interval=3.0)
+    except Exception as e:
+        import logging
+        logging.getLogger("k9.approval").debug(f"[APPROVAL] Supabase poller not started: {e}")
+
+
 class ReasonRequest(BaseModel):
     question: str = Field(..., description="Forensic or analytical query")
     context: Optional[dict] = Field(default=None, description="Optional context dict")
