@@ -36,6 +36,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
+import socket
 import time
 import uuid
 from collections import deque
@@ -111,6 +112,65 @@ class DispatchRequest(BaseModel):
 
 
 # ── ORBITRON ──────────────────────────────────────────────────────────────────
+
+# ── SwarmAgent Contract ─────────────────────────────────────────────────────────
+# Matches the canonical shapes from k9-swarm-agent.py so the orchestrator
+# is a first-class swarm node — the PWA, wallpaper, and K9starter all poll
+# /swarm/health, /swarm/peers, /swarm/message on :8744.
+
+import psutil
+
+class SwarmPeerInfo(BaseModel):
+    """Lightweight peer identity for the registry."""
+    agent_id: str = ""
+    role:     str = ""
+    ip:       str = ""
+    port:     int = 0
+    status:   str = "online"       # online | offline | degraded
+    reachable: bool = True
+    last_contact: float = 0.0
+    capabilities: list[str] = Field(default_factory=list)
+
+class SwarmMessagePayload(BaseModel):
+    """FIPA-lite ACL message — the lingua franca of the K-9 swarm."""
+    msg_id:       str = Field(default_factory=lambda: str(uuid.uuid4()))
+    sender_id:    str = ""
+    receiver_id: str = ""            # empty = broadcast
+    performative: str = "inform"     # inform | request | query | propose | ack
+    content:      dict[str, Any] = Field(default_factory=dict)
+    timestamp:    str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    reply_to:     str | None = None
+
+# In-memory peer registry + message inbox
+_swarm_peers: dict[str, SwarmPeerInfo] = {}
+_swarm_inbox: deque = deque(maxlen=100)
+_swarm_msg_count = 0
+
+def _swarm_self_health() -> dict:
+    """Build a health snapshot using psutil for real metrics."""
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory().percent
+    except Exception:
+        cpu, mem = 0.0, 0.0
+    return {
+        "agent_id":    "k9-orchestrator",
+        "status":      "online",
+        "service":     "k9-orchestrator",
+        "host":        socket.gethostname(),
+        "port":        PORT,
+        "pid":         os.getpid(),
+        "cpu_pct":     round(cpu, 1),
+        "mem_pct":     round(mem, 1),
+        "active_tasks": (len(COMMAND_REGISTRY) if 'COMMAND_REGISTRY' in dir() else 0),
+        "uptime_s":    round(time.time() - _start_time, 1),
+        "tasks_queued": 0,  # updated dynamically in health endpoint
+        "layer":       "L3-Coordination",
+        "sprint":      3,
+        "timestamp":   datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _orb_headers():
     h = {"apikey": ORBITRON_ANON_KEY, "Content-Type": "application/json"}
     if ORBITRON_AUTH_TOKEN:
@@ -297,15 +357,145 @@ async def root():
 
 @app.get("/swarm/health")
 async def health():
-    uptime = round(time.time() - _start_time, 1)
+    """Full SwarmAgent health contract — matches k9-swarm-agent.py AgentHealth."""
+    h = _swarm_self_health()
+    h["tasks_queued"] = (await _queue.stats()).get("queued", 0) if _queue else 0
+    h["tasks_done"]   = 0
+    h["commands"]     = list(COMMAND_REGISTRY.keys())
+    h["peer_count"]   = len(_swarm_peers)
+    return h
+
+
+
+@app.get("/swarm/peers")
+async def swarm_peers():
+    """List all known swarm peers. The PWA and wallpaper poll this."""
     return {
-        "status":       "online",
+        "count": len(_swarm_peers),
+        "peers": [
+            {
+                "id":         peer.agent_id[:8] if peer.agent_id else "",
+                "role":       peer.role,
+                "ip":         peer.ip,
+                "port":       peer.port,
+                "status":     peer.status,
+                "reachable":  peer.reachable,
+                "capabilities": peer.capabilities,
+                "last_contact_ago": round(time.time() - peer.last_contact, 1) if peer.last_contact else -1,
+            }
+            for peer in _swarm_peers.values()
+        ],
+    }
+
+
+@app.post("/swarm/message")
+async def swarm_message(payload: dict):
+    """Receive a FIPA-lite ACL message from another swarm agent."""
+    global _swarm_msg_count
+    try:
+        msg = SwarmMessagePayload(**payload)
+        _swarm_inbox.append(msg.model_dump())
+        _swarm_msg_count += 1
+
+        # Route by performative
+        performative = msg.performative.lower()
+        if performative == "request":
+            # A peer is requesting we run a command
+            action = msg.content.get("action", "")
+            if action == "execute_command":
+                cmd = msg.content.get("command", "")
+                params = msg.content.get("params", {})
+                if cmd in COMMAND_REGISTRY:
+                    result = await COMMAND_REGISTRY[cmd](params)
+                    return {"ok": True, "result": result, "msg_id": msg.msg_id}
+                return {"ok": False, "error": f"unknown command: {cmd}", "msg_id": msg.msg_id}
+            return {"ok": True, "ack": msg.msg_id, "note": "no action"}
+
+        elif performative == "query":
+            # A peer is querying our status
+            if msg.content.get("query") == "health":
+                return {"ok": True, "result": _swarm_self_health(), "msg_id": msg.msg_id}
+            if msg.content.get("query") == "peers":
+                return {"ok": True, "result": await swarm_peers(), "msg_id": msg.msg_id}
+            return {"ok": True, "ack": msg.msg_id}
+
+        elif performative == "propose":
+            # A peer is proposing a task — log it for review
+            log.info("[swarm] proposal from %s: %s", msg.sender_id, msg.content.get("proposal", ""))
+            return {"ok": True, "ack": msg.msg_id, "status": "queued_for_review"}
+
+        else:
+            # inform, ack, or unknown — just acknowledge
+            return {"ok": True, "ack": msg.msg_id}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/swarm/peer/register")
+async def swarm_peer_register(payload: dict):
+    """Register a new peer in the swarm registry."""
+    try:
+        identity = payload.get("identity", payload)
+        agent_id = identity.get("agent_id", f"{identity.get('role', 'unknown')}-{identity.get('port', 0)}")
+
+        peer = SwarmPeerInfo(
+            agent_id=agent_id,
+            role=identity.get("role", "unknown"),
+            ip=identity.get("ip", identity.get("tailscale_ip", "")),
+            port=identity.get("port", 0),
+            status=identity.get("status", "online"),
+            reachable=True,
+            last_contact=time.time(),
+            capabilities=identity.get("capabilities", []),
+        )
+        _swarm_peers[agent_id] = peer
+        log.info("[swarm] peer registered: %s (%s:%d)", agent_id, peer.ip, peer.port)
+        return {"ok": True, "registered": agent_id[:8], "peer_count": len(_swarm_peers)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@app.post("/swarm/peer/heartbeat")
+async def swarm_peer_heartbeat(payload: dict):
+    """Receive a heartbeat from a peer — updates peer health in registry."""
+    agent_id = payload.get("agent_id", "")
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id required")
+
+    if agent_id in _swarm_peers:
+        peer = _swarm_peers[agent_id]
+        peer.last_contact = time.time()
+        peer.status = payload.get("status", "online")
+        peer.reachable = True
+    else:
+        # Auto-register on first heartbeat
+        peer = SwarmPeerInfo(
+            agent_id=agent_id,
+            role=payload.get("role", "unknown"),
+            ip=payload.get("ip", ""),
+            port=payload.get("port", 0),
+            status=payload.get("status", "online"),
+            reachable=True,
+            last_contact=time.time(),
+            capabilities=payload.get("capabilities", []),
+        )
+        _swarm_peers[agent_id] = peer
+
+    return {"ok": True, "agent_id": agent_id[:8], "ts": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/swarm/stats")
+async def swarm_stats():
+    """Swarm-level statistics for monitoring dashboards."""
+    return {
         "service":      "k9-orchestrator",
         "port":         PORT,
-        "layer":        "L3-Coordination",
-        "uptime_s":     uptime,
-        "tasks_queued": (await _queue.stats()).get("queued", 0) if _queue else 0,
-        "tasks_done":   0,
+        "peer_count":   len(_swarm_peers),
+        "msg_count":    _swarm_msg_count,
+        "inbox_size":   len(_swarm_inbox),
+        "uptime_s":     round(time.time() - _start_time, 1),
+        "sprint":       3,
         "commands":     list(COMMAND_REGISTRY.keys()),
         "timestamp":    datetime.now(timezone.utc).isoformat(),
     }
