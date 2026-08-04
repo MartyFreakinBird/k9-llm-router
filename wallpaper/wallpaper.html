@@ -2098,6 +2098,105 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   color: var(--dim);
   margin-top: 2px;
 }
+
+/* ── SECURITY REINFORCEMENT (CB-9 sec) ─────────────────────────────────────── */
+.sec-ks-panel { display:flex;flex-direction:column;gap:8px;padding:10px 0 }
+.sec-ks-card {
+  background:rgba(15,20,28,0.6);border:1px solid rgba(248,113,113,0.2);
+  border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px
+}
+.sec-ks-card.active {
+  border-color:var(--red);background:rgba(248,113,113,0.08);
+  animation:sec-pulse 2s infinite
+}
+.sec-ks-card.safe {
+  border-color:rgba(74,222,128,0.2);background:rgba(74,222,128,0.04)
+}
+@keyframes sec-pulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0.2)}
+  50%{box-shadow:0 0 8px 2px rgba(248,113,113,0.3)}
+}
+.sec-ks-header { display:flex;align-items:center;gap:8px }
+.sec-ks-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0 }
+.sec-ks-dot.active { background:var(--red);box-shadow:0 0 6px var(--red) }
+.sec-ks-dot.safe { background:var(--green) }
+.sec-ks-title { font-size:11px;font-weight:600;color:var(--text) }
+.sec-ks-reason { font-size:9px;color:var(--muted);margin-left:auto }
+.sec-ks-btn {
+  padding:6px 14px;font-size:10px;font-weight:600;border-radius:4px;
+  cursor:pointer;font-family:var(--font-mono);border:1px solid
+}
+.sec-ks-btn.activate {
+  background:rgba(248,113,113,0.15);color:var(--red);border-color:rgba(248,113,113,0.4)
+}
+.sec-ks-btn.deactivate {
+  background:rgba(74,222,128,0.1);color:var(--green);border-color:rgba(74,222,128,0.3)
+}
+.sec-ks-btn:hover { opacity:0.85 }
+.sec-ks-creds { font-size:8px;color:var(--dim);line-height:1.5 }
+.sec-ks-creds .cred { display:inline-block;margin-right:6px;
+  padding:1px 5px;border-radius:2px;background:rgba(248,113,113,0.1);color:var(--red)
+}
+
+.sec-anomaly-list { display:flex;flex-direction:column;gap:5px;max-height:120px;overflow-y:auto }
+.sec-anomaly-row {
+  display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:4px;
+  font-size:10px;border-left:2px solid
+}
+.sec-anomaly-row.critical {
+  border-left-color:var(--red);background:rgba(248,113,113,0.05)
+}
+.sec-anomaly-row.warning {
+  border-left-color:var(--amber);background:rgba(245,158,11,0.04)
+}
+.sec-anomaly-row.info {
+  border-left-color:var(--cyan);background:rgba(34,211,238,0.03)
+}
+.sec-anomaly-type { font-weight:600;font-size:9px;text-transform:uppercase }
+.sec-anomaly-z { color:var(--dim);font-size:8px }
+.sec-anomaly-time { margin-left:auto;color:var(--dim);font-size:8px }
+
+.sec-egress-list { display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto }
+.sec-egress-row {
+  display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:3px;
+  font-size:9px;background:rgba(255,255,255,0.02)
+}
+.sec-egress-name { font-weight:600;color:var(--text) }
+.sec-egress-url { color:var(--dim);font-size:8px }
+.sec-egress-rate {
+  margin-left:auto;font-size:8px;padding:1px 5px;border-radius:2px;
+  background:rgba(34,211,238,0.1);color:var(--cyan)
+}
+.sec-egress-rate.high { background:rgba(245,158,11,0.15);color:var(--amber) }
+.sec-egress-remove {
+  font-size:8px;color:var(--red);cursor:pointer;padding:1px 4px;
+  border-radius:2px;border:1px solid rgba(248,113,113,0.2)
+}
+.sec-egress-remove:hover { background:rgba(248,113,113,0.1) }
+
+.sec-forensic-list { display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto }
+.sec-forensic-row {
+  display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:3px;
+  font-size:9px;background:rgba(255,255,255,0.02)
+}
+.sec-forensic-type {
+  font-size:8px;font-weight:600;padding:1px 4px;border-radius:2px;text-transform:uppercase
+}
+.sec-forensic-type.blocked_dispatch { background:rgba(248,113,113,0.1);color:var(--red) }
+.sec-forensic-type.anomaly { background:rgba(245,158,11,0.1);color:var(--amber) }
+.sec-forensic-type.unsigned_request { background:rgba(248,113,113,0.15);color:var(--red) }
+.sec-forensic-type.kill_switch { background:rgba(168,85,247,0.1);color:var(--purple) }
+.sec-forensic-reason { color:var(--muted);flex:1;font-size:8px }
+.sec-forensic-time { color:var(--dim);font-size:8px }
+
+.sec-baseline-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px }
+.sec-baseline-item {
+  padding:6px 8px;border-radius:3px;background:rgba(255,255,255,0.02)
+}
+.sec-baseline-label { color:var(--dim);font-size:8px;text-transform:uppercase }
+.sec-baseline-value { color:var(--text);font-size:11px;font-weight:600;margin-top:2px }
+.sec-baseline-value.halted { color:var(--red) }
+.sec-baseline-value.ok { color:var(--green) }
 .mon-reset-btn {
   font-size: 9px;
   padding: 4px 10px;
@@ -4713,6 +4812,77 @@ Verify the following script against K-9 SW4.0 constraints.
     <div class="lbl">Security Event Log</div>
     <div class="log-wrap" id="secLog"></div>
   </div>
+  <!-- ══ ROW 3: Security Reinforcement (CB-9) ══════════════════ -->
+  <div class="cell cell-dark" style="grid-column:1;grid-row:3">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⊘ Kill Switch</span>
+      <span style="font-size:8px;color:var(--dim)" id="sec-ks-update">—</span>
+    </div>
+    <div class="sec-ks-panel" id="sec-ks-panel">
+      <div class="sec-ks-card safe" id="sec-ks-card">
+        <div class="sec-ks-header">
+          <div class="sec-ks-dot safe" id="sec-ks-dot"></div>
+          <div class="sec-ks-title" id="sec-ks-title">Operational</div>
+          <div class="sec-ks-reason" id="sec-ks-reason">auto-execution active</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="sec-ks-btn activate" onclick="secActivateKillSwitch()">⛔ Activate Kill Switch</button>
+          <button class="sec-ks-btn deactivate" onclick="secDeactivateKillSwitch()" id="sec-ks-deactivate" style="display:none">✓ Deactivate</button>
+        </div>
+        <div class="sec-ks-creds" id="sec-ks-creds" style="display:none">
+          <span style="color:var(--dim)">Credentials flagged for revocation:</span>
+          <span id="sec-ks-cred-list"></span>
+        </div>
+      </div>
+    </div>
+    <div class="lbl" style="margin-top:8px">Behavioral Baseline</div>
+    <div class="sec-baseline-grid" id="sec-baseline-grid">
+      <div class="sec-baseline-item">
+        <div class="sec-baseline-label">Dispatch Rate</div>
+        <div class="sec-baseline-value" id="sec-bl-rate">—</div>
+      </div>
+      <div class="sec-baseline-item">
+        <div class="sec-baseline-label">Observations</div>
+        <div class="sec-baseline-value" id="sec-bl-obs">—</div>
+      </div>
+      <div class="sec-baseline-item">
+        <div class="sec-baseline-label">Answer Length</div>
+        <div class="sec-baseline-value" id="sec-bl-len">—</div>
+      </div>
+      <div class="sec-baseline-item">
+        <div class="sec-baseline-label">Status</div>
+        <div class="sec-baseline-value ok" id="sec-bl-status">learning</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- col 2: anomalies + egress -->
+  <div class="cell" style="grid-column:2;grid-row:3">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⚠ Behavioral Anomalies</span>
+      <button class="mon-reset-btn" onclick="secLoadAnomalies()">↻</button>
+    </div>
+    <div class="sec-anomaly-list" id="sec-anomaly-list">
+      <div class="mon-empty">No anomalies — baseline stable</div>
+    </div>
+    <div class="lbl" style="margin-top:8px">⊘ Egress Allowlist</div>
+    <div class="sec-egress-list" id="sec-egress-list">
+      <div class="mon-empty">Loading egress services…</div>
+    </div>
+  </div>
+
+  <!-- col 3: forensic capture -->
+  <div class="cell cell-dark" style="grid-column:3;grid-row:3">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>🔍 Forensic Capture</span>
+      <button class="mon-reset-btn" onclick="secLoadForensics()">↻</button>
+    </div>
+    <div class="sec-forensic-list" id="sec-forensic-list">
+      <div class="mon-empty">No forensic records — no blocked activity</div>
+    </div>
+    <div style="margin-top:6px;font-size:8px;color:var(--dim)" id="sec-forensic-stats">0 records captured</div>
+  </div>
+
   <!-- footer -->
   <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
     <div class="f-item"><span class="f-lbl">Posture</span><span class="f-val" id="footer-posture" style="color:var(--amber)">assessing</span></div>
@@ -6087,6 +6257,8 @@ function showView(id) {
   if (id === 'openclaw')   setTimeout(openclawInit, 200);
   if (id === 'monitor') { _monActive = true; setTimeout(monTabInit, 100); }
   else { _monActive = false; }
+  if (id === 'security') { setTimeout(secTabInit, 100); }
+  else { _secActive = false; }
   if (id === 'sw4') {
     setTimeout(() => {
       const tab = document.querySelector('.rt-tab[data-rtab="sw4"]');
@@ -11938,6 +12110,208 @@ async function monLoadJournal() {
   }).join('');
 }
 
+
+// ── CB-9 SECURITY REINFORCEMENT — security panel polling ─────────────────────
+let _secActive = false;
+
+function secTabInit() {
+  _secActive = true;
+  secPollStatus();
+  secLoadAnomalies();
+  secLoadEgress();
+  secLoadForensics();
+}
+
+async function secFetch(path) {
+  try {
+    const r = await fetch(`${MON_BASE}${path}`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function secPollStatus() {
+  if (!_secActive || document.hidden) return;
+  const s = await secFetch('/reason/security/status');
+  if (!s) {
+    const el = document.getElementById('sec-ks-update');
+    if (el) el.textContent = 'offline — k9-llm-router :8765 not reachable';
+    return;
+  }
+
+  // Kill switch
+  const ks = s.kill_switch || {};
+  const card = document.getElementById('sec-ks-card');
+  const dot = document.getElementById('sec-ks-dot');
+  const title = document.getElementById('sec-ks-title');
+  const reason = document.getElementById('sec-ks-reason');
+  const creds = document.getElementById('sec-ks-creds');
+  const credList = document.getElementById('sec-ks-cred-list');
+  const deactivateBtn = document.getElementById('sec-ks-deactivate');
+
+  if (ks.active) {
+    if (card) { card.className = 'sec-ks-card active'; }
+    if (dot) { dot.className = 'sec-ks-dot active'; }
+    if (title) title.textContent = 'KILL SWITCH ACTIVE';
+    if (reason) reason.textContent = ks.reason || 'manual activation';
+    if (creds) creds.style.display = 'block';
+    if (credList) {
+      credList.innerHTML = (ks.credentials_flagged || [])
+        .map(c => `<span class="cred">${c}</span>`).join('');
+    }
+    if (deactivateBtn) deactivateBtn.style.display = 'inline-block';
+    // Hide the activate button when active
+    const activateBtn = card?.querySelector('.sec-ks-btn.activate');
+    if (activateBtn) activateBtn.style.display = 'none';
+  } else {
+    if (card) { card.className = 'sec-ks-card safe'; }
+    if (dot) { dot.className = 'sec-ks-dot safe'; }
+    if (title) title.textContent = 'Operational';
+    if (reason) reason.textContent = 'auto-execution active';
+    if (creds) creds.style.display = 'none';
+    if (deactivateBtn) deactivateBtn.style.display = 'none';
+    const activateBtn = card?.querySelector('.sec-ks-btn.activate');
+    if (activateBtn) activateBtn.style.display = 'inline-block';
+  }
+
+  // Behavioral baseline
+  const bl = s.behavioral || {};
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setVal('sec-bl-rate', `${(bl.dispatch_rate_ema || 0).toFixed(1)}/min`);
+  setVal('sec-bl-obs', bl.total_observations || 0);
+  setVal('sec-bl-len', `${Math.round(bl.answer_len_ema || 0)}`);
+  const statusEl = document.getElementById('sec-bl-status');
+  if (statusEl) {
+    if (bl.halted) {
+      statusEl.textContent = 'HALTED';
+      statusEl.className = 'sec-baseline-value halted';
+    } else if ((bl.total_observations || 0) > 100) {
+      statusEl.textContent = 'stable';
+      statusEl.className = 'sec-baseline-value ok';
+    } else {
+      statusEl.textContent = 'learning';
+      statusEl.className = 'sec-baseline-value';
+    }
+  }
+
+  // Forensics stats
+  const fs = s.forensics || {};
+  setVal('sec-forensic-stats', `${fs.total_captured || 0} records captured`);
+
+  // Update timestamp
+  setVal('sec-ks-update', new Date().toLocaleTimeString());
+
+  // Also load anomalies and egress if they came in the status
+  if (s.recent_anomalies) secRenderAnomalies(s.recent_anomalies);
+  if (s.recent_forensics) secRenderForensics(s.recent_forensics);
+  if (s.egress) secRenderEgress(s.egress);
+}
+
+async function secLoadAnomalies() {
+  const data = await secFetch('/reason/security/anomalies?limit=20');
+  if (data && data.anomalies) secRenderAnomalies(data.anomalies);
+}
+
+function secRenderAnomalies(anomalies) {
+  const list = document.getElementById('sec-anomaly-list');
+  if (!list) return;
+  if (!anomalies || anomalies.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No anomalies — baseline stable</div>';
+    return;
+  }
+  list.innerHTML = anomalies.map(a => {
+    const sev = a.severity || 'info';
+    const type = (a.type || '').replace(/_/g, ' ');
+    const z = a.z_score ? `z=${a.z_score}` : '';
+    const time = monTimeAgo(a.timestamp);
+    return `<div class="sec-anomaly-row ${sev}">
+      <span class="sec-anomaly-type">${type}</span>
+      <span class="sec-anomaly-z">${z}</span>
+      <span class="sec-anomaly-time">${time}</span>
+    </div>`;
+  }).join('');
+}
+
+async function secLoadEgress() {
+  const data = await secFetch('/reason/security/egress');
+  if (data) secRenderEgress(data);
+}
+
+function secRenderEgress(services) {
+  const list = document.getElementById('sec-egress-list');
+  if (!list) return;
+  if (!services) return;
+  const entries = Object.entries(services);
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No egress services configured</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([name, svc]) => {
+    const rate = svc.current_rate || 0;
+    const limit = svc.rate_limit || 20;
+    const rateClass = rate > limit * 0.8 ? 'high' : '';
+    return `<div class="sec-egress-row">
+      <span class="sec-egress-name">${name}</span>
+      <span class="sec-egress-url">${(svc.url || '').replace('http://','')}</span>
+      <span class="sec-egress-rate ${rateClass}">${rate}/${limit}</span>
+      <span class="sec-egress-remove" onclick="secRemoveEgress('${name}')">✕</span>
+    </div>`;
+  }).join('');
+}
+
+async function secLoadForensics() {
+  const data = await secFetch('/reason/security/forensics/export?limit=20');
+  if (data && data.records) secRenderForensics(data.records);
+}
+
+function secRenderForensics(records) {
+  const list = document.getElementById('sec-forensic-list');
+  if (!list) return;
+  if (!records || records.length === 0) {
+    list.innerHTML = '<div class="mon-empty">No forensic records — no blocked activity</div>';
+    return;
+  }
+  list.innerHTML = records.map(r => {
+    const type = r.event_type || 'unknown';
+    const reason = (r.reason || '').substring(0, 80);
+    const time = monTimeAgo(r.timestamp);
+    return `<div class="sec-forensic-row">
+      <span class="sec-forensic-type ${type}">${type}</span>
+      <span class="sec-forensic-reason">${reason}</span>
+      <span class="sec-forensic-time">${time}</span>
+    </div>`;
+  }).join('');
+}
+
+async function secActivateKillSwitch() {
+  if (!confirm('Activate KILL SWITCH? This halts ALL auto-execution immediately.')) return;
+  try {
+    await fetch(`${MON_BASE}/reason/security/kill-switch/activate?reason=manual-ui`, {
+      method: 'POST', signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(secPollStatus, 500);
+  } catch(e) { console.error('Kill switch activate failed:', e); }
+}
+
+async function secDeactivateKillSwitch() {
+  try {
+    await fetch(`${MON_BASE}/reason/security/kill-switch/deactivate?authorized_by=wallpaper-ui`, {
+      method: 'POST', signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(secPollStatus, 500);
+  } catch(e) { console.error('Kill switch deactivate failed:', e); }
+}
+
+async function secRemoveEgress(serviceName) {
+  if (!confirm(`Remove '${serviceName}' from egress allowlist?`)) return;
+  try {
+    await fetch(`${MON_BASE}/reason/security/egress/${serviceName}/remove`, {
+      method: 'POST', signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(secLoadEgress, 500);
+  } catch(e) { console.error('Egress remove failed:', e); }
+}
+
 async function monResetCircuitBreaker() {
   try {
     await fetch(`${MON_BASE}/reason/monitor/circuit-breaker/reset`, {
@@ -12500,6 +12874,9 @@ setInterval(() => {
     monLoadJournal();
     monLoadApprovals();
   }
+  if (_secActive && !document.hidden) {
+    secPollStatus();
+  }
 }, 5000);
 
 async function monLoadApprovals() {
@@ -12573,6 +12950,9 @@ setInterval(() => {
     monLoadAlerts();
     monLoadJournal();
     monLoadApprovals();
+  }
+  if (_secActive && !document.hidden) {
+    secPollStatus();
   }
 }, 5000);
 
