@@ -2189,6 +2189,56 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 .sec-forensic-reason { color:var(--muted);flex:1;font-size:8px }
 .sec-forensic-time { color:var(--dim);font-size:8px }
 
+/* ── FORENSIC ANALYZER ───────────────────────────────────────────────────── */
+.sec-fa-panel { display:flex;flex-direction:column;gap:8px;padding:10px 0 }
+.sec-fa-card {
+  background:rgba(15,20,28,0.6);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;padding:10px
+}
+.sec-fa-card.critical { border-color:var(--red);background:rgba(248,113,113,0.08) }
+.sec-fa-card.warning { border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.04) }
+.sec-fa-card.none { border-color:rgba(74,222,128,0.2);background:rgba(74,222,128,0.03) }
+.sec-fa-header { display:flex;align-items:center;gap:8px;margin-bottom:6px }
+.sec-fa-class {
+  font-size:10px;font-weight:700;text-transform:uppercase;
+  padding:2px 8px;border-radius:3px
+}
+.sec-fa-class.none { background:rgba(74,222,128,0.15);color:var(--green) }
+.sec-fa-class.prompt_injection,
+.sec-fa-class.lateral_movement,
+.sec-fa-class.data_exfiltration,
+.sec-fa-class.credential_theft,
+.sec-fa-class.sandbox_escape,
+.sec-fa-class.rate_flood { background:rgba(248,113,113,0.15);color:var(--red) }
+.sec-fa-class.suspicious_but_inconclusive { background:rgba(245,158,11,0.15);color:var(--amber) }
+.sec-fa-conf { color:var(--dim);font-size:9px }
+.sec-fa-action {
+  font-size:9px;padding:1px 6px;border-radius:2px;text-transform:uppercase;font-weight:600
+}
+.sec-fa-action.monitor { background:rgba(74,222,128,0.1);color:var(--green) }
+.sec-fa-action.investigate { background:rgba(245,158,11,0.1);color:var(--amber) }
+.sec-fa-action.halt { background:rgba(248,113,113,0.1);color:var(--red) }
+.sec-fa-action.kill_switch { background:rgba(248,113,113,0.2);color:var(--red);font-weight:700 }
+.sec-fa-summary { color:var(--muted);font-size:10px;line-height:1.5;margin-top:6px }
+.sec-fa-indicators { display:flex;flex-wrap:wrap;gap:4px;margin-top:6px }
+.sec-fa-indicator {
+  font-size:8px;padding:1px 5px;border-radius:2px;
+  background:rgba(255,255,255,0.05);color:var(--cyan)
+}
+.sec-fa-mitre { display:flex;flex-wrap:wrap;gap:4px;margin-top:4px }
+.sec-fa-mitre-tag {
+  font-size:8px;padding:1px 5px;border-radius:2px;font-family:var(--font-mono);
+  background:rgba(168,85,247,0.1);color:var(--purple)
+}
+.sec-fa-btn {
+  padding:5px 12px;font-size:10px;font-weight:600;border-radius:3px;cursor:pointer;
+  font-family:var(--font-mono);border:1px solid rgba(34,211,238,0.3);
+  background:rgba(34,211,238,0.1);color:var(--cyan)
+}
+.sec-fa-btn:hover { background:rgba(34,211,238,0.2) }
+.sec-fa-btn.auto { border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.1);color:var(--amber) }
+.sec-fa-meta { display:flex;gap:12px;font-size:8px;color:var(--dim);margin-top:6px }
+
 .sec-baseline-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px }
 .sec-baseline-item {
   padding:6px 8px;border-radius:3px;background:rgba(255,255,255,0.02)
@@ -4881,6 +4931,31 @@ Verify the following script against K-9 SW4.0 constraints.
       <div class="mon-empty">No forensic records — no blocked activity</div>
     </div>
     <div style="margin-top:6px;font-size:8px;color:var(--dim)" id="sec-forensic-stats">0 records captured</div>
+  </div>
+
+
+  <!-- Forensic LLM Analyzer -->
+  <div class="cell" style="grid-column:1/-1;grid-row:4">
+    <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+      <span>🔍 LLM Forensic Analyzer <span style="font-size:8px;color:var(--dim);font-weight:400">local Ollama — no commercial safety filters</span></span>
+      <div style="display:flex;gap:6px">
+        <button class="sec-fa-btn" onclick="secRunForensicAnalysis()">▶ Analyze Now</button>
+        <button class="sec-fa-btn auto" id="sec-fa-auto-btn" onclick="secToggleAutoAnalyze()">⏱ Auto: OFF</button>
+      </div>
+    </div>
+    <div class="sec-fa-panel" id="sec-fa-panel">
+      <div class="sec-fa-card none" id="sec-fa-card">
+        <div class="sec-fa-header">
+          <span class="sec-fa-class none" id="sec-fa-class">No analysis yet</span>
+          <span class="sec-fa-conf" id="sec-fa-conf">—</span>
+          <span class="sec-fa-action monitor" id="sec-fa-action" style="margin-left:auto">monitor</span>
+        </div>
+        <div class="sec-fa-summary" id="sec-fa-summary">Click "Analyze Now" to run LLM forensic analysis on captured security events. Uses local Ollama model — commercial models may refuse to analyze attack payloads.</div>
+        <div class="sec-fa-indicators" id="sec-fa-indicators"></div>
+        <div class="sec-fa-mitre" id="sec-fa-mitre"></div>
+        <div class="sec-fa-meta" id="sec-fa-meta"></div>
+      </div>
+    </div>
   </div>
 
   <!-- footer -->
@@ -12120,6 +12195,7 @@ function secTabInit() {
   secLoadAnomalies();
   secLoadEgress();
   secLoadForensics();
+  secLoadLastAnalysis();
 }
 
 async function secFetch(path) {
@@ -12310,6 +12386,109 @@ async function secRemoveEgress(serviceName) {
     });
     setTimeout(secLoadEgress, 500);
   } catch(e) { console.error('Egress remove failed:', e); }
+
+
+// -- CB-9 FORENSIC ANALYZER — LLM forensic analysis ----------------------------
+async function secRunForensicAnalysis() {
+  const card = document.getElementById('sec-fa-card');
+  const summary = document.getElementById('sec-fa-summary');
+  if (summary) summary.textContent = 'Analyzing... (querying local Ollama model)';
+  if (card) card.className = 'sec-fa-card none';
+
+  try {
+    const r = await fetch(`${MON_BASE}/reason/security/forensics/analyze?limit=50`, {
+      method: 'POST', signal: AbortSignal.timeout(60000)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    secRenderForensicAnalysis(data);
+  } catch(e) {
+    if (summary) summary.textContent = 'Analysis failed: ' + e.message + '. Is Ollama running on :11434?';
+    console.error('Forensic analysis failed:', e);
+  }
+}
+
+function secRenderForensicAnalysis(data) {
+  const card = document.getElementById('sec-fa-card');
+  const cls = document.getElementById('sec-fa-class');
+  const conf = document.getElementById('sec-fa-conf');
+  const action = document.getElementById('sec-fa-action');
+  const summary = document.getElementById('sec-fa-summary');
+  const indicators = document.getElementById('sec-fa-indicators');
+  const mitre = document.getElementById('sec-fa-mitre');
+  const meta = document.getElementById('sec-fa-meta');
+
+  const classification = data.attack_classification || 'suspicious_but_inconclusive';
+  const confidence = data.confidence || 0;
+  const recAction = data.recommended_action || 'investigate';
+
+  // Card severity
+  if (card) {
+    if (classification === 'none') card.className = 'sec-fa-card none';
+    else if (classification === 'suspicious_but_inconclusive') card.className = 'sec-fa-card warning';
+    else card.className = 'sec-fa-card critical';
+  }
+
+  // Classification badge
+  if (cls) {
+    cls.className = 'sec-fa-class ' + classification;
+    cls.textContent = classification.replace(/_/g, ' ');
+  }
+
+  // Confidence
+  if (conf) conf.textContent = 'confidence: ' + (confidence * 100).toFixed(0) + '%';
+
+  // Recommended action
+  if (action) {
+    action.className = 'sec-fa-action ' + recAction;
+    action.textContent = recAction.replace(/_/g, ' ');
+  }
+
+  // Summary
+  if (summary) summary.textContent = data.pattern_summary || 'No summary.';
+
+  // Indicators
+  if (indicators) {
+    const inds = data.indicators || [];
+    indicators.innerHTML = inds.map(i => '<span class="sec-fa-indicator">' + i.replace(/_/g,' ') + '</span>').join('');
+  }
+
+  // MITRE mapping
+  if (mitre) {
+    const tags = data.mitre_mapping || [];
+    mitre.innerHTML = tags.map(t => '<span class="sec-fa-mitre-tag">' + t + '</span>').join('');
+  }
+
+  // Meta
+  if (meta) {
+    meta.innerHTML = '<span>model: ' + (data.model_used || '?') + '</span>'
+      + '<span>records: ' + (data.records_analyzed || 0) + '</span>'
+      + '<span>latency: ' + (data.analysis_latency_ms || 0) + 'ms</span>'
+      + (data.error ? '<span style="color:var(--red)">err: ' + data.error.substring(0,80) + '</span>' : '');
+  }
+}
+
+async function secToggleAutoAnalyze() {
+  const btn = document.getElementById('sec-fa-auto-btn');
+  const isAuto = btn && btn.textContent.includes('ON');
+  try {
+    await fetch(`${MON_BASE}/reason/security/forensics/auto-analyze?enable=${!isAuto}`, {
+      method: 'POST', signal: AbortSignal.timeout(5000)
+    });
+    if (btn) btn.textContent = isAuto ? '\u23f1 Auto: OFF' : '\u23f1 Auto: ON';
+  } catch(e) { console.error('Auto-analyze toggle failed:', e); }
+}
+
+async function secLoadLastAnalysis() {
+  try {
+    const r = await fetch(`${MON_BASE}/reason/security/forensics/analysis`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && !data.error) secRenderForensicAnalysis(data);
+  } catch(e) { /* no analysis yet — ignore */ }
+}
 }
 
 async function monResetCircuitBreaker() {

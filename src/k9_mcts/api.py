@@ -19,6 +19,7 @@ from .journal_persistence import get_persistence
 from .monitoring import get_monitor
 from .approval_workflow import get_approval_workflow, ApprovalState
 from .security_reinforcement import get_security_gate
+from .forensic_analyzer import get_forensic_analyzer, ThreatAssessment, AttackClassification, RecommendedAction
 from .handover_engine import HandoverDecision
 from .execution_dispatcher import get_dispatcher
 
@@ -314,6 +315,48 @@ async def egress_remove_service(service_name: str):
     get_security_gate().egress.remove_service(service_name)
     return {"removed": service_name, "remaining": list(get_security_gate().egress.list_services().keys())}
 
+
+
+# -- CB-9 FORENSIC ANALYZER: LLM-powered forensic analysis -----------------------
+
+@router.post("/security/forensics/analyze")
+async def forensics_analyze(limit: int = 50):
+    """Run LLM forensic analysis on captured records. Uses local Ollama model."""
+    gate = get_security_gate()
+    analyzer = get_forensic_analyzer()
+    records = gate.forensics.export(limit)
+    assessment = await analyzer.analyze(records)
+    return assessment.to_dict()
+
+
+@router.get("/security/forensics/analysis")
+async def forensics_last_analysis():
+    """Get the last forensic analysis result."""
+    analyzer = get_forensic_analyzer()
+    last = analyzer._last_analysis
+    if not last:
+        return {"error": "no analysis performed yet", "status": analyzer.status()}
+    return last.to_dict()
+
+
+@router.get("/security/forensics/analyzer-status")
+async def forensics_analyzer_status():
+    """Get forensic analyzer configuration and status."""
+    return get_forensic_analyzer().status()
+
+
+@router.post("/security/forensics/auto-analyze")
+async def forensics_toggle_auto(enable: bool = True):
+    """Toggle auto-analysis mode. When enabled, analyzes records every 5 min."""
+    analyzer = get_forensic_analyzer()
+    if enable and not analyzer._auto_mode:
+        gate = get_security_gate()
+        await analyzer.start_auto_analysis(
+            get_records_fn=lambda: gate.forensics.export(50),
+        )
+    elif not enable and analyzer._auto_mode:
+        await analyzer.stop_auto_analysis()
+    return analyzer.status()
 @router.get("/journal/{trace_id}")
 async def journal_entry(trace_id: str):
     """CB-7: Full decision detail by trace ID."""
