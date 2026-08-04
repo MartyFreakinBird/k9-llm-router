@@ -18,6 +18,7 @@ from .observability import get_journal
 from .journal_persistence import get_persistence
 from .monitoring import get_monitor
 from .approval_workflow import get_approval_workflow, ApprovalState
+from .security_reinforcement import get_security_gate
 from .handover_engine import HandoverDecision
 from .execution_dispatcher import get_dispatcher
 
@@ -255,6 +256,63 @@ async def approval_stats():
     """CB-9: Aggregate approval statistics."""
     return get_approval_workflow().stats()
 
+
+
+
+# -- CB-9 SECURITY: Security reinforcement endpoints ----------------------------
+
+@router.get("/security/status")
+async def security_status():
+    return get_security_gate().status()
+
+
+@router.post("/security/kill-switch/activate")
+async def kill_switch_activate(reason: str = "manual"):
+    return get_security_gate().kill_switch.activate(reason, "api-operator")
+
+
+@router.post("/security/kill-switch/deactivate")
+async def kill_switch_deactivate(authorized_by: str = "operator"):
+    return get_security_gate().kill_switch.deactivate(authorized_by)
+
+
+@router.post("/security/behavioral/halt")
+async def behavioral_halt(reason: str = "manual"):
+    get_security_gate().behavior.halt(reason)
+    return {"halted": True, "reason": reason}
+
+
+@router.post("/security/behavioral/resume")
+async def behavioral_resume():
+    get_security_gate().behavior.resume()
+    return {"halted": False}
+
+
+@router.get("/security/forensics/export")
+async def forensics_export(limit: int = 100):
+    return {
+        "records": get_security_gate().forensics.export(limit),
+        "stats": get_security_gate().forensics.stats(),
+    }
+
+
+@router.get("/security/anomalies")
+async def security_anomalies(limit: int = 20):
+    return {
+        "anomalies": get_security_gate().behavior.recent_anomalies(limit),
+        "baseline": get_security_gate().behavior.baseline_stats(),
+    }
+
+
+@router.get("/security/egress")
+async def egress_status():
+    return get_security_gate().egress.list_services()
+
+
+@router.post("/security/egress/{service_name}/remove")
+async def egress_remove_service(service_name: str):
+    get_security_gate().egress.remove_service(service_name)
+    return {"removed": service_name, "remaining": list(get_security_gate().egress.list_services().keys())}
 
 @router.get("/journal/{trace_id}")
 async def journal_entry(trace_id: str):

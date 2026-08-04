@@ -41,6 +41,7 @@ import httpx
 
 from .handover_engine import HandoverDecision, RiskLevel, HandoverResult
 from .jepa_target_encoder import get_target_encoder, OutcomeRecord
+from .security_reinforcement import get_security_gate
 
 logger = logging.getLogger("k9.dispatcher")
 
@@ -105,6 +106,26 @@ class ExecutionDispatcher:
         task_class = handover.task_class
         risk = handover.risk_level
         self.dispatch_count += 1
+
+        # ── Security Gate: check before every dispatch ──────────────────────────
+        sec = get_security_gate()
+        allowed, sec_reason = sec.check(
+            service_name=task_class,
+            method="POST" if task_class != "forensic" else "GET",
+            path="/" + task_class,
+            task_class=task_class,
+            confidence=handover.confidence,
+            question=question,
+            answer=answer,
+        )
+        if not allowed:
+            self.error_count += 1
+            logger.warning(f"[DISPATCHER] SECURITY GATE BLOCKED: {sec_reason}")
+            return ExecutionOutcome(
+                dispatch_result=DispatchResult.REJECTED,
+                service_called=task_class,
+                error=f"security_gate: {sec_reason}",
+            )
 
         try:
             if task_class == "compliance" and risk == RiskLevel.READ_ONLY:
