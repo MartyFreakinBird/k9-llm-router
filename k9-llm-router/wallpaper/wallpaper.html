@@ -763,12 +763,15 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   display:flex;align-items:center;padding:0 16px;gap:0;
   contain:layout style;
 }
-.mode-switcher{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-wrap:wrap}
+.mode-switcher{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;flex-shrink:0;flex-wrap:wrap}
 .mode-btn{
   font-size:10px;padding:5px 14px;color:var(--muted);cursor:pointer;
   text-transform:uppercase;letter-spacing:.08em;transition:all .15s;
   background:transparent;user-select:none;white-space:nowrap;flex-shrink:0;
 }
+.mode-btn:first-child{border-radius:4px 0 0 4px}
+.mode-btn:last-child{border-radius:0 4px 4px 0}
+.mode-btn:only-child{border-radius:4px}
 .mode-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .mode-btn.active{color:var(--cyan);background:rgba(34,211,238,.08)}
 .mode-bar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
@@ -823,6 +826,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   grid-column:1/-1;grid-row:2;
   display:none;overflow:auto;min-height:0;
 }
+.local-api-panel[style*="display:flex"]{flex-direction:column;}
 .local-inner{
   display:grid;grid-template-columns:220px 1fr 220px;
   height:100%;gap:1px;background:var(--border);
@@ -10714,7 +10718,7 @@ function setModuleMode(mod, mode) {
   const btnA  = document.getElementById(`${mod}-btn-local`);
   if (live)  live.style.display  = mode==='live'  ? 'block' : 'none';
   // local-api-panel default display is 'none' — show as block
-  if (local) local.style.display = mode==='local' ? 'block' : 'none';
+  if (local) local.style.display = mode==='local' ? 'flex' : 'none';
   if (btnL)  btnL.classList.toggle('active', mode==='live');
   if (btnA)  btnA.classList.toggle('active', mode==='local');
 }
@@ -10726,7 +10730,7 @@ function setOsintMode(m) {
       // Custom panel show/hide for KODI mode
       document.getElementById('osint-live-panel').style.display = 'none';
       document.getElementById('osint-local-panel').style.display = 'none';
-      document.getElementById('osint-kodi-panel').style.display = 'block';
+      document.getElementById('osint-kodi-panel').style.display = 'flex';
       ['osint-btn-live','osint-btn-local','osint-btn-kodi'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.classList.remove('active');
@@ -13089,11 +13093,11 @@ async function kodiInit() {
     const s = localStorage.getItem('kodi_settings');
     if (s) _kodiSettings = { ..._kodiSettings, ...JSON.parse(s) };
   } catch(e) {}
-  kodiRestoreSettings();
+  try { kodiRestoreSettings(); } catch(e) { console.warn('kodiRestoreSettings failed:', e); }
   // Check LibreTranslate availability
-  kodiCheckEngine();
+  try { kodiCheckEngine(); } catch(e) { console.warn('kodiCheckEngine failed:', e); }
   // Auto-connect
-  kodiConnect();
+  try { kodiConnect(); } catch(e) { console.warn('kodiConnect failed:', e); }
 }
 
 async function kodiConnect() {
@@ -13410,7 +13414,7 @@ function kodiSaveSettings() {
   _kodiSettings.autoTranslate = document.getElementById('kodi-auto-translate')?.checked ?? true;
   _kodiSettings.ttsEnabled = document.getElementById('kodi-tts-enabled')?.checked ?? false;
   _kodiSettings.overlayMode = document.getElementById('kodi-overlay-mode')?.checked ?? false;
-  document.getElementById('kodi-trans-direction').textContent = `→ ${_kodiSettings.translateLang}`;
+  const _kd = document.getElementById('kodi-trans-direction'); if (_kd) _kd.textContent = `→ ${_kodiSettings.translateLang}`;
   try { localStorage.setItem('kodi_settings', JSON.stringify(_kodiSettings)); } catch(e) {}
 }
 
@@ -13425,7 +13429,7 @@ function kodiRestoreSettings() {
   if (tts) tts.checked = _kodiSettings.ttsEnabled;
   const ov = document.getElementById('kodi-overlay-mode');
   if (ov) ov.checked = _kodiSettings.overlayMode;
-  document.getElementById('kodi-trans-direction').textContent = `→ ${_kodiSettings.translateLang || 'en'}`;
+  const _krd = document.getElementById('kodi-trans-direction'); if (_krd) _krd.textContent = `→ ${_kodiSettings.translateLang || 'en'}`;
 }
 
 
