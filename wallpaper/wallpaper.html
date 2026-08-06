@@ -4667,6 +4667,7 @@ Verify the following script against K-9 SW4.0 constraints.
     <div class="mode-switcher">
       <div class="mode-btn active" id="osint-btn-live" onclick="setOsintMode('live')">◐ LIVE APP</div>
       <div class="mode-btn" id="osint-btn-local" onclick="setOsintMode('local')">⚙ LOCAL API</div>
+      <div class="mode-btn" id="osint-btn-kodi" onclick="setOsintMode('kodi')">📺 KODI · LIVE TRANSLATE</div>
     </div>
     <div class="mode-bar-right">
       <span style="font-size:10px;color:var(--dim)">osintcmd.lovable.app</span>
@@ -4815,6 +4816,213 @@ Verify the following script against K-9 SW4.0 constraints.
         <div class="lbl" style="margin-top:12px">Log Stream</div>
         <div class="log-wrap" id="osintLog" style="height:100px"></div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- KODI LIVE TRANSLATE panel -->
+  <div id="osint-kodi-panel" class="local-api-panel" style="display:none">
+    <div class="local-inner" style="grid-template-columns:1fr 1fr 1fr">
+
+      <!-- COL 1: Kodi Status + Now Playing -->
+      <div class="cell cell-dark" style="display:flex;flex-direction:column">
+        <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+          <span>📺 Kodi · Now Playing</span>
+          <span id="kodi-status-dot" class="dot dd" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+        </div>
+
+        <!-- Kodi connection settings -->
+        <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center">
+          <input type="text" id="kodi-host" value="localhost" placeholder="host"
+            style="flex:1;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 6px;border-radius:3px;outline:none;font-family:var(--font-mono)">
+          <input type="number" id="kodi-port" value="8080" placeholder="port" style="width:50px;background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 6px;border-radius:3px;outline:none;font-family:var(--font-mono)">
+          <button class="mode-action-btn" onclick="kodiConnect()" style="padding:3px 8px;font-size:9px">Connect</button>
+        </div>
+
+        <!-- Now playing info -->
+        <div id="kodi-now-playing" style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:10px;margin-bottom:8px;flex-shrink:0">
+          <div style="font-size:9px;color:var(--dim);margin-bottom:4px">CURRENT CHANNEL</div>
+          <div id="kodi-channel-name" style="font-size:12px;color:var(--text);font-weight:600;line-height:1.3">Not connected</div>
+          <div id="kodi-show-title" style="font-size:10px;color:var(--muted);margin-top:3px"></div>
+          <div id="kodi-episode" style="font-size:9px;color:var(--dim);margin-top:2px"></div>
+          <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+            <span id="kodi-lang-flag" style="font-size:9px;padding:1px 6px;border-radius:2px;background:rgba(34,211,238,.1);color:var(--cyan);border:1px solid rgba(34,211,238,.2)">lang: ?</span>
+            <span id="kodi-runtime" style="font-size:8px;color:var(--dim)"></span>
+          </div>
+        </div>
+
+        <!-- Kodi playback controls -->
+        <div style="display:flex;gap:4px;flex-shrink:0;margin-bottom:8px">
+          <button class="mode-action-btn" onclick="kodiAction('Player.PlayPause')" style="flex:1;padding:6px;font-size:11px">⏯</button>
+          <button class="mode-action-btn" onclick="kodiAction('Player.Stop')" style="flex:1;padding:6px;font-size:11px">⏹</button>
+          <button class="mode-action-btn" onclick="kodiAction('Input.Up')" style="flex:1;padding:6px;font-size:11px">↑</button>
+          <button class="mode-action-btn" onclick="kodiAction('Input.Down')" style="flex:1;padding:6px;font-size:11px">↓</button>
+          <button class="mode-action-btn" onclick="kodiAction('Input.Select')" style="flex:1;padding:6px;font-size:11px">✓</button>
+          <button class="mode-action-btn" onclick="kodiAction('Input.Back')" style="flex:1;padding:6px;font-size:11px">←</button>
+        </div>
+
+        <!-- Channel list -->
+        <div style="flex:1;overflow-y:auto;min-height:0">
+          <div style="font-size:9px;color:var(--dim);margin-bottom:4px">CHANNELS</div>
+          <div id="kodi-channel-list" style="display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:10px;color:var(--dim);padding:4px">Connect to see channels</div>
+          </div>
+        </div>
+
+        <!-- Auto-refresh toggle -->
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-shrink:0">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:9px;color:var(--dim)">
+            <input type="checkbox" id="kodi-auto-refresh" onchange="kodiToggleAutoRefresh()" style="width:12px;height:12px">
+            Auto-refresh (10s)
+          </label>
+        </div>
+      </div>
+
+      <!-- COL 2: Live Translation Display -->
+      <div class="cell" style="display:flex;flex-direction:column;overflow:hidden">
+        <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+          <span>🌐 Live Translation</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <select id="kodi-translate-lang" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:2px 4px;border-radius:3px;outline:none" onchange="kodiSaveSettings()">
+              <option value="en">→ English</option>
+              <option value="es">→ Spanish</option>
+              <option value="fr">→ French</option>
+              <option value="de">→ German</option>
+              <option value="ja">→ Japanese</option>
+              <option value="zh">→ Chinese</option>
+              <option value="ko">→ Korean</option>
+              <option value="pt">→ Portuguese</option>
+              <option value="ru">→ Russian</option>
+              <option value="ar">→ Arabic</option>
+              <option value="it">→ Italian</option>
+              <option value="tr">→ Turkish</option>
+              <option value="hi">→ Hindi</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Audio capture status -->
+        <div style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:8px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;gap:4px;align-items:center">
+              <button id="kodi-mic-btn" class="hermes-mic-btn" onclick="kodiToggleCapture()" title="Start/stop audio capture" style="width:34px;height:34px;font-size:14px;transition:all .2s">🎤</button>
+              <div>
+                <div id="kodi-capture-status" style="font-size:10px;color:var(--dim);font-weight:600">Ready</div>
+                <div id="kodi-capture-source" style="font-size:8px;color:var(--dim)">Click mic to start</div>
+              </div>
+            </div>
+            <div style="flex:1"></div>
+            <select id="kodi-recog-lang" style="background:var(--bg2);border:1px solid var(--border-hi);color:var(--text);font-size:9px;padding:3px 4px;border-radius:3px;outline:none" onchange="kodiSaveSettings()">
+              <option value="auto">Auto-detect</option>
+              <option value="es-ES">Spanish (ES)</option>
+              <option value="es-MX">Spanish (MX)</option>
+              <option value="fr-FR">French</option>
+              <option value="de-DE">German</option>
+              <option value="ru-RU">Russian</option>
+              <option value="ja-JP">Japanese</option>
+              <option value="zh-CN">Chinese</option>
+              <option value="ko-KR">Korean</option>
+              <option value="ar-SA">Arabic</option>
+              <option value="pt-BR">Portuguese</option>
+              <option value="it-IT">Italian</option>
+              <option value="tr-TR">Turkish</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="vi-VN">Vietnamese</option>
+              <option value="th-TH">Thai</option>
+              <option value="en-US">English (US)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Original transcription -->
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:6px">
+          <div style="font-size:8px;color:var(--dim);margin-bottom:3px;letter-spacing:.1em">ORIGINAL TRANSCRIPTION</div>
+          <div id="kodi-original-text" style="flex:1;overflow-y:auto;background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:12px;line-height:1.6;color:var(--text);font-family:var(--font-mono);scrollbar-width:thin">
+            <span style="color:var(--dim);font-size:10px">Start audio capture to see live transcription of foreign broadcast…</span>
+          </div>
+        </div>
+
+        <!-- Translated text -->
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+          <div style="font-size:8px;color:var(--green);margin-bottom:3px;letter-spacing:.1em">TRANSLATION <span id="kodi-trans-direction" style="color:var(--dim)">→ en</span></div>
+          <div id="kodi-translated-text" style="flex:1;overflow-y:auto;background:rgba(74,222,128,.04);border:1px solid rgba(74,222,128,.15);border-radius:4px;padding:10px;font-size:13px;line-height:1.7;color:var(--text);scrollbar-width:thin">
+            <span style="color:var(--dim);font-size:10px">Translation will appear here in real-time…</span>
+          </div>
+        </div>
+
+        <!-- Translation engine status -->
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:8px;color:var(--dim);margin-top:4px;flex-shrink:0">
+          <span id="kodi-engine-status">Engine: LibreTranslate :5050 · checking…</span>
+          <span id="kodi-translation-count">0 translations</span>
+        </div>
+      </div>
+
+      <!-- COL 3: Audio Routing Guide + Settings -->
+      <div class="cell cell-dark" style="display:flex;flex-direction:column;overflow-y:auto">
+        <div class="lbl">🎛 Audio Routing Guide</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+          <div style="color:var(--cyan);font-size:10px;margin-bottom:4px">VB-Audio Virtual Cable (free)</div>
+          1. Install VB-Cable from <span style="color:var(--cyan);cursor:pointer" onclick="window.open(\'https://vb-audio.com/Cable/\',\'_blank\')">vb-audio.com</span><br>
+          2. Set Kodi output → CABLE Input<br>
+          3. Set browser mic input → CABLE Output<br>
+          4. Click 🎤 to start live capture<br>
+          <div style="margin-top:6px;color:var(--amber);font-size:10px">WhisperLive (offline)</div>
+          <code style="font-size:9px;color:var(--green)">pip install WhisperLive<br>python3 transcribe.py --model small</code>
+        </div>
+
+        <div class="lbl" style="margin-top:8px">🔒 Translation Engines</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15);border-radius:3px">
+            <span style="font-size:11px">🟢</span>
+            <div>
+              <div style="color:var(--green);font-weight:600">LibreTranslate (local)</div>
+              <div style="font-size:8px;color:var(--dim)">:5050 · self-hosted · zero data leaves machine</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15);border-radius:3px">
+            <span style="font-size:11px">🟡</span>
+            <div>
+              <div style="color:var(--amber);font-weight:600">Xenova WASM (browser)</div>
+              <div style="font-size:8px;color:var(--dim)">NLLB-200 · in-browser · no server needed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.15);border-radius:3px">
+            <span style="font-size:11px">🔵</span>
+            <div>
+              <div style="color:var(--cyan);font-weight:600">WhisperLive (offline)</div>
+              <div style="font-size:8px;color:var(--dim)">OpenAI Whisper model · fully offline</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lbl" style="margin-top:8px">⚙ Settings</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-auto-translate" checked onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Auto-translate on capture
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-tts-enabled" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            TTS read translation aloud
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-overlay-mode" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Subtitle overlay mode
+          </label>
+        </div>
+
+        <div class="lbl" style="margin-top:10px">📊 Session Stats</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:10px">
+          <div class="p-row"><span style="color:var(--dim)">Translations</span><span id="kodi-stat-translations" style="color:var(--text)">0</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Engine</span><span id="kodi-stat-engine" style="color:var(--dim)">—</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Target lang</span><span id="kodi-stat-target" style="color:var(--cyan)">en</span></div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -10513,7 +10721,25 @@ function setModuleMode(mod, mode) {
 
 // Alias legacy per-module functions → generic
 function setOrbitronMode(m) { setModuleMode('orbitron', m); }
-function setOsintMode(m)    { setModuleMode('osint', m); }
+function setOsintMode(m) {
+    if (m === 'kodi') {
+      // Custom panel show/hide for KODI mode
+      document.getElementById('osint-live-panel').style.display = 'none';
+      document.getElementById('osint-local-panel').style.display = 'none';
+      document.getElementById('osint-kodi-panel').style.display = 'block';
+      ['osint-btn-live','osint-btn-local','osint-btn-kodi'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.remove('active');
+      });
+      document.getElementById('osint-btn-kodi').classList.add('active');
+      kodiInit();
+      return;
+    }
+    // Hide kodi panel for non-kodi modes
+    const kodiP = document.getElementById('osint-kodi-panel');
+    if (kodiP) kodiP.style.display = 'none';
+    setModuleMode('osint', m);
+  }
 
 function reloadModuleIframe(mod) {
   const f = document.getElementById(`${mod}-iframe`);
@@ -12834,6 +13060,375 @@ async function vectosTranslateResponse(text) {
   if (!_vectosSettings.autoTranslate || !_vectosSettings.translateTo) return text;
   return await ltTranslate(text, 'en', _vectosSettings.translateTo);
 }
+
+// ── KODI LIVE TRANSLATION ────────────────────────────────────────────────────
+// Connects to Kodi JSON-RPC API to get currently playing channel info,
+// captures system audio via Web Speech API, translates through LibreTranslate,
+// and displays live translated subtitles for foreign news broadcasts.
+
+let _kodiConnected = false;
+let _kodiHost = 'localhost';
+let _kodiPort = 8080;
+let _kodiPlayerId = null;
+let _kodiAutoRefresh = false;
+let _kodiRefreshInterval = null;
+let _kodiRecognition = null;
+let _kodiRecognizing = false;
+let _kodiTranslationCount = 0;
+let _kodiSettings = { translateLang: 'en', recogLang: 'auto', autoTranslate: true, ttsEnabled: false, overlayMode: false };
+
+function kodiBaseUrl() {
+  return window.K9_CONFIG
+    ? window.K9_CONFIG.resolveLocalhost(`http://${_kodiHost}:${_kodiPort}`)
+    : `http://${_kodiHost}:${_kodiPort}`;
+}
+
+async function kodiInit() {
+  // Load settings
+  try {
+    const s = localStorage.getItem('kodi_settings');
+    if (s) _kodiSettings = { ..._kodiSettings, ...JSON.parse(s) };
+  } catch(e) {}
+  kodiRestoreSettings();
+  // Check LibreTranslate availability
+  kodiCheckEngine();
+  // Auto-connect
+  kodiConnect();
+}
+
+async function kodiConnect() {
+  _kodiHost = document.getElementById('kodi-host')?.value || 'localhost';
+  _kodiPort = parseInt(document.getElementById('kodi-port')?.value || '8080');
+  const dot = document.getElementById('kodi-status-dot');
+
+  try {
+    // Kodi JSON-RPC: get active players
+    const r = await fetch(`${kodiBaseUrl()}/jsonrpc?request={"jsonrpc":"2.0","method":"Player.GetActivePlayers","id":1}`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const players = data.result || [];
+      if (players.length > 0) {
+        _kodiPlayerId = players[0].playerid;
+        _kodiConnected = true;
+        if (dot) { dot.classList.remove('dd', 'dr'); dot.classList.add('dg'); }
+        kodiGetNowPlaying();
+        kodiGetChannels();
+      } else {
+        _kodiConnected = true;
+        if (dot) { dot.classList.remove('dd', 'dr'); dot.classList.add('dg'); }
+        document.getElementById('kodi-channel-name').textContent = 'No active playback';
+        kodiGetChannels();
+      }
+    }
+  } catch(e) {
+    _kodiConnected = false;
+    if (dot) { dot.classList.remove('dd', 'dg'); dot.classList.add('dr'); }
+    document.getElementById('kodi-channel-name').textContent = 'Connection failed';
+    document.getElementById('kodi-channel-name').style.color = 'var(--red)';
+  }
+}
+
+async function kodiGetNowPlaying() {
+  if (!_kodiConnected || _kodiPlayerId === null) return;
+  try {
+    const req = {
+      jsonrpc: '2.0',
+      method: 'Player.GetItem',
+      params: { playerid: _kodiPlayerId, properties: ['title','showtitle','episode','season','channel','channeltype','duration','streamdetails'] },
+      id: 1
+    };
+    const r = await fetch(`${kodiBaseUrl()}/jsonrpc?request=${encodeURIComponent(JSON.stringify(req))}`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    const item = data.result?.item || {};
+    document.getElementById('kodi-channel-name').textContent = item.title || item.label || 'Unknown';
+    document.getElementById('kodi-channel-name').style.color = 'var(--text)';
+    document.getElementById('kodi-show-title').textContent = item.showtitle || '';
+    document.getElementById('kodi-episode').textContent = item.episode ? `S${item.season || 0}E${item.episode}` : '';
+
+    // Try to detect language from stream details
+    const langs = item.streamdetails?.audio || [];
+    if (langs.length > 0 && langs[0].language) {
+      document.getElementById('kodi-lang-flag').textContent = `lang: ${langs[0].language}`;
+      // Auto-set recognition language if set to auto
+      if (_kodiSettings.recogLang === 'auto') {
+        const langMap = { 'spa': 'es-ES', 'eng': 'en-US', 'fra': 'fr-FR', 'deu': 'de-DE', 'jpn': 'ja-JP', 'chi': 'zh-CN', 'kor': 'ko-KR', 'rus': 'ru-RU', 'ara': 'ar-SA', 'ita': 'it-IT', 'por': 'pt-BR', 'tur': 'tr-TR', 'hin': 'hi-IN' };
+        const mapped = langMap[langs[0].language];
+        if (mapped) {
+          const sel = document.getElementById('kodi-recog-lang');
+          if (sel) sel.value = mapped;
+        }
+      }
+    }
+
+    if (item.duration) {
+      const mins = Math.floor(item.duration / 60);
+      const secs = item.duration % 60;
+      document.getElementById('kodi-runtime').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    }
+  } catch(e) { /* ignore */ }
+}
+
+async function kodiGetChannels() {
+  try {
+    const req = {
+      jsonrpc: '2.0',
+      method: 'PVR.GetChannels',
+      params: { channelgroupid: 'alltv', properties: ['channelname','channeltype','thumbnail'] },
+      id: 1
+    };
+    const r = await fetch(`${kodiBaseUrl()}/jsonrpc?request=${encodeURIComponent(JSON.stringify(req))}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    const channels = data.result?.channels || [];
+    const list = document.getElementById('kodi-channel-list');
+    if (!list) return;
+    if (channels.length === 0) {
+      list.innerHTML = '<div style="font-size:10px;color:var(--dim);padding:4px">No PVR channels configured</div>';
+      return;
+    }
+    list.innerHTML = channels.slice(0, 50).map(ch => {
+      const label = ch.channelname || ch.label || 'Unknown';
+      return `<div class="p-row" style="cursor:pointer;padding:3px 6px;border-radius:3px;transition:background .15s"
+        onmouseover="this.style.background='rgba(34,211,238,.08)'"
+        onmouseout="this.style.background=''"
+        onclick="kodiPlayChannel(${ch.channelid})">
+        <span style="font-size:10px;color:var(--text)">${label}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('kodi-channel-list').innerHTML = '<div style="font-size:10px;color:var(--dim)">PVR not configured</div>';
+  }
+}
+
+async function kodiPlayChannel(channelId) {
+  try {
+    const req = { jsonrpc: '2.0', method: 'Player.Open', params: { item: { channelid: channelId } }, id: 1 };
+    await fetch(`${kodiBaseUrl()}/jsonrpc?request=${encodeURIComponent(JSON.stringify(req))}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    setTimeout(() => kodiGetNowPlaying(), 1000);
+  } catch(e) { /* ignore */ }
+}
+
+async function kodiAction(method) {
+  try {
+    const req = { jsonrpc: '2.0', method: method, id: 1 };
+    await fetch(`${kodiBaseUrl()}/jsonrpc?request=${encodeURIComponent(JSON.stringify(req))}`, {
+      signal: AbortSignal.timeout(3000)
+    });
+  } catch(e) { /* ignore */ }
+}
+
+function kodiToggleAutoRefresh() {
+  _kodiAutoRefresh = document.getElementById('kodi-auto-refresh')?.checked || false;
+  if (_kodiAutoRefresh) {
+    _kodiRefreshInterval = setInterval(() => {
+      if (_kodiConnected) kodiGetNowPlaying();
+    }, 10000);
+  } else {
+    if (_kodiRefreshInterval) { clearInterval(_kodiRefreshInterval); _kodiRefreshInterval = null; }
+  }
+}
+
+// ── Audio capture via Web Speech API ──
+function kodiToggleCapture() {
+  if (_kodiRecognizing) {
+    if (_kodiRecognition) _kodiRecognition.stop();
+  } else {
+    kodiStartCapture();
+  }
+}
+
+function kodiStartCapture() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    kodiUpdateStatus('Voice recognition not supported. Use Chrome/Edge.', 'error');
+    return;
+  }
+
+  _kodiRecognition = new SR();
+  _kodiRecognition.continuous = true;
+  _kodiRecognition.interimResults = true;
+
+  const recogLang = document.getElementById('kodi-recog-lang')?.value || 'en-US';
+  if (recogLang !== 'auto') _kodiRecognition.lang = recogLang;
+
+  _kodiRecognition.onstart = () => {
+    _kodiRecognizing = true;
+    const btn = document.getElementById('kodi-mic-btn');
+    if (btn) { btn.classList.add('recording'); btn.style.background = 'rgba(248,113,113,.2)'; btn.style.color = 'var(--red)'; }
+    kodiUpdateStatus('Listening to system audio…', 'active');
+    document.getElementById('kodi-capture-source').textContent = recogLang === 'auto' ? 'Auto-detect language' : recogLang;
+  };
+
+  _kodiRecognition.onresult = async (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+
+    // Update original text display
+    const origEl = document.getElementById('kodi-original-text');
+    if (interim) {
+      origEl.innerHTML = `<span style="color:var(--muted)">${interim}</span>`;
+    }
+    if (final) {
+      // Append final text
+      const existing = origEl.dataset.full || '';
+      const fullText = existing + ' ' + final;
+      origEl.dataset.full = fullText;
+      origEl.innerHTML = `<span style="color:var(--text)">${fullText.trim()}</span>`;
+      // Translate if auto-translate is on
+      if (_kodiSettings.autoTranslate) {
+        kodiTranslateChunk(final.trim());
+      }
+    }
+  };
+
+  _kodiRecognition.onerror = (e) => {
+    if (e.error === 'not-allowed') kodiUpdateStatus('Microphone access denied. Requires localhost or HTTPS.', 'error');
+    else if (e.error === 'no-speech') kodiUpdateStatus('No speech detected. Check audio routing.', 'warn');
+    else kodiUpdateStatus('Recognition error: ' + e.error, 'error');
+  };
+
+  _kodiRecognition.onend = () => {
+    _kodiRecognizing = false;
+    const btn = document.getElementById('kodi-mic-btn');
+    if (btn) { btn.classList.remove('recording'); btn.style.background = ''; btn.style.color = ''; }
+    kodiUpdateStatus('Ready', 'idle');
+    // Auto-restart if still in capture mode (continuous mode)
+    if (_kodiSettings.autoTranslate && document.getElementById('kodi-auto-translate')?.checked) {
+      try { _kodiRecognition.start(); } catch(e) { /* already started */ }
+    }
+  };
+
+  try { _kodiRecognition.start(); } catch(e) { /* already started */ }
+}
+
+async function kodiTranslateChunk(text) {
+  if (!text || !text.trim()) return;
+  const targetLang = _kodiSettings.translateLang || 'en';
+  const transEl = document.getElementById('kodi-translated-text');
+
+  // Try server-side LibreTranslate first
+  try {
+    const r = await fetch(`${LT_URL}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: text, source: 'auto', target: targetLang, format: 'text' }),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const translated = data.translatedText || text;
+      const existing = transEl.dataset.full || '';
+      const fullText = existing + ' ' + translated;
+      transEl.dataset.full = fullText;
+      transEl.innerHTML = `<span style="color:var(--text)">${fullText.trim()}</span>`;
+      _kodiTranslationCount++;
+      document.getElementById('kodi-translation-count').textContent = `${_kodiTranslationCount} translations`;
+      // Auto-scroll
+      transEl.scrollTop = transEl.scrollHeight;
+      // TTS if enabled
+      if (_kodiSettings.ttsEnabled && window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(translated);
+        u.lang = targetLang;
+        const voices = window.speechSynthesis.getVoices();
+        const v = voices.find(x => x.lang && x.lang.toLowerCase().startsWith(targetLang));
+        if (v) u.voice = v;
+        window.speechSynthesis.speak(u);
+      }
+      return;
+    }
+  } catch(e) { /* fall through to client-side */ }
+
+  // Client-side fallback: @xenova/transformers
+  try {
+    if (typeof window.transformers === 'undefined') {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    const { pipeline } = window.transformers;
+    const translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
+    const result = await translator(text, { tgt_lang: targetLang });
+    const translated = result[0]?.translation_text || text;
+    const existing = transEl.dataset.full || '';
+    const fullText = existing + ' ' + translated;
+    transEl.dataset.full = fullText;
+    transEl.innerHTML = `<span style="color:var(--text)">${fullText.trim()}</span>`;
+    _kodiTranslationCount++;
+    document.getElementById('kodi-translation-count').textContent = `${_kodiTranslationCount} translations`;
+    transEl.scrollTop = transEl.scrollHeight;
+  } catch(e) {
+    // If all translation fails, show original with note
+    const existing = transEl.dataset.full || '';
+    transEl.dataset.full = existing + ' ' + text;
+    transEl.innerHTML = `<span style="color:var(--dim)">${(existing + ' ' + text).trim()}</span><div style="font-size:8px;color:var(--red);margin-top:2px">Translation unavailable — showing original</div>`;
+  }
+}
+
+function kodiUpdateStatus(text, state) {
+  const el = document.getElementById('kodi-capture-status');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = state === 'active' ? 'var(--green)' : state === 'error' ? 'var(--red)' : state === 'warn' ? 'var(--amber)' : 'var(--dim)';
+}
+
+async function kodiCheckEngine() {
+  const el = document.getElementById('kodi-engine-status');
+  if (!el) return;
+  try {
+    const r = await fetch(`${LT_URL}/languages`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const langs = await r.json();
+      el.textContent = `Engine: LibreTranslate :5050 ✓ (${langs.length} languages)`;
+      el.style.color = 'var(--green)';
+    }
+  } catch(e) {
+    el.textContent = 'Engine: LibreTranslate offline · WASM fallback available';
+    el.style.color = 'var(--amber)';
+  }
+}
+
+function kodiSaveSettings() {
+  _kodiSettings.translateLang = document.getElementById('kodi-translate-lang')?.value || 'en';
+  _kodiSettings.recogLang = document.getElementById('kodi-recog-lang')?.value || 'auto';
+  _kodiSettings.autoTranslate = document.getElementById('kodi-auto-translate')?.checked ?? true;
+  _kodiSettings.ttsEnabled = document.getElementById('kodi-tts-enabled')?.checked ?? false;
+  _kodiSettings.overlayMode = document.getElementById('kodi-overlay-mode')?.checked ?? false;
+  document.getElementById('kodi-trans-direction').textContent = `→ ${_kodiSettings.translateLang}`;
+  try { localStorage.setItem('kodi_settings', JSON.stringify(_kodiSettings)); } catch(e) {}
+}
+
+function kodiRestoreSettings() {
+  const tl = document.getElementById('kodi-translate-lang');
+  if (tl && _kodiSettings.translateLang) tl.value = _kodiSettings.translateLang;
+  const rl = document.getElementById('kodi-recog-lang');
+  if (rl && _kodiSettings.recogLang) rl.value = _kodiSettings.recogLang;
+  const at = document.getElementById('kodi-auto-translate');
+  if (at) at.checked = _kodiSettings.autoTranslate;
+  const tts = document.getElementById('kodi-tts-enabled');
+  if (tts) tts.checked = _kodiSettings.ttsEnabled;
+  const ov = document.getElementById('kodi-overlay-mode');
+  if (ov) ov.checked = _kodiSettings.overlayMode;
+  document.getElementById('kodi-trans-direction').textContent = `→ ${_kodiSettings.translateLang || 'en'}`;
+}
+
+
 
 
 function vectosLoadSettings() {
