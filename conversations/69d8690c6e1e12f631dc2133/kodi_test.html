@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><head><title>Kodi Test</title>
+<style>
+:root{
+  --bg:#080c10;--bg2:#0d1117;--bg3:#111820;--bg4:#0a0f15;
+  --border:rgba(255,255,255,0.06);--border-hi:rgba(255,255,255,0.14);
+  --text:#e2e8f0;--muted:#64748b;--dim:#334155;
+  --cyan:#22d3ee;--teal:#14b8a6;--amber:#f59e0b;
+  --red:#f87171;--green:#4ade80;--purple:#a78bfa;
+}
+body{background:var(--bg);color:var(--text);font-family:monospace;margin:0;padding:20px}
+.mode-bar{
+  grid-column:1/-1;grid-row:1;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:0;
+  contain:layout style;
+}
+.mode-bar-mod{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;margin-right:14px;flex-shrink:0}
+.mode-switcher{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-wrap:wrap}
+.mode-btn{
+  font-size:10px;padding:5px 14px;color:var(--muted);cursor:pointer;
+  text-transform:uppercase;letter-spacing:.08em;transition:all .15s;
+  background:transparent;user-select:none;white-space:nowrap;flex-shrink:0;
+}
+.mode-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.mode-btn.active{color:var(--cyan);background:rgba(34,211,238,.08)}
+.mode-bar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.mode-action-btn{font-size:10px;color:var(--muted);padding:5px 12px;border:1px solid var(--border);border-radius:3px;cursor:pointer}
+</style>
+</head><body>
+<h2 style="color:var(--cyan);font-size:14px;margin-bottom:10px">OSINT Tab Mode Bar Test</h2>
+<div class="mode-bar" style="border-radius:4px">
+  <span class="mode-bar-mod">OSINT CMD</span>
+  <div class="mode-switcher">
+    <div class="mode-btn active" id="osint-btn-live" onclick="alert('LIVE APP')">◐ LIVE APP</div>
+    <div class="mode-btn" id="osint-btn-local" onclick="alert('LOCAL API')">⚙ LOCAL API</div>
+    <div class="mode-btn" id="osint-btn-kodi" onclick="alert('KODI')">📺 KODI · LIVE TRANSLATE</div>
+  </div>
+  <div class="mode-bar-right">
+    <span style="font-size:10px;color:var(--dim)">osintcmd.lovable.app</span>
+    <div class="mode-action-btn" onclick="alert('popout')">⬡ popout</div>
+    <div class="mode-action-btn" onclick="alert('reload')">⟳ reload</div>
+    <div class="mode-action-btn" style="border-color:rgba(74,222,128,.25);color:var(--green)">⚿ login</div>
+  </div>
+</div>
+<p style="margin-top:20px;color:var(--muted);font-size:11px">If you can see the "📺 KODI · LIVE TRANSLATE" button above, the CSS fix is working.</p>
+</body></html>
