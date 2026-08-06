@@ -763,11 +763,11 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   display:flex;align-items:center;padding:0 16px;gap:0;
   contain:layout style;
 }
-.mode-switcher{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.mode-switcher{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-wrap:wrap}
 .mode-btn{
   font-size:10px;padding:5px 14px;color:var(--muted);cursor:pointer;
   text-transform:uppercase;letter-spacing:.08em;transition:all .15s;
-  background:transparent;user-select:none;
+  background:transparent;user-select:none;white-space:nowrap;flex-shrink:0;
 }
 .mode-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .mode-btn.active{color:var(--cyan);background:rgba(34,211,238,.08)}
@@ -4962,7 +4962,7 @@ Verify the following script against K-9 SW4.0 constraints.
         <div class="lbl">🎛 Audio Routing Guide</div>
         <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px">
           <div style="color:var(--cyan);font-size:10px;margin-bottom:4px">VB-Audio Virtual Cable (free)</div>
-          1. Install VB-Cable from <span style="color:var(--cyan);cursor:pointer" onclick="window.open(\'https://vb-audio.com/Cable/\',\'_blank\')">vb-audio.com</span><br>
+          1. Install VB-Cable from <span style="color:var(--cyan);cursor:pointer" onclick="window.open('https://vb-audio.com/Cable/','_blank')">vb-audio.com</span><br>
           2. Set Kodi output → CABLE Input<br>
           3. Set browser mic input → CABLE Output<br>
           4. Click 🎤 to start live capture<br>
