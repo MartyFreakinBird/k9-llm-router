@@ -168,6 +168,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 .view[data-layout="code"].active     { display:grid;grid-template-columns:200px 1fr 1fr 260px;grid-template-rows:1fr 40px;gap:1px;background:var(--border) }
 .view[data-layout="panel"].active    { display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 40px;gap:1px;background:var(--border) }
 .view[data-layout="iframe"].active   { display:grid;grid-template-columns:1fr;grid-template-rows:36px 1fr 40px;gap:1px;background:var(--border) }
+.view[data-layout="kodi"].active     { display:grid;grid-template-columns:1fr;grid-template-rows:36px 1fr 40px;gap:1px;background:var(--border) }
 
 /* ── KYPRO TAB layout ───────────────────
    3-col × 2-row + footer
@@ -827,6 +828,13 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
   display:none;overflow:auto;min-height:0;
 }
 .local-api-panel[style*="display:flex"]{flex-direction:column;}
+
+.kodi-content{
+  grid-column:1/-1;grid-row:2;
+  overflow:auto;min-height:0;
+  display:flex;flex-direction:column;
+}
+.kodi-content > .local-inner{flex:1}
 .local-inner{
   display:grid;grid-template-columns:220px 1fr 220px;
   height:100%;gap:1px;background:var(--border);
@@ -2302,6 +2310,7 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
       <div class="nav-dropdown">
         <div class="nav-dd-label">Signal Sources</div>
         <div class="nav-dd-item" data-view="osint" onclick="showView('osint')">◐ OSINT CMD</div>
+        <div class="nav-dd-item" data-view="kodi" onclick="showView('kodi')">📺 Kodi · Live Translate</div>
         <div class="nav-dd-item" data-view="fed" onclick="showView('fed')">⬢ FedWhisperer</div>
 <div class="nav-dd-item" data-view="fedui" onclick="showView('fedui')">⬢ FED UI</div>
         <div class="nav-dd-sep"></div>
@@ -4671,7 +4680,6 @@ Verify the following script against K-9 SW4.0 constraints.
     <div class="mode-switcher">
       <div class="mode-btn active" id="osint-btn-live" onclick="setOsintMode('live')">◐ LIVE APP</div>
       <div class="mode-btn" id="osint-btn-local" onclick="setOsintMode('local')">⚙ LOCAL API</div>
-      <div class="mode-btn" id="osint-btn-kodi" onclick="setOsintMode('kodi')">📺 KODI · LIVE TRANSLATE</div>
     </div>
     <div class="mode-bar-right">
       <span style="font-size:10px;color:var(--dim)">osintcmd.lovable.app</span>
@@ -4825,7 +4833,71 @@ Verify the following script against K-9 SW4.0 constraints.
 
 
   <!-- KODI LIVE TRANSLATE panel -->
-  <div id="osint-kodi-panel" class="local-api-panel" style="display:none">
+  
+        </div>
+
+        <div class="lbl" style="margin-top:8px">⚙ Settings</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-auto-translate" checked onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Auto-translate on capture
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-tts-enabled" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            TTS read translation aloud
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-overlay-mode" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Subtitle overlay mode
+          </label>
+        </div>
+
+        <div class="lbl" style="margin-top:10px">📊 Session Stats</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:10px">
+          <div class="p-row"><span style="color:var(--dim)">Translations</span><span id="kodi-stat-translations" style="color:var(--text)">0</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Engine</span><span id="kodi-stat-engine" style="color:var(--dim)">—</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Target lang</span><span id="kodi-stat-target" style="color:var(--cyan)">en</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
+    <div class="f-item"><span class="f-lbl">OSINT CMD</span><span class="f-val" style="color:var(--purple)">Globe Platform · Lovable</span></div>
+    <span class="f-sep">·</span>
+    <div class="f-item"><span class="f-lbl">Globe</span><span class="f-val" id="osint-globe-status" style="color:var(--amber)">Cesium/WebGL — fallback SVG map available</span></div>
+    <span class="f-sep">·</span>
+    <div class="f-item"><span class="f-lbl">Local</span><span class="f-val">osint-cmd :5001</span></div>
+    <span class="f-sep">·</span>
+    <div class="f-item"><span class="f-lbl">Compliance</span><span class="f-val" style="color:var(--green)">ComplianceEngine enforced</span></div>
+    <span class="f-sep">·</span>
+    <div class="f-item"><span class="f-lbl">18+ endpoints · WebSocket · Three.js 3D globe</span></div>
+  </div>
+</div>
+
+<div class="view" id="v-kodi" data-layout="kodi">
+
+  <!-- mode bar -->
+  <div class="mode-bar">
+    <span class="mode-bar-mod">Kodi · Live Translate</span>
+    <div class="mode-switcher">
+      <div class="mode-btn active" id="kodi-btn-connect" onclick="kodiConnect()">↻ Connect</div>
+      <div class="mode-btn" id="kodi-btn-channels" onclick="kodiGetChannels()">☰ Channels</div>
+      <div class="mode-btn" id="kodi-btn-settings" onclick="kodiToggleSettings()">⚙ Settings</div>
+    </div>
+    <div class="mode-bar-right">
+      <span style="font-size:10px;color:var(--dim)">localhost:8080 · LibreTranslate :5050</span>
+      <div class="mode-action-btn" onclick="kodiInit()">⟳ restart</div>
+    </div>
+  </div>
+
+  <!-- kodi panel content -->
+<div id="osint-kodi-panel" class="kodi-content">
     <div class="local-inner" style="grid-template-columns:1fr 1fr 1fr">
 
       <!-- COL 1: Kodi Status + Now Playing -->
@@ -4997,49 +5069,16 @@ Verify the following script against K-9 SW4.0 constraints.
               <div style="font-size:8px;color:var(--dim)">OpenAI Whisper model · fully offline</div>
             </div>
           </div>
-        </div>
 
-        <div class="lbl" style="margin-top:8px">⚙ Settings</div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-auto-translate" checked onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            Auto-translate on capture
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-tts-enabled" onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            TTS read translation aloud
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-overlay-mode" onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            Subtitle overlay mode
-          </label>
-        </div>
-
-        <div class="lbl" style="margin-top:10px">📊 Session Stats</div>
-        <div style="display:flex;flex-direction:column;gap:3px;font-size:10px">
-          <div class="p-row"><span style="color:var(--dim)">Translations</span><span id="kodi-stat-translations" style="color:var(--text)">0</span></div>
-          <div class="p-row"><span style="color:var(--dim)">Engine</span><span id="kodi-stat-engine" style="color:var(--dim)">—</span></div>
-          <div class="p-row"><span style="color:var(--dim)">Target lang</span><span id="kodi-stat-target" style="color:var(--cyan)">en</span></div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
+  <!-- footer -->
   <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
-    <div class="f-item"><span class="f-lbl">OSINT CMD</span><span class="f-val" style="color:var(--purple)">Globe Platform · Lovable</span></div>
+    <div class="f-item"><span class="f-lbl">Kodi</span><span class="f-val" style="color:var(--cyan)">JSON-RPC :8080</span></div>
     <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">Globe</span><span class="f-val" id="osint-globe-status" style="color:var(--amber)">Cesium/WebGL — fallback SVG map available</span></div>
+    <div class="f-item"><span class="f-lbl">Engine</span><span class="f-val" style="color:var(--green)">LibreTranslate :5050</span></div>
     <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">Local</span><span class="f-val">osint-cmd :5001</span></div>
+    <div class="f-item"><span class="f-lbl">Audio</span><span class="f-val" style="color:var(--amber)">VB-Cable required</span></div>
     <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">Compliance</span><span class="f-val" style="color:var(--green)">ComplianceEngine enforced</span></div>
-    <span class="f-sep">·</span>
-    <div class="f-item"><span class="f-lbl">18+ endpoints · WebSocket · Three.js 3D globe</span></div>
+    <div class="f-item"><span class="f-lbl">Speech</span><span class="f-val">Web Speech API</span></div>
   </div>
 </div>
 
@@ -6606,6 +6645,7 @@ function showView(id) {
   if (id === 'grid')       setTimeout(gridInit, 200);
   if (id === 'defi')       setTimeout(defiTabInit, 400);
   if (id === 'osint')      setTimeout(osintTabInit, 300);
+  if (id === 'kodi')       setTimeout(kodiInit, 300);
   if (id === 'arch')       setTimeout(archTabInit, 150);
   if (id === 'setup')      setTimeout(setupTabInit, 200);
   if (id === 'openclaw')   setTimeout(openclawInit, 200);
@@ -10726,22 +10766,6 @@ function setModuleMode(mod, mode) {
 // Alias legacy per-module functions → generic
 function setOrbitronMode(m) { setModuleMode('orbitron', m); }
 function setOsintMode(m) {
-    if (m === 'kodi') {
-      // Custom panel show/hide for KODI mode
-      document.getElementById('osint-live-panel').style.display = 'none';
-      document.getElementById('osint-local-panel').style.display = 'none';
-      document.getElementById('osint-kodi-panel').style.display = 'flex';
-      ['osint-btn-live','osint-btn-local','osint-btn-kodi'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.classList.remove('active');
-      });
-      document.getElementById('osint-btn-kodi').classList.add('active');
-      kodiInit();
-      return;
-    }
-    // Hide kodi panel for non-kodi modes
-    const kodiP = document.getElementById('osint-kodi-panel');
-    if (kodiP) kodiP.style.display = 'none';
     setModuleMode('osint', m);
   }
 
@@ -13080,6 +13104,13 @@ let _kodiRecognition = null;
 let _kodiRecognizing = false;
 let _kodiTranslationCount = 0;
 let _kodiSettings = { translateLang: 'en', recogLang: 'auto', autoTranslate: true, ttsEnabled: false, overlayMode: false };
+
+function kodiToggleSettings() {
+  const col3 = document.querySelector('#v-kodi .local-inner > div:last-child');
+  if (col3) {
+    col3.style.display = col3.style.display === 'none' ? 'flex' : 'none';
+  }
+}
 
 function kodiBaseUrl() {
   return window.K9_CONFIG
