@@ -4832,41 +4832,6 @@ Verify the following script against K-9 SW4.0 constraints.
   </div>
 
 
-  <!-- KODI LIVE TRANSLATE panel -->
-  
-        </div>
-
-        <div class="lbl" style="margin-top:8px">⚙ Settings</div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-auto-translate" checked onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            Auto-translate on capture
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-tts-enabled" onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            TTS read translation aloud
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="kodi-overlay-mode" onchange="kodiSaveSettings()" style="width:12px;height:12px">
-            Subtitle overlay mode
-          </label>
-        </div>
-
-        <div class="lbl" style="margin-top:10px">📊 Session Stats</div>
-        <div style="display:flex;flex-direction:column;gap:3px;font-size:10px">
-          <div class="p-row"><span style="color:var(--dim)">Translations</span><span id="kodi-stat-translations" style="color:var(--text)">0</span></div>
-          <div class="p-row"><span style="color:var(--dim)">Engine</span><span id="kodi-stat-engine" style="color:var(--dim)">—</span></div>
-          <div class="p-row"><span style="color:var(--dim)">Target lang</span><span id="kodi-stat-target" style="color:var(--cyan)">en</span></div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
     <div class="f-item"><span class="f-lbl">OSINT CMD</span><span class="f-val" style="color:var(--purple)">Globe Platform · Lovable</span></div>
     <span class="f-sep">·</span>
@@ -5069,6 +5034,38 @@ Verify the following script against K-9 SW4.0 constraints.
               <div style="font-size:8px;color:var(--dim)">OpenAI Whisper model · fully offline</div>
             </div>
           </div>
+        </div>
+
+        <div class="lbl" style="margin-top:8px">⚙ Settings</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-auto-translate" checked onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Auto-translate on capture
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-tts-enabled" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            TTS read translation aloud
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;margin-top:3px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="kodi-overlay-mode" onchange="kodiSaveSettings()" style="width:12px;height:12px">
+            Subtitle overlay mode
+          </label>
+        </div>
+
+        <div class="lbl" style="margin-top:10px">📊 Session Stats</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:10px">
+          <div class="p-row"><span style="color:var(--dim)">Translations</span><span id="kodi-stat-translations" style="color:var(--text)">0</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Engine</span><span id="kodi-stat-engine" style="color:var(--dim)">—</span></div>
+          <div class="p-row"><span style="color:var(--dim)">Target lang</span><span id="kodi-stat-target" style="color:var(--cyan)">en</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- footer -->
   <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
