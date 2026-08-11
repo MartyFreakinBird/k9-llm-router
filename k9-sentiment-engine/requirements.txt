@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+vaderSentiment
+beautifulsoup4
+requests
+feedparser
+python-dateutil
+websockets
+transformers
+torch
+tiktoken
