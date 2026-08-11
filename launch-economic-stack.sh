@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # K-9 Economic Stack — Launch Script
-# Sprint AEG-5 + INT-1 (updated)
+# v2.0 — Updated Aug 2026 (AEG-6 + TX Adapter + Sentiment Engine)
 #
 # Services (start order matters):
 #   1.  k9-paymaster          :9002  — economic gate + CLOB signing
@@ -121,6 +121,21 @@ SVC_CMD[k9-wallpaper-ws]="python k9_wallpaper_ws.py"
 SVC_DIR[k9-wallpaper-ws]="$K9_DIR"
 SVC_PORT[k9-wallpaper-ws]="8790"
 
+# TX Blockchain Adapter — Coreum/Sologenic surveillance (read-only)
+SVC_CMD[k9-tx-adapter]="python -m uvicorn src.k9_tx_adapter:app --host 0.0.0.0 --port 9005"
+SVC_DIR[k9-tx-adapter]="$K9_DIR"
+SVC_PORT[k9-tx-adapter]="9005"
+
+# Sentiment Engine — zero-cost multi-source sentiment (Reddit + News + VADER)
+SVC_CMD[k9-sentiment-engine]="uvicorn main:app --host 0.0.0.0 --port 9006"
+SVC_DIR[k9-sentiment-engine]="$K9_DIR/k9-sentiment-engine"
+SVC_PORT[k9-sentiment-engine]="9006"
+
+# Quant Engine — k9-quant-engine
+SVC_CMD[k9-quant-engine]="python -m uvicorn src.aeg_token_model:app --host 0.0.0.0 --port 9001"
+SVC_DIR[k9-quant-engine]="$K9_DIR"
+SVC_PORT[k9-quant-engine]="9001"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -133,6 +148,9 @@ START_ORDER=(
   aeg-node-adapter
   aeg-token-model
   aeg-signal-router
+  k9-tx-adapter
+  k9-sentiment-engine
+  k9-quant-engine
   lovable-bridge
   k9-wallpaper-ws
 )
