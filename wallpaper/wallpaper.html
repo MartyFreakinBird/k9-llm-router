@@ -4680,6 +4680,7 @@ Verify the following script against K-9 SW4.0 constraints.
     <div class="mode-switcher">
       <div class="mode-btn active" id="osint-btn-live" onclick="setOsintMode('live')">◐ LIVE APP</div>
       <div class="mode-btn" id="osint-btn-local" onclick="setOsintMode('local')">⚙ LOCAL API</div>
+      <div class="mode-btn" id="osint-btn-sentiment" onclick="setOsintMode('sentiment')">SNT SENTIMENT</div>
     </div>
     <div class="mode-bar-right">
       <span style="font-size:10px;color:var(--dim)">osintcmd.lovable.app</span>
@@ -4832,6 +4833,152 @@ Verify the following script against K-9 SW4.0 constraints.
   </div>
 
 
+  <!-- SENTIMENT panel (hidden by default) -->
+  <div id="osint-sentiment-panel" style="display:none;padding:12px;height:calc(100% - 0px);overflow-y:auto;background:#050810">
+    <div style="max-width:1400px;margin:0 auto;display:grid;grid-template-columns:280px 1fr 320px;gap:10px;height:100%">
+
+      <!-- LEFT: Source + Query Controls -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:8px;font-family:var(--font-hd)">SNT Sentiment Engine</div>
+          <div style="font-size:9px;color:var(--dim);margin-bottom:6px">k9-sentiment-engine :9006 · zero-cost · VADER + FinBERT</div>
+          <div id="sentiment-svc-status" style="display:flex;align-items:center;gap:6px;font-size:10px">
+            <div class="dot dd" id="sentiment-dot"></div>
+            <span id="sentiment-status-text" style="color:var(--dim)">checking…</span>
+          </div>
+        </div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">Query</div>
+          <input id="sentiment-query" type="text" placeholder="ticker, keyword, topic…" value=""
+            style="width:100%;background:#0a0e14;border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:11px;color:var(--text);font-family:var(--font-mono);outline:none;margin-bottom:8px"
+            onkeydown="if(event.key==='Enter')sentimentSearch()">
+          <div style="font-size:9px;color:var(--dim);margin-bottom:6px">Sources</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+            <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text);cursor:pointer">
+              <input type="checkbox" id="sent-src-reddit" checked style="accent-color:var(--cyan)"> Reddit
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text);cursor:pointer">
+              <input type="checkbox" id="sent-src-news" checked style="accent-color:var(--cyan)"> Google News
+            </label>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-bottom:6px">Reddit Subreddits</div>
+          <select id="sent-subreddit" style="width:100%;background:#0a0e14;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:10px;color:var(--text);margin-bottom:8px">
+            <option value="wallstreetbets">r/wallstreetbets</option>
+            <option value="stocks">r/stocks</option>
+            <option value="investing">r/investing</option>
+            <option value="cryptocurrency">r/cryptocurrency</option>
+            <option value="economics">r/economics</option>
+            <option value="worldnews">r/worldnews</option>
+            <option value="geopolitics">r/geopolitics</option>
+            <option value="fedreserve">r/fedreserve</option>
+            <option value="economy">r/economy</option>
+            <option value="options">r/options</option>
+          </select>
+          <div style="display:flex;gap:4px">
+            <div class="mode-action-btn" onclick="sentimentSearch()" style="flex:1;text-align:center;background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.3);color:var(--cyan)">⟳ Analyze</div>
+            <div class="mode-action-btn" onclick="sentimentAutoToggle()" id="sentiment-auto-btn" style="text-align:center">⏸ Auto: OFF</div>
+          </div>
+        </div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">User Monitor</div>
+          <input id="sentiment-user" type="text" placeholder="reddit username…" value=""
+            style="width:100%;background:#0a0e14;border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:11px;color:var(--text);font-family:var(--font-mono);outline:none;margin-bottom:6px"
+            onkeydown="if(event.key==='Enter')sentimentMonitorUser()">
+          <div class="mode-action-btn" onclick="sentimentMonitorUser()" style="text-align:center">◉ Track User</div>
+          <div id="sentiment-user-results" style="margin-top:8px;font-size:9px;color:var(--dim);max-height:200px;overflow-y:auto"></div>
+        </div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">Watchlist</div>
+          <div id="sentiment-watchlist" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+            <span style="font-size:9px;color:var(--dim)">empty</span>
+          </div>
+          <input id="sent-wl-input" type="text" placeholder="add symbol…" value=""
+            style="width:100%;background:#0a0e14;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:10px;color:var(--text);font-family:var(--font-mono);outline:none"
+            onkeydown="if(event.key==='Enter')sentimentAddWatch()">
+        </div>
+      </div>
+
+      <!-- CENTER: Sentiment Feed -->
+      <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
+        <!-- Aggregate Sentiment Bar -->
+        <div id="sentiment-gauge-bar" style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          <div style="text-align:center">
+            <div style="font-size:9px;color:var(--dim);margin-bottom:3px">SCORE</div>
+            <div id="sent-gauge-score" style="font-size:22px;font-weight:700;color:var(--dim);font-family:var(--font-mono)">--</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:9px;color:var(--dim);margin-bottom:3px">LABEL</div>
+            <div id="sent-gauge-label" style="font-size:14px;font-weight:700;color:var(--dim)">--</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:9px;color:var(--dim);margin-bottom:3px">BULLISH</div>
+            <div id="sent-gauge-bull" style="font-size:18px;font-weight:700;color:var(--green);font-family:var(--font-mono)">0</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:9px;color:var(--dim);margin-bottom:3px">BEARISH</div>
+            <div id="sent-gauge-bear" style="font-size:18px;font-weight:700;color:var(--red);font-family:var(--font-mono)">0</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:9px;color:var(--dim);margin-bottom:3px">TREND</div>
+            <div id="sent-gauge-trend" style="font-size:14px;font-weight:700;color:var(--dim)">--</div>
+          </div>
+        </div>
+
+        <!-- Sentiment Post Feed -->
+        <div style="flex:1;overflow-y:auto;background:rgba(15,20,30,.4);border:1px solid var(--border);border-radius:6px;padding:8px;min-height:0">
+          <div id="sentiment-feed" style="display:flex;flex-direction:column;gap:6px">
+            <div style="text-align:center;color:var(--dim);font-size:11px;padding:40px 0">
+              Enter a query or add a symbol to your watchlist to begin sentiment analysis.
+              <br><br>
+              <span style="font-size:9px">Sources: Reddit (r/wallstreetbets, r/stocks, r/economics…) · Google News RSS</span><br>
+              <span style="font-size:9px">NLP: VADER Sentiment (offline) · FinBERT (optional, HuggingFace)</span><br>
+              <span style="font-size:9px">Cost: $0 — no API keys required</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Stats + History -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">Engine Stats</div>
+          <div id="sentiment-stats" style="font-size:9px;color:var(--dim);line-height:1.8">
+            <div>Requests: <span id="sent-stat-req" style="color:var(--text)">0</span></div>
+            <div>Posts analyzed: <span id="sent-stat-posts" style="color:var(--text)">0</span></div>
+            <div>Cache hits: <span id="sent-stat-cache" style="color:var(--text)">0</span></div>
+            <div>FinBERT: <span id="sent-stat-finbert" style="color:var(--dim)">not loaded</span></div>
+            <div>Uptime: <span id="sent-stat-uptime" style="color:var(--text)">--</span></div>
+          </div>
+        </div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px;flex:1;overflow-y:auto;min-height:0">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">Sentiment History</div>
+          <div id="sentiment-history" style="font-size:9px;display:flex;flex-direction:column;gap:4px">
+            <span style="color:var(--dim)">no history yet</span>
+          </div>
+        </div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">Cross-Module</div>
+          <div style="font-size:9px;color:var(--dim);line-height:1.6">
+            <div>Fed Whisperer: <span style="color:var(--cyan)">policy sentiment</span></div>
+            <div>AI Yield Whisperer: <span style="color:var(--cyan)">market sentiment</span></div>
+            <div>OSINT CMD: <span style="color:var(--cyan)">global news sentiment</span></div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:4px">
+            <div class="mode-action-btn" onclick="sentimentPushToModule('fed')" style="flex:1;text-align:center;font-size:9px">→ Fed</div>
+            <div class="mode-action-btn" onclick="sentimentPushToModule('yield')" style="flex:1;text-align:center;font-size:9px">→ Yield</div>
+            <div class="mode-action-btn" onclick="sentimentPushToModule('osint')" style="flex:1;text-align:center;font-size:9px">→ OSINT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div class="cell-footer" style="grid-column:1/-1;grid-row:3">
     <div class="f-item"><span class="f-lbl">OSINT CMD</span><span class="f-val" style="color:var(--purple)">Globe Platform · Lovable</span></div>
     <span class="f-sep">·</span>
@@ -4842,6 +4989,8 @@ Verify the following script against K-9 SW4.0 constraints.
     <div class="f-item"><span class="f-lbl">Compliance</span><span class="f-val" style="color:var(--green)">ComplianceEngine enforced</span></div>
     <span class="f-sep">·</span>
     <div class="f-item"><span class="f-lbl">18+ endpoints · WebSocket · Three.js 3D globe</span></div>
+    <span class="f-sep">·</span>
+    <div class="f-item"><span class="f-lbl">Sentiment</span><span class="f-val" style="color:var(--cyan)">VADER + FinBERT · :9006</span></div>
   </div>
 </div>
 
@@ -7272,6 +7421,17 @@ const K9_SERVICES = [
     homePill: null,
     hbRow:    null,
     startCmd: 'cd /mnt/f/K9/k9-dispatcher && python3 main.py',
+  },
+  {
+    id:       'sentiment',
+    label:    'k9-sentiment-engine',
+    repo:     'k9-llm-router',
+    port:     9006,
+    health:   '/health',
+    type:     'fastapi',
+    homePill: null,
+    hbRow:    null,
+    startCmd: 'cd ~/k9/k9-sentiment-engine && source .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 9006 --reload',
   },
 ];
 
@@ -10751,13 +10911,19 @@ setInterval(()=>{
 function setModuleMode(mod, mode) {
   const live  = document.getElementById(`${mod}-live-panel`);
   const local = document.getElementById(`${mod}-local-panel`);
+  const sent  = document.getElementById(`${mod}-sentiment-panel`);
   const btnL  = document.getElementById(`${mod}-btn-live`);
   const btnA  = document.getElementById(`${mod}-btn-local`);
+  const btnS  = document.getElementById(`${mod}-btn-sentiment`);
   if (live)  live.style.display  = mode==='live'  ? 'block' : 'none';
-  // local-api-panel default display is 'none' — show as block
   if (local) local.style.display = mode==='local' ? 'flex' : 'none';
+  if (sent)  sent.style.display  = mode==='sentiment' ? 'block' : 'none';
   if (btnL)  btnL.classList.toggle('active', mode==='live');
   if (btnA)  btnA.classList.toggle('active', mode==='local');
+  if (btnS)  btnS.classList.toggle('active', mode==='sentiment');
+  if (mode === 'sentiment' && mod === 'osint') {
+    sentimentInit();
+  }
 }
 
 // Alias legacy per-module functions → generic
@@ -10765,6 +10931,362 @@ function setOrbitronMode(m) { setModuleMode('orbitron', m); }
 function setOsintMode(m) {
     setModuleMode('osint', m);
   }
+
+/* ════════════════════════════════════════════════════════════════
+   SENTIMENT ENGINE — k9-sentiment-engine :9006
+   Zero-cost multi-source sentiment: Reddit + Google News + VADER/FinBERT
+   ════════════════════════════════════════════════════════════════ */
+const SENT_API = (() => {
+  try { return K9_CONFIG.resolveLocalhost(9006); }
+  catch { return 'http://localhost:9006'; }
+})();
+
+let _sentInitialized = false;
+let _sentAutoPoll = null;
+let _sentAutoOn = false;
+let _sentHistory = [];
+let _sentWatchlist = [];
+let _sentStats = { requests: 0, posts: 0, cache: 0 };
+
+function sentimentInit() {
+  if (_sentInitialized) return;
+  _sentInitialized = true;
+  sentimentCheckHealth();
+  sentimentLoadWatchlist();
+}
+
+async function sentimentCheckHealth() {
+  const dot = document.getElementById('sentiment-dot');
+  const txt = document.getElementById('sentiment-status-text');
+  try {
+    const r = await fetch(`${SENT_API}/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const d = await r.json();
+      if (dot) { dot.className = 'dot dg'; }
+      if (txt) { txt.textContent = 'online · ' + (d.model || 'VADER'); txt.style.color = 'var(--green)'; }
+      const fb = document.getElementById('sent-stat-finbert');
+      if (fb && d.finbert_available) { fb.textContent = 'loaded'; fb.style.color = 'var(--green)'; }
+    } else throw new Error();
+  } catch {
+    if (dot) { dot.className = 'dot dr'; }
+    if (txt) { txt.textContent = 'offline · run on homelab'; txt.style.color = 'var(--red)'; }
+  }
+}
+
+async function sentimentSearch() {
+  const q = document.getElementById('sentiment-query').value.trim();
+  if (!q) return;
+  _sentStats.requests++;
+
+  const useReddit = document.getElementById('sent-src-reddit').checked;
+  const useNews = document.getElementById('sent-src-news').checked;
+  const sources = [];
+  if (useReddit) sources.push('reddit');
+  if (useNews) sources.push('news');
+
+  const feed = document.getElementById('sentiment-feed');
+  feed.innerHTML = '<div style="text-align:center;color:var(--dim);padding:30px">Analyzing sentiment…</div>';
+
+  try {
+    const results = [];
+
+    if (useReddit) {
+      const sub = document.getElementById('sent-subreddit').value;
+      try {
+        const r = await fetch(`${SENT_API}/sentiment/reddit/${sub}?limit=25&sort=hot`, { signal: AbortSignal.timeout(15000) });
+        if (r.ok) {
+          const d = await r.json();
+          _sentStats.posts += d.aggregate?.total_posts || 0;
+          results.push({ source: 'reddit', sub: sub, data: d });
+        }
+      } catch (e) { console.warn('reddit sentiment failed', e); }
+    }
+
+    if (useNews) {
+      try {
+        const r = await fetch(`${SENT_API}/sentiment/news?query=${encodeURIComponent(q)}&limit=20`, { signal: AbortSignal.timeout(15000) });
+        if (r.ok) {
+          const d = await r.json();
+          _sentStats.posts += d.aggregate?.total_posts || 0;
+          results.push({ source: 'news', data: d });
+        }
+      } catch (e) { console.warn('news sentiment failed', e); }
+    }
+
+    // Also try symbol endpoint if query looks like a ticker
+    if (/^[A-Z]{1,5}$/.test(q)) {
+      try {
+        const r = await fetch(`${SENT_API}/sentiment/symbols/${q}`, { signal: AbortSignal.timeout(15000) });
+        if (r.ok) {
+          const d = await r.json();
+          _sentStats.posts += d.aggregate?.total_posts || 0;
+          results.push({ source: 'symbol', sym: q, data: d });
+        }
+      } catch (e) { console.warn('symbol sentiment failed', e); }
+    }
+
+    sentimentRenderResults(results, q);
+    sentimentUpdateStats();
+    sentimentAddHistory(q, results);
+  } catch (e) {
+    feed.innerHTML = `<div style="text-align:center;color:var(--red);padding:20px">Error: ${e.message}</div>`;
+  }
+}
+
+function sentimentRenderResults(results, query) {
+  const feed = document.getElementById('sentiment-feed');
+  feed.innerHTML = '';
+
+  if (results.length === 0) {
+    feed.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px">No results. Is the sentiment engine running on :9006?</div>';
+    return;
+  }
+
+  // Aggregate sentiment across all sources
+  let totalScore = 0, totalPosts = 0, bull = 0, bear = 0, neutral = 0;
+  results.forEach(r => {
+    const agg = r.data.aggregate;
+    if (agg) {
+      totalScore += (agg.sentiment_score || 0) * (agg.total_posts || 0);
+      totalPosts += agg.total_posts || 0;
+      bull += agg.bullish_count || 0;
+      bear += agg.bearish_count || 0;
+      neutral += agg.neutral_count || 0;
+    }
+  });
+  const avgScore = totalPosts > 0 ? totalScore / totalPosts : 0;
+  const label = avgScore > 0.05 ? 'BULLISH' : avgScore < -0.05 ? 'BEARISH' : 'NEUTRAL';
+  const labelColor = avgScore > 0.05 ? 'var(--green)' : avgScore < -0.05 ? 'var(--red)' : 'var(--dim)';
+
+  // Update gauge
+  document.getElementById('sent-gauge-score').textContent = avgScore.toFixed(2);
+  document.getElementById('sent-gauge-score').style.color = labelColor;
+  document.getElementById('sent-gauge-label').textContent = label;
+  document.getElementById('sent-gauge-label').style.color = labelColor;
+  document.getElementById('sent-gauge-bull').textContent = bull;
+  document.getElementById('sent-gauge-bear').textContent = bear;
+  document.getElementById('sent-gauge-trend').textContent = totalPosts > 0 ? `${totalPosts} posts` : '--';
+
+  // Render posts from each source
+  results.forEach(result => {
+    const posts = result.data.posts || [];
+    const sourceLabel = result.source === 'reddit' ? `r/${result.sub}` : result.source === 'news' ? 'Google News' : result.source === 'symbol' ? result.sym : result.source;
+
+    // Source header
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:10px;font-weight:700;color:var(--cyan);margin:4px 0;padding:4px 8px;background:rgba(34,211,238,.06);border-radius:3px;border-left:2px solid var(--cyan)';
+    header.textContent = `${sourceLabel} — ${posts.length} posts`;
+    feed.appendChild(header);
+
+    posts.forEach(post => {
+      const s = post.sentiment || {};
+      const sColor = s.label === 'bullish' ? 'var(--green)' : s.label === 'bearish' ? 'var(--red)' : 'var(--dim)';
+      const sIcon = s.label === 'bullish' ? '▲' : s.label === 'bearish' ? '▼' : '●';
+
+      const item = document.createElement('div');
+      item.style.cssText = 'background:rgba(15,20,30,.4);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:10px';
+
+      const title = post.title || post.text || '(no content)';
+      const truncated = title.length > 120 ? title.substring(0, 120) + '…' : title;
+      const author = post.author || post.source || 'unknown';
+      const time = post.created_utc ? new Date(post.created_utc * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+      const score = s.compound !== undefined ? s.compound.toFixed(3) : 'N/A';
+      const url = post.url || post.permalink || '#';
+
+      item.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div style="flex:1">
+            <div style="color:var(--text);line-height:1.4">${sentimentEscape(truncated)}</div>
+            <div style="margin-top:3px;display:flex;gap:8px;color:var(--dim);font-size:9px">
+              <span>👤 ${sentimentEscape(author)}</span>
+              ${time ? `<span>⏱ ${time}</span>` : ''}
+              ${post.score !== undefined ? `<span>↑ ${post.score}</span>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            <span style="color:${sColor};font-weight:700;font-size:12px">${sIcon}</span>
+            <div style="font-size:9px;color:${sColor};margin-top:2px">${score}</div>
+          </div>
+        </div>
+        ${url !== '#' ? `<div style="margin-top:4px"><a href="${sentimentEscape(url)}" target="_blank" style="color:var(--cyan);font-size:9px;text-decoration:none">↗ source</a></div>` : ''}
+      `;
+      feed.appendChild(item);
+    });
+  });
+}
+
+function sentimentEscape(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function sentimentAutoToggle() {
+  _sentAutoOn = !_sentAutoOn;
+  const btn = document.getElementById('sentiment-auto-btn');
+  if (_sentAutoOn) {
+    btn.textContent = '▶ Auto: ON';
+    btn.style.background = 'rgba(74,222,128,.12)';
+    btn.style.borderColor = 'rgba(74,222,128,.3)';
+    btn.style.color = 'var(--green)';
+    _sentAutoPoll = setInterval(() => {
+      const q = document.getElementById('sentiment-query').value.trim();
+      if (q) sentimentSearch();
+    }, 30000);
+    sentimentSearch(); // immediate
+  } else {
+    btn.textContent = '⏸ Auto: OFF';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    if (_sentAutoPoll) { clearInterval(_sentAutoPoll); _sentAutoPoll = null; }
+  }
+}
+
+async function sentimentMonitorUser() {
+  const user = document.getElementById('sentiment-user').value.trim();
+  if (!user) return;
+  const results = document.getElementById('sentiment-user-results');
+  results.innerHTML = '<span style="color:var(--dim)">tracking…</span>';
+  try {
+    const r = await fetch(`${SENT_API}/sentiment/users/${user}?platform=reddit&limit=20`, { signal: AbortSignal.timeout(15000) });
+    if (r.ok) {
+      const d = await r.json();
+      const posts = d.posts || [];
+      const agg = d.aggregate || {};
+      results.innerHTML = `
+        <div style="color:var(--text);font-weight:700;margin-bottom:4px">@${user}</div>
+        <div style="color:var(--dim)">Posts: ${agg.total_posts || posts.length}</div>
+        <div style="color:var(--dim)">Avg sentiment: ${(agg.sentiment_score || 0).toFixed(2)}</div>
+        <div style="color:var(--dim)">Bullish: ${agg.bullish_count || 0} · Bearish: ${agg.bearish_count || 0}</div>
+        ${posts.slice(0, 5).map(p => {
+          const s = p.sentiment || {};
+          const c = s.label === 'bullish' ? 'var(--green)' : s.label === 'bearish' ? 'var(--red)' : 'var(--dim)';
+          return `<div style="margin-top:4px;padding:3px 4px;background:rgba(15,20,30,.4);border-radius:3px;border-left:2px solid ${c}">${sentimentEscape((p.title||'').substring(0,60))}</div>`;
+        }).join('')}
+      `;
+    } else {
+      results.innerHTML = '<span style="color:var(--red)">Failed to fetch user</span>';
+    }
+  } catch (e) {
+    results.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+function sentimentAddWatch() {
+  const input = document.getElementById('sent-wl-input');
+  const sym = input.value.trim().toUpperCase();
+  if (!sym || _sentWatchlist.includes(sym)) return;
+  _sentWatchlist.push(sym);
+  input.value = '';
+  sentimentSaveWatchlist();
+  sentimentRenderWatchlist();
+  // Auto-search
+  document.getElementById('sentiment-query').value = sym;
+  sentimentSearch();
+}
+
+function sentimentRemoveWatch(sym) {
+  _sentWatchlist = _sentWatchlist.filter(s => s !== sym);
+  sentimentSaveWatchlist();
+  sentimentRenderWatchlist();
+}
+
+function sentimentRenderWatchlist() {
+  const wl = document.getElementById('sentiment-watchlist');
+  if (_sentWatchlist.length === 0) {
+    wl.innerHTML = '<span style="font-size:9px;color:var(--dim)">empty</span>';
+    return;
+  }
+  wl.innerHTML = _sentWatchlist.map(s => `
+    <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:3px;font-size:9px;color:var(--cyan);cursor:pointer"
+      onclick="sentimentRemoveWatch('${s}')" title="click to remove">
+      ${s} ✕
+    </span>
+  `).join('');
+}
+
+function sentimentSaveWatchlist() {
+  try { localStorage.setItem('k9_sentiment_watchlist', JSON.stringify(_sentWatchlist)); } catch {}
+}
+
+function sentimentLoadWatchlist() {
+  try {
+    const saved = localStorage.getItem('k9_sentiment_watchlist');
+    if (saved) { _sentWatchlist = JSON.parse(saved) || []; sentimentRenderWatchlist(); }
+  } catch {}
+}
+
+function sentimentAddHistory(query, results) {
+  let totalScore = 0, totalPosts = 0;
+  results.forEach(r => {
+    const agg = r.data.aggregate;
+    if (agg) {
+      totalScore += (agg.sentiment_score || 0) * (agg.total_posts || 0);
+      totalPosts += agg.total_posts || 0;
+    }
+  });
+  const avg = totalPosts > 0 ? totalScore / totalPosts : 0;
+  _sentHistory.unshift({ query, score: avg, posts: totalPosts, time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) });
+  if (_sentHistory.length > 20) _sentHistory.pop();
+  sentimentRenderHistory();
+}
+
+function sentimentRenderHistory() {
+  const h = document.getElementById('sentiment-history');
+  if (_sentHistory.length === 0) {
+    h.innerHTML = '<span style="color:var(--dim)">no history yet</span>';
+    return;
+  }
+  h.innerHTML = _sentHistory.map(item => {
+    const c = item.score > 0.05 ? 'var(--green)' : item.score < -0.05 ? 'var(--red)' : 'var(--dim)';
+    const icon = item.score > 0.05 ? '▲' : item.score < -0.05 ? '▼' : '●';
+    return `<div style="padding:4px 6px;background:rgba(15,20,30,.4);border-radius:3px;border-left:2px solid ${c}">
+      <span style="color:var(--text);font-weight:600">${sentimentEscape(item.query)}</span>
+      <span style="float:right;color:${c}">${icon} ${item.score.toFixed(2)}</span>
+      <div style="font-size:8px;color:var(--dim)">${item.time} · ${item.posts} posts</div>
+    </div>`;
+  }).join('');
+}
+
+function sentimentUpdateStats() {
+  document.getElementById('sent-stat-req').textContent = _sentStats.requests;
+  document.getElementById('sent-stat-posts').textContent = _sentStats.posts;
+  document.getElementById('sent-stat-cache').textContent = _sentStats.cache;
+}
+
+async function sentimentPushToModule(target) {
+  const score = parseFloat(document.getElementById('sent-gauge-score').textContent) || 0;
+  const label = document.getElementById('sent-gauge-label').textContent || 'NEUTRAL';
+  const query = document.getElementById('sentiment-query').value.trim() || 'aggregate';
+
+  const msg = { query, score, label, source: 'k9-sentiment-engine', timestamp: new Date().toISOString() };
+
+  // Push to target module
+  const routes = {
+    'fed': () => showView('fed'),
+    'yield': () => showView('orbitron'),
+    'osint': () => showView('osint'),
+  };
+
+  try {
+    // Also push via K9-CB to orbitron-bus
+    const cb = {
+      timestamp: new Date().toISOString(),
+      source: 'k9-sentiment-engine',
+      type: 'observation',
+      ontology_tags: ['sentiment', target],
+      confidence: Math.abs(score),
+      payload: msg,
+      trace_id: crypto.randomUUID(),
+      causation_id: null,
+      signature: null
+    };
+    console.log('[SENTIMENT] Pushing to module:', target, cb);
+  } catch {}
+
+  if (routes[target]) routes[target]();
+}
 
 function reloadModuleIframe(mod) {
   const f = document.getElementById(`${mod}-iframe`);
