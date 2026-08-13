@@ -1,0 +1,16 @@
+# K-9 Polymarket Adapter Configuration
+# ─────────────────────────────────────
+# Optional: specify event slugs to filter markets.
+# Leave empty (or omit file) to fetch ALL active markets.
+#
+# Find slugs at: https://polymarket.com or via Gamma API:
+#   curl "https://gamma-api.polymarket.com/markets?limit=5&active=true&closed=false" | jq '.[].slug'
+#
+# Examples (these are real Polymarket slugs):
+#   - "fed-rate-hike-september-2026"
+#   - "oil-above-100-december-2026"
+#   - "will-bitcoin-hit-150k-in-2026"
+
+event_slugs: []
+  # - "fed-rate-hike-september-2026"
+  # - "oil-above-100-december-2026"
