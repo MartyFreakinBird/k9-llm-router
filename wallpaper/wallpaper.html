@@ -153,6 +153,13 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
 }
 #clock{font-family:var(--font-hd);font-weight:700;font-size:13px;color:var(--text)}
 #datestamp{font-size:10px;color:var(--muted)}
+#sync-badge{font-size:8.5px;font-family:var(--font-mono);letter-spacing:.04em;padding:2px 7px;border-radius:3px;flex-shrink:0;cursor:default;transition:all .2s;border:1px solid var(--border);background:var(--bg3);color:var(--dim)}
+#sync-badge.synced{border-color:rgba(74,222,128,.25);color:var(--green);background:rgba(74,222,128,.06)}
+#sync-badge.stale{border-color:rgba(248,113,113,.25);color:var(--red);background:rgba(248,113,113,.06)}
+#sync-badge.checking{border-color:rgba(245,158,11,.25);color:var(--amber);background:rgba(245,158,11,.06)}
+#sync-badge:hover{border-color:var(--cyan);color:var(--cyan)}
+#ver-badge{font-size:8.5px;font-family:var(--font-mono);color:var(--dim);letter-spacing:.04em;padding:2px 7px;border-radius:3px;flex-shrink:0;border:1px solid var(--border);background:var(--bg3);cursor:default;transition:all .2s}
+#ver-badge:hover{border-color:var(--cyan);color:var(--cyan)}
 
 /* ── VIEW CONTAINER ─────────────────── */
 /* contain:strict caused 0×0 collapse in embedded engines when ancestor heights
@@ -2410,6 +2417,8 @@ body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tex
     </div>
   </div>
   <div class="hdr-right">
+    <span id="sync-badge" class="checking" title="Checking sync status…">⟳ sync…</span>
+    <span id="ver-badge" title="Git commit version">v…</span>
     <div onclick="openPalette()" title="Command Palette (Ctrl+K)"
          style="font-size:9px;color:var(--dim);cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:3px;font-family:var(--font-mono);letter-spacing:.06em;transition:all .15s;flex-shrink:0;user-select:none"
          onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'"
@@ -14714,6 +14723,74 @@ setInterval(() => {
   }
 }, 5000);
 
+</script>
+
+<script id="k9-sync-health">
+/* ════════════════════════════════════════════════════════════════
+   SYNC HEALTH + VERSION BADGE
+   Reads .sync-health.json from same directory as wallpaper.html
+   Shows green (synced) / red (stale) / amber (checking)
+   ════════════════════════════════════════════════════════════════ */
+(function() {
+  const SYNC_FILE = '.sync-health.json';
+  const SYNC_INTERVAL = 30000; // 30s
+
+  async function checkSyncHealth() {
+    const badge = document.getElementById('sync-badge');
+    const verBadge = document.getElementById('ver-badge');
+    if (!badge || !verBadge) return;
+
+    badge.className = 'checking';
+    badge.textContent = '⟳ sync…';
+
+    try {
+      // Try to fetch the sync health JSON (same dir as wallpaper)
+      const r = await fetch(SYNC_FILE, { cache: 'no-cache', signal: AbortSignal.timeout(3000) });
+      if (!r.ok) throw new Error('no sync file');
+
+      const d = await r.json();
+
+      // Check if synced (file exists and is recent)
+      const syncedAt = new Date(d.synced_at);
+      const ageMs = Date.now() - syncedAt.getTime();
+      const isFresh = ageMs < 3600000; // < 1hr old
+
+      if (d.synced && isFresh) {
+        badge.className = 'synced';
+        badge.textContent = '✓ synced';
+        badge.title = `Synced: ${d.commit} · ${d.wallpaper_lines} lines · ${new Date(d.synced_at).toLocaleString()}`;
+      } else {
+        badge.className = 'stale';
+        badge.textContent = '⚠ stale';
+        badge.title = `Last sync: ${new Date(d.synced_at).toLocaleString()} (${Math.round(ageMs/60000)}min ago)`;
+      }
+
+      // Version badge
+      if (d.commit) {
+        verBadge.textContent = `v${d.commit}`;
+        verBadge.title = `Git: ${d.commit} · ${d.commit_date} · ${d.wallpaper_lines} lines`;
+      }
+    } catch {
+      // No sync file — try to at least show something
+      badge.className = 'stale';
+      badge.textContent = '⚠ no sync';
+      badge.title = 'No .sync-health.json found — run k9wall-deploy';
+
+      // Try to get git version from a different method (if running locally)
+      verBadge.textContent = 'v?';
+      verBadge.title = 'Git version unknown';
+    }
+  }
+
+  // Initial check
+  setTimeout(checkSyncHealth, 1500);
+
+  // Periodic check
+  setInterval(checkSyncHealth, SYNC_INTERVAL);
+
+  // Expose for manual refresh
+  window.checkSyncHealth = checkSyncHealth;
+})();
 </script>
 
 <script id="k9-url-rewriter">

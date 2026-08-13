@@ -146,7 +146,8 @@ clean_runtime() {
   fi
 }
 
-notify_openclaw() {
+write_sync_health
+  notify_openclaw() {
   # Notify OpenClaw if running (hot-reload trigger)
   if command -v curl &>/dev/null; then
     curl -s -o /dev/null -w '' "http://127.0.0.1:18789/reload" 2>/dev/null && \
@@ -159,6 +160,7 @@ do_sync() {
   sync_wallpaper
   sync_assets
   clean_runtime
+  write_sync_health
   notify_openclaw
   ok "Sync complete"
 }
@@ -251,3 +253,26 @@ case "${1:-sync}" in
     exit 1
     ;;
 esac
+
+# ── Sync health writer ───────────────────────────────────────────────
+write_sync_health() {
+  local health_file="$K9_RUNTIME/.sync-health.json"
+  local commit_hash
+  commit_hash=$(cd "$K9_REPO_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local commit_date
+  commit_date=$(cd "$K9_REPO_DIR" && git log -1 --format='%ci' 2>/dev/null || echo "unknown")
+  local wallpaper_lines
+  wallpaper_lines=$(wc -l < "$K9_RUNTIME/wallpaper.html" 2>/dev/null || echo 0)
+
+  cat > "$health_file" << JSON
+{
+  "synced": true,
+  "commit": "$commit_hash",
+  "commit_date": "$commit_date",
+  "wallpaper_lines": $wallpaper_lines,
+  "synced_at": "$(date -Iseconds)",
+  "runtime_path": "$K9_RUNTIME"
+}
+JSON
+  log "Sync health written: $commit_hash · ${wallpaper_lines} lines"
+}
