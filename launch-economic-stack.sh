@@ -136,6 +136,11 @@ SVC_CMD[k9-quant-engine]="python -m uvicorn src.aeg_token_model:app --host 0.0.0
 SVC_DIR[k9-quant-engine]="$K9_DIR"
 SVC_PORT[k9-quant-engine]="9001"
 
+# Polymarket Adapter — prediction market data :9007
+SVC_CMD[k9-polymarket]="python -m uvicorn src.k9_polymarket_adapter:app --host 0.0.0.0 --port 9007"
+SVC_DIR[k9-polymarket]="$K9_DIR"
+SVC_PORT[k9-polymarket]="9007"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -151,6 +156,7 @@ START_ORDER=(
   k9-tx-adapter
   k9-sentiment-engine
   k9-quant-engine
+  k9-polymarket
   lovable-bridge
   k9-wallpaper-ws
 )

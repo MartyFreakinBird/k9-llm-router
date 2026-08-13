@@ -185,6 +185,15 @@ except ImportError as e:
 # ── CB-4: JPY REPATRIATION QUANT ENGINE ──────────────────────────────────────
 try:
     from src.quant_signal_bridge import enrich_with_quant_context, run_full_analysis
+
+    # CB-Polymarket: Prediction market adapter (optional)
+    _polymarket_enabled = False
+    try:
+        from src.k9_polymarket_adapter import app as polymarket_app, refresh_markets as poly_refresh
+        _polymarket_enabled = True
+        log.info("CB-Polymarket: adapter loaded")
+    except ImportError as e:
+        log.warning(f"CB-Polymarket: not available ({e})")
     _cb4_enabled = True
     log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
 except ImportError as e:

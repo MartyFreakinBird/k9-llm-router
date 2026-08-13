@@ -5030,6 +5030,18 @@ Verify the following script against K-9 SW4.0 constraints.
           <div>Fed Whisperer: <span style="color:var(--cyan)">policy sentiment</span></div>
           <div>AI Yield Whisperer: <span style="color:var(--cyan)">market sentiment</span></div>
           <div>OSINT CMD: <span style="color:var(--cyan)">global news sentiment</span></div>
+
+        <div style="background:rgba(15,20,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px;flex-shrink:0">
+          <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:6px">📊 Prediction Markets (Polymarket)</div>
+          <div id="poly-status" style="font-size:9px;color:var(--dim);margin-bottom:6px">checking…</div>
+          <div id="poly-edges" style="font-size:9px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto">
+            <span style="color:var(--dim)">no data — click refresh</span>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:4px">
+            <div class="mode-action-btn" onclick="polyRefresh()" style="flex:1;text-align:center;font-size:9px;background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.3);color:var(--cyan)">⟳ Refresh</div>
+            <div class="mode-action-btn" onclick="polyShowEdges()" style="flex:1;text-align:center;font-size:9px">⚡ Edges</div>
+          </div>
+        </div>
         </div>
         <div style="margin-top:6px;display:flex;gap:4px">
           <div class="mode-action-btn" onclick="sentimentPushToModule('fed')" style="flex:1;text-align:center;font-size:9px">→ Fed</div>
@@ -7489,6 +7501,17 @@ const K9_SERVICES = [
     homePill: null,
     hbRow:    null,
     startCmd: 'cd ~/k9/k9-sentiment-engine && source .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 9006 --reload',
+  },
+  {
+    id:       'polymarket',
+    label:    'k9-polymarket',
+    repo:     'k9-llm-router',
+    port:     9007,
+    health:   '/polymarket/health',
+    type:     'fastapi',
+    homePill:  null,
+    hbRow:    'hb-9007',
+    startCmd: 'cd ~/k9/k9-llm-router && source .venv/bin/activate && uvicorn src.k9_polymarket_adapter:app --host 0.0.0.0 --port 9007',
   },
 ];
 
@@ -11009,6 +11032,7 @@ function sentimentInit() {
   if (_sentInitialized) return;
   _sentInitialized = true;
   sentimentCheckHealth();
+  polyInit();
   sentimentLoadWatchlist();
 }
 
@@ -11343,6 +11367,87 @@ async function sentimentPushToModule(target) {
   } catch {}
 
   if (routes[target]) routes[target]();
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   POLYMARKET — Prediction Market Edge Detection
+   k9-polymarket-adapter :9007 (via k9-llm-router /polymarket/*)
+   ════════════════════════════════════════════════════════════════ */
+const POLY_API = (() => {
+  try { return K9_CONFIG.resolveLocalhost(8765); }
+  catch { return 'http://localhost:8765'; }
+})();
+
+let _polyLoaded = false;
+
+async function polyInit() {
+  if (_polyLoaded) return;
+  _polyLoaded = true;
+  polyCheckHealth();
+}
+
+async function polyCheckHealth() {
+  const el = document.getElementById('poly-status');
+  if (!el) return;
+  try {
+    const r = await fetch(`${POLY_API}/polymarket/health`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    const count = d.cached_markets || 0;
+    el.textContent = count > 0 ? `online · ${count} markets` : 'online · no data yet';
+    el.style.color = count > 0 ? 'var(--green)' : 'var(--amber)';
+    if (count > 0) polyShowEdges();
+  } catch {
+    el.textContent = 'offline — start :9007';
+    el.style.color = 'var(--red)';
+  }
+}
+
+async function polyRefresh() {
+  const el = document.getElementById('poly-status');
+  const edges = document.getElementById('poly-edges');
+  if (el) { el.textContent = 'fetching from Gamma API…'; el.style.color = 'var(--amber)'; }
+  if (edges) edges.innerHTML = '<span style="color:var(--dim)">fetching…</span>';
+  try {
+    const r = await fetch(`${POLY_API}/polymarket/refresh`, { method: 'POST', signal: AbortSignal.timeout(60000) });
+    const d = await r.json();
+    if (d.success) {
+      if (el) { el.textContent = `${d.markets_stored} markets · ${d.edges_detected} edges`; el.style.color = 'var(--green)'; }
+      polyShowEdges();
+    } else {
+      if (el) { el.textContent = 'refresh failed: ' + (d.error || 'unknown'); el.style.color = 'var(--red)'; }
+    }
+  } catch (e) {
+    if (el) { el.textContent = 'error: ' + e.message; el.style.color = 'var(--red)'; }
+  }
+}
+
+async function polyShowEdges() {
+  const edges = document.getElementById('poly-edges');
+  if (!edges) return;
+  try {
+    const r = await fetch(`${POLY_API}/polymarket/edges?min_volume=100000&min_edge=0.30&limit=10`);
+    const d = await r.json();
+    if (!d.edges || d.edges.length === 0) {
+      edges.innerHTML = '<span style="color:var(--dim)">no significant edges found</span>';
+      return;
+    }
+    edges.innerHTML = d.edges.map(e => {
+      const pct = (e.market_prob * 100).toFixed(1);
+      const vol = e.volume > 1e6 ? (e.volume/1e6).toFixed(1)+'M' : (e.volume/1e3).toFixed(0)+'K';
+      const color = e.market_prob > 0.5 ? 'var(--green)' : 'var(--red)';
+      const cat = e.category || 'other';
+      return `<div style="padding:4px;background:rgba(15,20,30,.6);border-radius:4px;border-left:2px solid ${color}">
+        <div style="color:var(--text);font-size:9px;line-height:1.3">${e.question ? e.question.substring(0,60) : 'unknown'}…</div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px">
+          <span style="color:${color};font-weight:700">${pct}%</span>
+          <span style="color:var(--dim)">vol: ${vol} · ${cat}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    edges.innerHTML = '<span style="color:var(--dim)">failed to load edges</span>';
+  }
 }
 
 function reloadModuleIframe(mod) {
