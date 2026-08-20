@@ -1,0 +1,155 @@
+{
+  "name": "K-9 OSINT News Scrape",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "minutes", "minutesInterval": 10 } ]
+        }
+      },
+      "name": "Every 10 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9006/sentiment/news?q={{encodeURIComponent($json.query || 'Bitcoin OR BTC OR crypto OR Federal Reserve OR FOMC')}}&limit=20",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Fetch Crypto+Fed News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9006/sentiment/reddit/CryptoCurrency?limit=25",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Fetch Reddit Crypto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 380]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9006/sentiment/reddit/wallstreetbets?limit=25",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Fetch Reddit WSB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 560]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9006/sentiment/aggregate",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Get Aggregate Sentiment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 740]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "name": "Merge All Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [680, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process sentiment data and detect shifts\nconst items = [];\n\n// Get aggregate sentiment\nconst agg = $('Get Aggregate Sentiment').first().json;\nconst newsData = $('Fetch Crypto+Fed News').first().json;\nconst redditCrypto = $('Fetch Reddit Crypto').first().json;\nconst redditWSB = $('Fetch Reddit WSB').first().json;\n\n// Calculate sentiment scores\nconst newsSentiment = newsData?.average_sentiment || 0;\nconst cryptoSentiment = redditCrypto?.average_sentiment || 0;\nconst wsbSentiment = redditWSB?.average_sentiment || 0;\nconst overallSentiment = (newsSentiment + cryptoSentiment + wsbSentiment) / 3;\n\n// Determine sentiment regime\nlet regime = 'NEUTRAL';\nlet regimeColor = '🟡';\nif (overallSentiment > 0.3) { regime = 'BULLISH'; regimeColor = '🟢'; }\nelse if (overallSentiment < -0.3) { regime = 'BEARISH'; regimeColor = '🔴'; }\n\n// Extract top stories\nconst topStories = (newsData?.results || []).slice(0, 5).map(r => ({\n  title: r.title,\n  sentiment: r.sentiment,\n  source: r.source\n}));\n\n// Extract top reddit posts\nconst topReddit = (redditCrypto?.results || []).slice(0, 5).map(r => ({\n  title: r.title,\n  sentiment: r.sentiment,\n  score: r.score\n}));\n\n// Build summary\nconst summary = `${regimeColor} OSINT: ${regime} (${overallSentiment.toFixed(2)})\\n` +\n  `News: ${newsSentiment.toFixed(2)} (${newsData?.count || 0} articles)\\n` +\n  `Reddit: Crypto ${cryptoSentiment.toFixed(2)}, WSB ${wsbSentiment.toFixed(2)}\\n` +\n  `Top: ${topStories[0]?.title?.substring(0, 80) || 'N/A'}`;\n\n// Build CB v1 envelope for significant sentiment\nconst isSignificant = Math.abs(overallSentiment) > 0.2 || Math.abs(newsSentiment) > 0.4;\n\nitems.push({\n  json: {\n    timestamp: new Date().toISOString(),\n    source: 'k9-osint-n8n',\n    type: 'sentiment_snapshot',\n    ontology_tags: ['sentiment', 'osint', 'news', 'reddit'],\n    confidence: isSignificant ? 0.82 : 0.5,\n    payload: {\n      regime,\n      overall_sentiment: overallSentiment,\n      news_sentiment: newsSentiment,\n      reddit_crypto_sentiment: cryptoSentiment,\n      reddit_wsb_sentiment: wsbSentiment,\n      news_count: newsData?.count || 0,\n      reddit_count: (redditCrypto?.count || 0) + (redditWSB?.count || 0),\n      top_stories: topStories,\n      top_reddit: topReddit,\n      summary\n    },\n    is_significant: isSignificant,\n    trace_id: '',\n    causation_id: '',\n    signature: ''\n  }\n});\n\nreturn items;"
+      },
+      "name": "Process + Score",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 450]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.is_significant }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Significant?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1.2,
+      "position": [1120, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Route to Signal Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 350]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/n8n/webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'osint_sentiment', data: $json.payload }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Push to Wallpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 550]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "k9-osint",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook (manual trigger)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 900]
+    }
+  ],
+  "connections": {
+    "Every 10 min": {
+      "main": [
+        [
+          { "node": "Fetch Crypto+Fed News", "type": "main", "index": 0 },
+          { "node": "Fetch Reddit Crypto", "type": "main", "index": 0 },
+          { "node": "Fetch Reddit WSB", "type": "main", "index": 0 },
+          { "node": "Get Aggregate Sentiment", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Crypto+Fed News": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 0 } ] ] },
+    "Fetch Reddit Crypto": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 1 } ] ] },
+    "Fetch Reddit WSB": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 2 } ] ] },
+    "Get Aggregate Sentiment": { "main": [ [ { "node": "Merge All Sources", "type": "main", "index": 3 } ] ] },
+    "Merge All Sources": { "main": [ [ { "node": "Process + Score", "type": "main", "index": 0 } ] ] },
+    "Process + Score": { "main": [ [ { "node": "Significant?", "type": "main", "index": 0 } ] ] },
+    "Significant?": {
+      "main": [
+        [ { "node": "Route to Signal Router", "type": "main", "index": 0 } ],
+        [ { "node": "Push to Wallpaper", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}
