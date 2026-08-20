@@ -1,0 +1,144 @@
+{
+  "name": "K-9 GEX Pipeline",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "minutes", "minutesInterval": 5 } ]
+        }
+      },
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9008/gex/BTC",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Fetch BTC GEX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9008/gex/ETH",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Fetch ETH GEX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const d = item.json;\n  return {\n    json: {\n      asset: d.asset,\n      spot: d.spot_price,\n      gamma_flip: d.gamma_flip?.strike || 0,\n      net_gex: d.net_gex,\n      call_walls: (d.call_walls || []).slice(0, 5).map(w => w.strike),\n      put_walls: (d.put_walls || []).slice(0, 5).map(w => w.strike),\n      timestamp: d.timestamp,\n      summary: `${d.asset}: spot=$${d.spot_price?.toFixed(0)} flip=$${d.gamma_flip?.strike?.toFixed(0)} net_gex=${d.net_gex?.toFixed(0)}`\n    }\n  };\n});"
+      },
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "source", "value": "k9-gex-n8n" },
+            { "name": "type", "value": "gamma_exposure_snapshot" },
+            { "name": "confidence", "value": 0.85 },
+            { "name": "payload", "value": "={{ JSON.stringify($json) }}" }
+          ]
+        }
+      },
+      "name": "Route to Signal Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "k9-gex-feed",
+        "text": "={{ $json.summary }}",
+        "additionalFields": {}
+      },
+      "name": "Log to K-9",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "k9-gex",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook (for Jellycuts)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 600]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://localhost:9008/gex/' + ($json.asset || 'BTC') + '/walls?top=10' }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Get Walls (lightweight)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "name": "Respond to Shortcut",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 600]
+    }
+  ],
+  "connections": {
+    "Every 5 min": {
+      "main": [
+        [ { "node": "Fetch BTC GEX", "type": "main", "index": 0 }, { "node": "Fetch ETH GEX", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Fetch BTC GEX": { "main": [ [ { "node": "Merge", "type": "main", "index": 0 } ] ] },
+    "Fetch ETH GEX": { "main": [ [ { "node": "Merge", "type": "main", "index": 1 } ] ] },
+    "Merge": { "main": [ [ { "node": "Format Summary", "type": "main", "index": 0 } ] ] },
+    "Format Summary": {
+      "main": [
+        [ { "node": "Route to Signal Router", "type": "main", "index": 0 } ],
+        [ { "node": "Log to K-9", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Webhook (for Jellycuts)": { "main": [ [ { "node": "Get Walls (lightweight)", "type": "main", "index": 0 } ] ] },
+    "Get Walls (lightweight)": { "main": [ [ { "node": "Respond to Shortcut", "type": "main", "index": 0 } ] ] }
+  }
+}

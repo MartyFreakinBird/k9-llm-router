@@ -1,0 +1,93 @@
+#Color: blue
+#Icon: shortcuts
+
+import Shortcuts
+
+// ============================================================
+// BTC/ETH GEX WALLS — K-9 INTEGRATED VERSION
+// ============================================================
+// Calls K-9 GEX Engine (1 HTTP request instead of 58)
+// Displays: Call Walls, Put Walls, Gamma Flip, Net GEX
+// ============================================================
+
+// CONFIG
+var ServerURL = "http://localhost:9008"
+var Asset = "BTC"
+var TopCount = 5
+
+// Ask user for asset
+chooseFromMenu(prompt: "Select asset", menuItems: ["BTC", "ETH"], defaultItem: "BTC") >> Asset
+
+// 1. CALL K-9 GEX ENGINE (1 HTTP request, ~1 second)
+var GEXURL = "${ServerURL}/gex/${Asset}/walls?top=${TopCount}"
+dictionary(json: {}) >> EmptyRequest
+
+downloadURL(url: GEXURL, method: GET, headers: {}, requestType: Json, requestJSON: EmptyRequest, requestVar: GEXResponse) >> GEXResponse
+
+// 2. PARSE RESPONSE
+getDictionaryFrom(input: GEXResponse) >> GEXDictionary
+valueFor(key: "asset", dictionary: GEXDictionary) >> ResponseAsset
+valueFor(key: "spot", dictionary: GEXDictionary) >> SpotPrice
+valueFor(key: "gamma_flip", dictionary: GEXDictionary) >> GammaFlip
+valueFor(key: "net_gex", dictionary: GEXDictionary) >> NetGEX
+valueFor(key: "call_walls", dictionary: GEXDictionary) >> CallWallsList
+valueFor(key: "put_walls", dictionary: GEXDictionary) >> PutWallsList
+valueFor(key: "timestamp", dictionary: GEXDictionary) >> Timestamp
+
+// 3. FORMAT OUTPUT
+calculate(input: "0 + ${SpotPrice}") >> SpotNum
+calculate(input: "0 + ${GammaFlip}") >> FlipNum
+calculate(input: "0 + ${NetGEX}") >> NetNum
+
+// Determine sentiment
+var GEXSentiment = "NEUTRAL"
+var GEXColor = "🟡"
+if(NetNum > 0) {
+    GEXSentiment = "LONG GAMMA (dealers dampen vol)"
+    GEXColor = "🟢"
+} else {
+    GEXSentiment = "SHORT GAMMA (dealers amplify vol)"
+    GEXColor = "🔴"
+}
+
+// Format call walls
+var CallWallsText = ""
+repeatEach(CallWallsList) {
+    if(CallWallsText == "") {
+        CallWallsText = RepeatItem
+    } else {
+        CallWallsText = "${CallWallsText}, ${RepeatItem}"
+    }
+}
+
+// Format put walls
+var PutWallsText = ""
+repeatEach(PutWallsList) {
+    if(PutWallsText == "") {
+        PutWallsText = RepeatItem
+    } else {
+        PutWallsText = "${PutWallsText}, ${RepeatItem}"
+    }
+}
+
+// 4. BUILD DISPLAY
+text(text: "${GEXColor} ${Asset} GEX REPORT
+
+Spot: $${SpotNum}
+Gamma Flip: $${FlipNum}
+Net GEX: ${NetNum}
+Sentiment: ${GEXSentiment}
+
+📈 CALL WALLS:
+${CallWallsText}
+
+📉 PUT WALLS:
+${PutWallsText}
+
+Updated: ${Timestamp}") >> GEXReport
+
+// 5. SHOW RESULT
+showResult(text: GEXReport)
+
+// 6. COPY TO CLIPBOARD (optional)
+setClipboard(text: GEXReport)
