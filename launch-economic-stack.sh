@@ -141,6 +141,11 @@ SVC_CMD[k9-polymarket]="python -m uvicorn src.k9_polymarket_adapter:app --host 0
 SVC_DIR[k9-polymarket]="$K9_DIR"
 SVC_PORT[k9-polymarket]="9007"
 
+# GEX Engine — gamma exposure :9008
+SVC_CMD[k9-gex]="python -m uvicorn src.k9_gex_engine:app --host 0.0.0.0 --port 9008"
+SVC_DIR[k9-gex]="$K9_DIR"
+SVC_PORT[k9-gex]="9008"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -157,6 +162,7 @@ START_ORDER=(
   k9-sentiment-engine
   k9-quant-engine
   k9-polymarket
+  k9-gex
   lovable-bridge
   k9-wallpaper-ws
 )

@@ -194,6 +194,15 @@ try:
         log.info("CB-Polymarket: adapter loaded")
     except ImportError as e:
         log.warning(f"CB-Polymarket: not available ({e})")
+
+    # GEX Engine: Gamma Exposure (optional)
+    _gex_enabled = False
+    try:
+        from src.k9_gex_engine import compute_gex as gex_calc, _cache as gex_cache
+        _gex_enabled = True
+        log.info("GEX Engine: loaded (Deribit options gamma exposure)")
+    except ImportError as e:
+        log.warning(f"GEX Engine: not available ({e})")
     _cb4_enabled = True
     log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
 except ImportError as e:

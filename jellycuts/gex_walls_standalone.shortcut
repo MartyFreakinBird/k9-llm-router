@@ -1,0 +1,328 @@
+#Color: purple
+#Icon: shortcuts
+
+import Shortcuts
+
+// ============================================================
+// BTC GEX WALLS — STANDALONE (NO SERVER NEEDED)
+// ============================================================
+// Optimized: 2 API calls instead of 58
+// Uses Deribit get_book_summary (bulk OI + IV in 1 call)
+// Computes Black-Scholes gamma locally with mark_iv
+// ============================================================
+
+// CONFIG
+var TopCount = 10
+var GEXMultiplier = 0.01
+var RiskFreeRate = 0.05
+var DebugMode = false
+
+// 1. GET CURRENT TIME
+date(date: "1 January 1970") >> EpochDate
+getTimeBetween(first: EpochDate, second: CurrentDate, interval: Seconds) >> NowUnix
+calculate(input: "0 + ${NowUnix}") >> NowUnixNum
+calculate(input: "${NowUnixNum} * 1000") >> NowMs
+
+// 2. GET ALL BTC OPTION INSTRUMENTS (1 API CALL)
+dictionary(json: {}) >> EmptyRequest
+downloadURL(url: "https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false", method: GET, headers: {}, requestType: Json, requestJSON: EmptyRequest, requestVar: InstrumentsResponse) >> InstrumentsResponse
+getDictionaryFrom(input: InstrumentsResponse) >> InstrumentsDictionary
+valueFor(key: "result", dictionary: InstrumentsDictionary) >> Contracts
+count(input: Contracts) >> ContractCount
+
+// 3. GET BULK BOOK SUMMARY — ALL CONTRACTS IN 1 CALL (OI + IV + UNDERLYING)
+downloadURL(url: "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option", method: GET, headers: {}, requestType: Json, requestJSON: EmptyRequest, requestVar: BookResponse) >> BookResponse
+getDictionaryFrom(input: BookResponse) >> BookDictionary
+valueFor(key: "result", dictionary: BookDictionary) >> BookResults
+
+// Get underlying from first result
+repeatEach(BookResults) {
+    valueFor(key: "underlying_price", dictionary: RepeatItem) >> UnderlyingRaw
+    if(UnderlyingRaw != 0) {
+        calculate(input: "0 + ${UnderlyingRaw}") >> UnderlyingNum
+    }
+}
+
+// 4. FIND NEAREST EXPIRY WITH SIGNIFICANT OI (skip < 4hr)
+var MinExpiry = 0
+calculate(input: "${NowMs} + 14400000") >> MinExpiry  // 4 hours from now
+
+var ExpiryOI = dictionary(json: {})
+var AllExpiries = []
+
+repeatEach(Contracts) {
+    valueFor(key: "expiration_timestamp", dictionary: RepeatItem) >> ScanExpiry
+    if(ScanExpiry >= MinExpiry) {
+        valueFor(key: "instrument_name", dictionary: RepeatItem) >> ScanName
+        var ScanFound = false
+        repeatEach(AllExpiries) {
+            if(RepeatItem == ScanExpiry) {
+                ScanFound = true
+            }
+        }
+        if(ScanFound == false) {
+            AllExpiries += ScanExpiry
+        }
+    }
+}
+
+// Find nearest expiry
+var NearestExpiry = 9999999999999
+repeatEach(AllExpiries) {
+    if(RepeatItem < NearestExpiry) {
+        NearestExpiry = RepeatItem
+    }
+}
+
+// 5. FILTER CONTRACTS TO NEAREST EXPIRY + COMPUTE GEX
+var GEX_Dict = dictionary(json: {})
+var SeenStrikes = []
+
+// Time to expiry in years
+calculate(input: "${NearestExpiry} - ${NowMs}") >> TMs
+calculate(input: "${TMs} / 31557600000") >> TYears
+
+var ContractsProcessed = 0
+var ErrorsCount = 0
+
+repeatEach(Contracts) {
+    valueFor(key: "expiration_timestamp", dictionary: RepeatItem) >> ProcExpiry
+    if(ProcExpiry == NearestExpiry) {
+        valueFor(key: "instrument_name", dictionary: RepeatItem) >> InstrumentName
+        valueFor(key: "strike", dictionary: RepeatItem) >> Strike
+        valueFor(key: "option_type", dictionary: RepeatItem) >> OptionType
+        valueFor(key: "contract_size", dictionary: RepeatItem) >> ContractSize
+        calculate(input: "0 + ${Strike}") >> StrikeNum
+        calculate(input: "0 + ${ContractSize}") >> ContractSizeNum
+
+        // Look up in book summary (no extra API call!)
+        var BookData = dictionary(json: {})
+        var BookFound = false
+        repeatEach(BookResults) {
+            valueFor(key: "instrument_name", dictionary: RepeatItem) >> BookName
+            if(BookName == InstrumentName) {
+                BookData = RepeatItem
+                BookFound = true
+            }
+        }
+
+        if(BookFound == true) {
+            valueFor(key: "open_interest", dictionary: BookData) >> OpenInterest
+            valueFor(key: "mark_iv", dictionary: BookData) >> MarkIV
+            calculate(input: "0 + ${OpenInterest}") >> OpenInterestNum
+            calculate(input: "0 + ${MarkIV}") >> MarkIVNum
+            calculate(input: "${MarkIVNum} / 100") >> IVDecimal
+
+            if(OpenInterestNum > 0) {
+                if(IVDecimal > 0) {
+                    // Black-Scholes Gamma
+                    // d1 = (ln(S/K) + (r + 0.5*sigma^2)*T) / (sigma * sqrt(T))
+                    // gamma = n'(d1) / (S * sigma * sqrt(T))
+                    calculate(input: "ln(${UnderlyingNum} / ${StrikeNum})") >> LogTerm
+                    calculate(input: "0.5 * ${IVDecimal} * ${IVDecimal} * ${TYears}") >> SigmaHalfTerm
+                    calculate(input: "${RiskFreeRate} * ${TYears}") >> RateTerm
+                    calculate(input: "${LogTerm} + ${SigmaHalfTerm} + ${RateTerm}") >> D1Numerator
+                    calculate(input: "${IVDecimal} * sqrt(${TYears})") >> D1Denominator
+                    if(D1Denominator > 0) {
+                        calculate(input: "${D1Numerator} / ${D1Denominator}") >> D1
+                        // n'(d1) = exp(-d1^2/2) / sqrt(2*pi)
+                        calculate(input: "${D1} * ${D1}") >> D1Squared
+                        calculate(input: "-0.5 * ${D1Squared}") >> NegHalfD1Sq
+                        calculate(input: "exp(${NegHalfD1Sq})") >> ExpTerm
+                        calculate(input: "sqrt(6.28318530718)") >> SqrtTwoPi
+                        calculate(input: "${ExpTerm} / ${SqrtTwoPi}") >> NPrimeD1
+                        // gamma = n'(d1) / (S * sigma * sqrt(T))
+                        calculate(input: "${NPrimeD1} / (${UnderlyingNum} * ${IVDecimal} * sqrt(${TYears}))") >> Gamma
+
+                        if(Gamma > 0) {
+                            // GEX = gamma * OI * contractSize * S^2 * multiplier
+                            calculate(input: "${Gamma} * ${OpenInterestNum} * ${ContractSizeNum} * ${UnderlyingNum} * ${UnderlyingNum} * ${GEXMultiplier}") >> RawGEX
+
+                            if(OptionType == "call") {
+                                var GEX = RawGEX
+                            } else {
+                                calculate(input: "-1 * ${RawGEX}") >> GEX
+                            }
+
+                            // Aggregate by strike (use string key)
+                            text(text: StrikeNum) >> StrikeKey
+                            var KeyExists = false
+                            repeatEach(SeenStrikes) {
+                                if(RepeatItem == StrikeKey) {
+                                    KeyExists = true
+                                }
+                            }
+                            if(KeyExists == true) {
+                                valueFor(key: StrikeKey, dictionary: GEX_Dict) >> ExistingGEX
+                                calculate(input: "0 + ${ExistingGEX}") >> ExistingGEXNum
+                                calculate(input: "${ExistingGEXNum} + ${GEX}") >> NewGEX
+                                setValue(key: StrikeKey, value: NewGEX, dictionary: GEX_Dict)
+                            } else {
+                                setValue(key: StrikeKey, value: GEX, dictionary: GEX_Dict)
+                                SeenStrikes += StrikeKey
+                            }
+                            ContractsProcessed = ContractsProcessed + 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 6. GET STRIKE KEYS
+keysFrom(dictionary: GEX_Dict) >> GEXKeys
+count(input: GEXKeys) >> KeyCount
+
+if(KeyCount == 0) {
+    showResult(text: "No GEX data computed. Check if market is open or try later.")
+    exit
+}
+
+// 7. TOP CALL WALLS (highest positive GEX)
+var CW_List = []
+var UsedForCalls = []
+var CallCount = 0
+repeat(TopCount) {
+    var CallBestKey = ""
+    var CallBestVal = -999999999999
+    var CallFound = false
+    repeatEach(GEXKeys) {
+        var CallKey = RepeatItem
+        var CallIsUsed = false
+        repeatEach(UsedForCalls) {
+            if(RepeatItem == CallKey) {
+                CallIsUsed = true
+            }
+        }
+        if(CallIsUsed == false) {
+            valueFor(key: CallKey, dictionary: GEX_Dict) >> CallCheckVal
+            calculate(input: "0 + ${CallCheckVal}") >> CallCheckNum
+            if(CallCheckNum > 0) {
+                if(CallCheckNum > CallBestVal) {
+                    CallBestVal = CallCheckNum
+                    CallBestKey = CallKey
+                    CallFound = true
+                }
+            }
+        }
+    }
+    if(CallFound == true) {
+        CW_List += CallBestKey
+        UsedForCalls += CallBestKey
+        CallCount = CallCount + 1
+    }
+}
+
+// 8. TOP PUT WALLS (most negative GEX)
+var PW_List = []
+var UsedForPuts = []
+var PutCount = 0
+repeat(TopCount) {
+    var PutBestKey = ""
+    var PutBestVal = 999999999999
+    var PutFound = false
+    repeatEach(GEXKeys) {
+        var PutKey = RepeatItem
+        var PutIsUsed = false
+        repeatEach(UsedForPuts) {
+            if(RepeatItem == PutKey) {
+                PutIsUsed = true
+            }
+        }
+        if(PutIsUsed == false) {
+            valueFor(key: PutKey, dictionary: GEX_Dict) >> PutCheckVal
+            calculate(input: "0 + ${PutCheckVal}") >> PutCheckNum
+            if(PutCheckNum < 0) {
+                if(PutCheckNum < PutBestVal) {
+                    PutBestVal = PutCheckNum
+                    PutBestKey = PutKey
+                    PutFound = true
+                }
+            }
+        }
+    }
+    if(PutFound == true) {
+        PW_List += PutBestKey
+        UsedForPuts += PutBestKey
+        PutCount = PutCount + 1
+    }
+}
+
+// 9. GAMMA FLIP (strike with GEX closest to zero)
+var FlipKey = ""
+var FlipMinAbs = 999999999999
+var FlipInitialized = false
+repeatEach(GEXKeys) {
+    valueFor(key: RepeatItem, dictionary: GEX_Dict) >> FlipGEX
+    calculate(input: "0 + ${FlipGEX}") >> FlipNum
+    var FlipAbs = FlipNum
+    if(FlipNum < 0) {
+        calculate(input: "-1 * ${FlipNum}") >> FlipAbs
+    }
+    if(FlipInitialized == false) {
+        FlipMinAbs = FlipAbs
+        FlipKey = RepeatItem
+        FlipInitialized = true
+    } else {
+        if(FlipAbs < FlipMinAbs) {
+            FlipMinAbs = FlipAbs
+            FlipKey = RepeatItem
+        }
+    }
+}
+
+// 10. CALCULATE NET GEX
+var NetGEX = 0
+var TotalCall = 0
+var TotalPut = 0
+repeatEach(GEXKeys) {
+    valueFor(key: RepeatItem, dictionary: GEX_Dict) >> SumGEX
+    calculate(input: "0 + ${SumGEX}") >> SumNum
+    calculate(input: "${NetGEX} + ${SumNum}") >> NetGEX
+    if(SumNum > 0) {
+        calculate(input: "${TotalCall} + ${SumNum}") >> TotalCall
+    } else {
+        calculate(input: "${TotalPut} + ${SumNum}") >> TotalPut
+    }
+}
+
+// 11. DETERMINE SENTIMENT
+var GEXSentiment = "NEUTRAL"
+var GEXColor = "🟡"
+if(NetGEX > 0) {
+    GEXSentiment = "LONG GAMMA — dealers dampen volatility"
+    GEXColor = "🟢"
+} else {
+    GEXSentiment = "SHORT GAMMA — dealers amplify volatility"
+    GEXColor = "🔴"
+}
+
+// 12. COMBINE WALLS FOR OUTPUT
+combineText(text: CW_List, combine: Custom, separator: " | ") >> CW_String
+combineText(text: PW_List, combine: Custom, separator: " | ") >> PW_String
+
+// 13. DISPLAY
+text(text: "${GEXColor} BTC GEX WALLS
+
+Spot: $${UnderlyingNum}
+Gamma Flip: ${FlipKey}
+Net GEX: ${NetGEX}
+Sentiment: ${GEXSentiment}
+
+📈 CALL WALLS (${CallCount}):
+${CW_String}
+
+📉 PUT WALLS (${PutCount}):
+${PW_String}
+
+📊 Stats:
+Contracts: ${ContractsProcessed}
+Total Call GEX: ${TotalCall}
+Total Put GEX: ${TotalPut}
+
+API calls: 2 (instruments + book_summary)
+Expiry: ${NearestExpiry}") >> GEXReport
+
+showResult(text: GEXReport)
+setClipboard(text: GEXReport)
