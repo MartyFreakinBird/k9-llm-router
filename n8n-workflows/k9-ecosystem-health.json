@@ -1,0 +1,101 @@
+{
+  "name": "K-9 Ecosystem Health Monitor",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "minutes", "minutesInterval": 2 } ]
+        }
+      },
+      "name": "Every 2 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Define all K-9 services to monitor\nconst services = [\n  { name: 'k9-llm-router', url: 'http://localhost:8765/health', port: 8765, tier: 'critical' },\n  { name: 'k9-orchestrator', url: 'http://localhost:8744/health', port: 8744, tier: 'critical' },\n  { name: 'k9-paymaster', url: 'http://localhost:9002/health', port: 9002, tier: 'critical' },\n  { name: 'k9-mcp-manager', url: 'http://localhost:3030/health', port: 3030, tier: 'critical' },\n  { name: 'k9-quant-engine', url: 'http://localhost:9001/health', port: 9001, tier: 'important' },\n  { name: 'aeg-token-model', url: 'http://localhost:9003/health', port: 9003, tier: 'important' },\n  { name: 'aeg-signal-router', url: 'http://localhost:9004/health', port: 9004, tier: 'important' },\n  { name: 'k9-sentiment-engine', url: 'http://localhost:9006/health', port: 9006, tier: 'monitor' },\n  { name: 'k9-polymarket-adapter', url: 'http://localhost:9007/gex/health', port: 9007, tier: 'monitor' },\n  { name: 'k9-gex-engine', url: 'http://localhost:9008/gex/health', port: 9008, tier: 'monitor' },\n  { name: 'n8n', url: 'http://localhost:5678/healthz', port: 5678, tier: 'infra' },\n  { name: 'ollama', url: 'http://localhost:11434/api/tags', port: 11434, tier: 'infra' }\n];\n\nreturn services.map(s => ({ json: s }));"
+      },
+      "name": "Service List",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": { "timeout": 5000, "allowUnauthorizedCerts": true },
+        "respondError": true
+      },
+      "name": "Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate health results\nconst items = [];\nconst allItems = $('Health Check').all();\nconst services = $('Service List').all();\n\nlet healthy = 0, unhealthy = 0, critical_down = 0;\nconst downServices = [];\n\nfor (let i = 0; i < services.length; i++) {\n  const svc = services[i].json;\n  const resp = allItems[i];\n  const isHealthy = resp && resp.json && !resp.error;\n  \n  if (isHealthy) {\n    healthy++;\n  } else {\n    unhealthy++;\n    if (svc.tier === 'critical') critical_down++;\n    downServices.push(svc.name);\n  }\n}\n\nconst total = services.length;\nconst healthPercent = Math.round((healthy / total) * 100);\n\n// Build summary\nlet summary = `K-9 Health: ${healthPercent}% (${healthy}/${total} up)`;\nif (critical_down > 0) {\n  summary = `🔴 CRITICAL: ${critical_down} critical services down! ${downServices.join(', ')}`;\n} else if (unhealthy > 0) {\n  summary = `🟡 ${unhealthy} services down: ${downServices.join(', ')}`;\n} else {\n  summary = `🟢 All ${total} K-9 services healthy`;\n}\n\n// Determine if alert needed\nconst isAlert = critical_down > 0 || unhealthy >= 3;\n\nitems.push({\n  json: {\n    timestamp: new Date().toISOString(),\n    health_percent: healthPercent,\n    healthy_count: healthy,\n    unhealthy_count: unhealthy,\n    critical_down: critical_down,\n    down_services: downServices,\n    summary,\n    is_alert: isAlert,\n    type: 'ecosystem_health'\n  }\n});\n\nreturn items;"
+      },
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.is_alert }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $json.timestamp, source: 'k9-health-monitor', type: 'ecosystem_alert', ontology_tags: ['health', 'monitoring', 'infrastructure'], confidence: 0.95, payload: { health_percent: $json.health_percent, down_services: $json.down_services, critical_down: $json.critical_down, summary: $json.summary }, trace_id: '', causation_id: '', signature: '' }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Alert Signal Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/n8n/webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'health_alert', data: $json }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Push to Wallpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Every 2 min": { "main": [ [ { "node": "Service List", "type": "main", "index": 0 } ] ] },
+    "Service List": { "main": [ [ { "node": "Health Check", "type": "main", "index": 0 } ] ] },
+    "Health Check": { "main": [ [ { "node": "Aggregate Results", "type": "main", "index": 0 } ] ] },
+    "Aggregate Results": { "main": [ [ { "node": "Alert?", "type": "main", "index": 0 } ] ] },
+    "Alert?": {
+      "main": [
+        [ { "node": "Alert Signal Router", "type": "main", "index": 0 } ],
+        [ { "node": "Push to Wallpaper", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}

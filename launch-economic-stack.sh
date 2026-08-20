@@ -146,6 +146,11 @@ SVC_CMD[k9-gex]="python -m uvicorn src.k9_gex_engine:app --host 0.0.0.0 --port 9
 SVC_DIR[k9-gex]="$K9_DIR"
 SVC_PORT[k9-gex]="9008"
 
+# Automation Coordinator — Phase 5 automation hub :9009
+SVC_CMD[k9-auto]="python -m src.k9_automation_coordinator"
+SVC_DIR[k9-auto]="$K9_DIR"
+SVC_PORT[k9-auto]="9009"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -163,6 +168,7 @@ START_ORDER=(
   k9-quant-engine
   k9-polymarket
   k9-gex
+  k9-auto
   lovable-bridge
   k9-wallpaper-ws
 )
