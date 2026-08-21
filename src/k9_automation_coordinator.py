@@ -38,6 +38,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+import sys
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,12 +54,14 @@ K9_LLM_ROUTER = os.getenv("K9_LLM_ROUTER_URL", "http://localhost:8765")
 SENTIMENT_ENGINE = os.getenv("SENTIMENT_ENGINE_URL", "http://localhost:9006")
 GEX_ENGINE = os.getenv("GEX_ENGINE_URL", "http://localhost:9008")
 POLYMARKET_ADAPTER = os.getenv("POLYMARKET_ADAPTER_URL", "http://localhost:9007")
+FISCAL_DOMINANCE_URL = os.getenv("FISCAL_DOMINANCE_URL", "http://localhost:9010")
 
 # Intervals (seconds)
 OSINT_INTERVAL = int(os.getenv("AUTOMATION_OSINT_INTERVAL", "600"))      # 10 min
 GEX_INTERVAL = int(os.getenv("AUTOMATION_GEX_INTERVAL", "300"))         # 5 min
 HEALTH_INTERVAL = int(os.getenv("AUTOMATION_HEALTH_INTERVAL", "120"))   # 2 min
 POLY_INTERVAL = int(os.getenv("AUTOMATION_POLY_INTERVAL", "900"))       # 15 min
+FOMC_INTERVAL = int(os.getenv("AUTOMATION_FOMC_INTERVAL", "1800"))     # 30 min
 
 # Sentiment thresholds
 SENTIMENT_SHIFT_THRESHOLD = 0.25  # |Δ sentiment| to trigger signal
@@ -417,6 +420,52 @@ async def polymarket_cycle():
             log.warning(f"Polymarket fetch failed: {e}")
 
 
+# ── 5. FOMC Fiscal Fragility Monitor ─────────────────────────────────────────
+
+async def fomc_cycle():
+    """Monitor fiscal dominance score and FOMC cascade, route shifts."""
+    log.info("FOMC fiscal cycle starting...")
+
+    try:
+        # Import locally to handle missing module gracefully
+        sys.path.insert(0, '.')
+        from src.k9_fomc_fiscal_modifier import get_fiscal_dominance_score, compute_cascade, route_fomc_signal
+
+        fiscal_score = get_fiscal_dominance_score()
+        cascade = compute_cascade(fiscal_score)
+
+        flips = cascade["aggregate"]["flip_count"]
+        regime = cascade["fiscal_regime"]
+
+        log.info(
+            f"FOMC: fiscal_score={fiscal_score:.1f} regime={regime} "
+            f"flips={flips} hike={cascade['aggregate']['hike_probability']:.2f} "
+            f"hold={cascade['aggregate']['hold_probability']:.2f} "
+            f"cut={cascade['aggregate']['cut_probability']:.2f}"
+        )
+
+        if flips > 0:
+            routed = route_fomc_signal(cascade)
+            log.info(f"  -> FOMC signal routed: {routed} ({flips} flips)")
+
+            # Push to wallpaper
+            await push_to_wallpaper({
+                "type": "fomc_cascade_shift",
+                "data": {
+                    "fiscal_score": fiscal_score,
+                    "regime": regime,
+                    "flips": flips,
+                    "aggregate": cascade["aggregate"],
+                    "trilemma": cascade["trilemma"],
+                }
+            })
+
+    except ImportError:
+        log.debug("FOMC fiscal modifier not available")
+    except Exception as e:
+        log.warning(f"FOMC cycle error: {e}")
+
+
 # ── Main Loop ────────────────────────────────────────────────────────────────
 
 async def run_cycle(coro, interval: int, name: str):
@@ -432,7 +481,7 @@ async def run_cycle(coro, interval: int, name: str):
 async def main():
     log.info("═══════════════════════════════════════════")
     log.info("  K-9 Phase 5 Automation Coordinator")
-    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min")
+    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min | FOMC: 30min")
     log.info("═══════════════════════════════════════════")
 
     # Stagger initial runs
@@ -444,6 +493,8 @@ async def main():
     await gex_cycle()
     await asyncio.sleep(5)
     await polymarket_cycle()
+    await asyncio.sleep(5)
+    await fomc_cycle()
 
     # Start all loops
     await asyncio.gather(
@@ -451,6 +502,7 @@ async def main():
         run_cycle(gex_cycle, GEX_INTERVAL, "GEX"),
         run_cycle(health_cycle, HEALTH_INTERVAL, "Health"),
         run_cycle(polymarket_cycle, POLY_INTERVAL, "Polymarket"),
+        run_cycle(fomc_cycle, FOMC_INTERVAL, "FOMC"),
     )
 
 

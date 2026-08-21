@@ -151,6 +151,16 @@ SVC_CMD[k9-auto]="python -m src.k9_automation_coordinator"
 SVC_DIR[k9-auto]="$K9_DIR"
 SVC_PORT[k9-auto]="9009"
 
+# Fiscal Dominance Engine — doom loop score :9010
+SVC_CMD[k9-fiscal]="python -m uvicorn src.k9_fiscal_dominance:app --host 0.0.0.0 --port 9010"
+SVC_DIR[k9-fiscal]="$K9_DIR"
+SVC_PORT[k9-fiscal]="9010"
+
+# Options Data Ingestion — DoltHub/Kaggle :9011
+SVC_CMD[k9-options]="python -m uvicorn src.k9_options_ingestion:app --host 0.0.0.0 --port 9011"
+SVC_DIR[k9-options]="$K9_DIR"
+SVC_PORT[k9-options]="9011"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -169,6 +179,8 @@ START_ORDER=(
   k9-polymarket
   k9-gex
   k9-auto
+  k9-fiscal
+  k9-options
   lovable-bridge
   k9-wallpaper-ws
 )

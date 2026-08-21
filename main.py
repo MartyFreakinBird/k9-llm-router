@@ -203,6 +203,15 @@ try:
         log.info("GEX Engine: loaded (Deribit options gamma exposure)")
     except ImportError as e:
         log.warning(f"GEX Engine: not available ({e})")
+
+    # FOMC Fiscal Fragility Modifier (optional)
+    _fomc_fiscal_enabled = False
+    try:
+        from src.k9_fomc_fiscal_modifier import compute_cascade, grid_bot_stress_test, run_full_analysis
+        _fomc_fiscal_enabled = True
+        log.info("FOMC Fiscal Modifier: loaded (fiscal fragility cascade)")
+    except ImportError as e:
+        log.warning(f"FOMC Fiscal Modifier: not available ({e})")
     _cb4_enabled = True
     log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
 except ImportError as e:

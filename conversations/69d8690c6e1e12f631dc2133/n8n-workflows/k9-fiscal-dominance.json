@@ -1,0 +1,144 @@
+{
+  "name": "K-9 Fiscal Dominance Monitor",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "minutes", "minutesInterval": 30 } ]
+        }
+      },
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9010/fiscal/score",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Fiscal Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9010/fiscal/stress",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Stress Scenarios",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9010/fiscal/banking",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Banking Stress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 600]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:8765/fomc/cascade",
+        "options": { "timeout": 10000 }
+      },
+      "name": "FOMC Cascade",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 800]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [680, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build fiscal dominance summary\nconst score = $('Fiscal Score').first().json;\nconst stress = $('Stress Scenarios').first().json;\nconst banking = $('Banking Stress').first().json;\nconst fomc = $('FOMC Cascade').first().json;\n\nconst dominanceScore = score?.dominance_score || 50;\nconst regime = dominanceScore > 70 ? 'HIGH' : dominanceScore > 50 ? 'MODERATE' : 'LOW';\nconst flips = fomc?.aggregate?.flip_count || 0;\nconst mortgage = score?.mortgage_rate?.current || 0;\nconst kreDrawdown = banking?.kre_drawdown_pct || 0;\n\nlet alertLevel = 'NORMAL';\nlet alertColor = '🟢';\nif (dominanceScore > 70) { alertLevel = 'CRITICAL'; alertColor = '🔴'; }\nelse if (dominanceScore > 55) { alertLevel = 'ELEVATED'; alertColor = '🟡'; }\n\nconst summary = `${alertColor} Fiscal Dominance: ${regime} (${dominanceScore.toFixed(0)})\\n` +\n  `10Y: ${(score?.ten_year_yield || 0).toFixed(2)}% | Mortgage: ${mortgage.toFixed(2)}%\\n` +\n  `KRE drawdown: ${kreDrawdown.toFixed(1)}% | FOMC flips: ${flips}\\n` +\n  `Trilemma: ${fomc?.trilemma?.most_likely_outcome || 'data-dependent'}`;\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    dominance_score: dominanceScore,\n    regime,\n    alert_level: alertLevel,\n    ten_year_yield: score?.ten_year_yield || 0,\n    mortgage_rate: mortgage,\n    kre_drawdown: kreDrawdown,\n    fomc_flips: flips,\n    fomc_aggregate: fomc?.aggregate || {},\n    stress_scenarios: stress?.scenarios || [],\n    banking: banking || {},\n    summary,\n    is_alert: dominanceScore > 60 || flips > 0\n  }\n}];"
+      },
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 450]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.is_alert }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1.2,
+      "position": [1120, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $json.timestamp, source: 'k9-fiscal-n8n', type: 'fiscal_dominance_alert', ontology_tags: ['fiscal', 'treasury', 'monetary_policy', 'doom_loop'], confidence: 0.88, payload: { dominance_score: $json.dominance_score, regime: $json.regime, ten_year_yield: $json.ten_year_yield, mortgage_rate: $json.mortgage_rate, kre_drawdown: $json.kre_drawdown, fomc_flips: $json.fomc_flips, fomc_aggregate: $json.fomc_aggregate, summary: $json.summary }, trace_id: '', causation_id: '', signature: '' }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Route to Signal Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 350]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/n8n/webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'fiscal_dominance', data: $json }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Push to Wallpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 550]
+    }
+  ],
+  "connections": {
+    "Every 30 min": {
+      "main": [
+        [
+          { "node": "Fiscal Score", "type": "main", "index": 0 },
+          { "node": "Stress Scenarios", "type": "main", "index": 0 },
+          { "node": "Banking Stress", "type": "main", "index": 0 },
+          { "node": "FOMC Cascade", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fiscal Score": { "main": [ [ { "node": "Merge", "type": "main", "index": 0 } ] ] },
+    "Stress Scenarios": { "main": [ [ { "node": "Merge", "type": "main", "index": 1 } ] ] },
+    "Banking Stress": { "main": [ [ { "node": "Merge", "type": "main", "index": 2 } ] ] },
+    "FOMC Cascade": { "main": [ [ { "node": "Merge", "type": "main", "index": 3 } ] ] },
+    "Merge": { "main": [ [ { "node": "Build Summary", "type": "main", "index": 0 } ] ] },
+    "Build Summary": { "main": [ [ { "node": "Alert?", "type": "main", "index": 0 } ] ] },
+    "Alert?": {
+      "main": [
+        [ { "node": "Route to Signal Router", "type": "main", "index": 0 } ],
+        [ { "node": "Push to Wallpaper", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}
