@@ -39,9 +39,9 @@ log = logging.getLogger("k9.3commas")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-THREECOMMAS_SECRET = os.getenv("3COMMAS_SECRET_SECRET", "")
-THREECOMMAS_BOT_UUID = os.getenv("3COMMAS_BOT_UUID", "ee41599e-95dd-4b6e-8374-d0968cbff2de")
-THREECOMMAS_WEBHOOK_URL = os.getenv("3COMMAS_WEBHOOK_URL", "https://app.3commas.io/trade_signal/trading_view")
+THREECOMMAS_SECRET = os.getenv("THREECOMMAS_SECRET_SECRET", "")
+THREECOMMAS_BOT_UUID = os.getenv("THREECOMMAS_BOT_UUID", "ee41599e-95dd-4b6e-8374-d0968cbff2de")
+THREECOMMAS_WEBHOOK_URL = os.getenv("THREECOMMAS_WEBHOOK_URL", "https://app.3commas.io/trade_signal/trading_view")
 
 MICROFLOW_URL = os.getenv("MICROFLOW_URL", "http://localhost:9012")
 FISCAL_DOMINANCE_URL = os.getenv("FISCAL_DOMINANCE_URL", "http://localhost:9010")
@@ -50,9 +50,9 @@ GEX_ENGINE_URL = os.getenv("GEX_ENGINE_URL", "http://localhost:9008")
 POLYMARKET_URL = os.getenv("POLYMARKET_URL", "http://localhost:9007")
 AEG_SIGNAL_ROUTER = os.getenv("AEG_SIGNAL_ROUTER_URL", "http://localhost:9004")
 
-MAX_LAG = int(os.getenv("3COMMAS_MAX_LAG", "300"))  # 5 minutes
-RATE_LIMIT_SECONDS = int(os.getenv("3COMMAS_RATE_LIMIT", "300"))  # 5 min per instrument
-CONFIDENCE_THRESHOLD = float(os.getenv("3COMMAS_CONFIDENCE_THRESHOLD", "0.65"))
+MAX_LAG = int(os.getenv("THREECOMMAS_MAX_LAG", "300"))  # 5 minutes
+RATE_LIMIT_SECONDS = int(os.getenv("THREECOMMAS_RATE_LIMIT", "300"))  # 5 min per instrument
+CONFIDENCE_THRESHOLD = float(os.getenv("THREECOMMAS_CONFIDENCE_THRESHOLD", "0.65"))
 
 # Supported actions
 VALID_ACTIONS = {
@@ -166,7 +166,7 @@ def _build_3commas_payload(
 def _send_to_3commas(payload: dict) -> dict:
     """POST signal to 3Commas webhook endpoint."""
     if not THREECOMMAS_SECRET:
-        return {"success": False, "error": "3COMMAS_SECRET_SECRET not set in environment"}
+        return {"success": False, "error": "THREECOMMAS_SECRET_SECRET not set in environment"}
     try:
         with httpx.Client(timeout=15) as c:
             resp = c.post(THREECOMMAS_WEBHOOK_URL, json=payload)
