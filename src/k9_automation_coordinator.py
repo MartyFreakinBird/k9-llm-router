@@ -56,6 +56,7 @@ GEX_ENGINE = os.getenv("GEX_ENGINE_URL", "http://localhost:9008")
 POLYMARKET_ADAPTER = os.getenv("POLYMARKET_ADAPTER_URL", "http://localhost:9007")
 FISCAL_DOMINANCE_URL = os.getenv("FISCAL_DOMINANCE_URL", "http://localhost:9010")
 MICROFLOW_URL = os.getenv("MICROFLOW_URL", "http://localhost:9012")
+THREECOMMAS_URL = os.getenv("THREECOMMAS_URL", "http://localhost:9013")
 
 # Intervals (seconds)
 OSINT_INTERVAL = int(os.getenv("AUTOMATION_OSINT_INTERVAL", "600"))      # 10 min
@@ -64,6 +65,7 @@ HEALTH_INTERVAL = int(os.getenv("AUTOMATION_HEALTH_INTERVAL", "120"))   # 2 min
 POLY_INTERVAL = int(os.getenv("AUTOMATION_POLY_INTERVAL", "900"))       # 15 min
 FOMC_INTERVAL = int(os.getenv("AUTOMATION_FOMC_INTERVAL", "1800"))     # 30 min
 MICROFLOW_INTERVAL = int(os.getenv("AUTOMATION_MICROFLOW_INTERVAL", "3600"))  # 1 hour
+THREECOMMAS_INTERVAL = int(os.getenv("AUTOMATION_3COMMAS_INTERVAL", "1800"))  # 30 min
 
 # Sentiment thresholds
 SENTIMENT_SHIFT_THRESHOLD = 0.25  # |Δ sentiment| to trigger signal
@@ -513,6 +515,44 @@ async def microflow_cycle():
         log.warning(f"Microflow cycle error: {e}")
 
 
+# ── 7. 3Commas Signal Bridge ───────────────────────────────────────────────────
+
+async def threecommas_cycle():
+    """Generate automated signals from microflow, GEX, FOMC and dispatch to 3Commas."""
+    log.info("3Commas signal cycle starting...")
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{THREECOMMAS_URL}/3commas/auto")
+            result = resp.json() if resp.status_code == 200 else {}
+
+        total = result.get("total_generated", 0)
+        delivered = result.get("delivered", 0)
+        blocked = result.get("blocked", 0)
+
+        log.info(f"  Signals: {total} generated, {delivered} delivered, {blocked} blocked")
+
+        for signal in result.get("signals", []):
+            status = signal.get("gates", {}).get("delivery", signal.get("gates", {}).get("suppress_short", "unknown"))
+            log.info(f"  {signal.get('action', '?'):15s} {signal.get('instrument', '?'):5s} "
+                     f"-> {status}")
+
+        # Push to wallpaper if any signals
+        if total > 0:
+            await push_to_wallpaper({
+                "type": "threecommas_signals",
+                "data": {
+                    "total": total,
+                    "delivered": delivered,
+                    "blocked": blocked,
+                    "signals": result.get("signals", []),
+                }
+            })
+
+    except Exception as e:
+        log.warning(f"3Commas cycle error: {e}")
+
+
 # ── Main Loop ────────────────────────────────────────────────────────────────
 
 async def run_cycle(coro, interval: int, name: str):
@@ -528,7 +568,7 @@ async def run_cycle(coro, interval: int, name: str):
 async def main():
     log.info("═══════════════════════════════════════════")
     log.info("  K-9 Phase 5 Automation Coordinator")
-    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min | FOMC: 30min | Micro: 1h")
+    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min | FOMC: 30min | Micro: 1h | 3Commas: 30m")
     log.info("═══════════════════════════════════════════")
 
     # Stagger initial runs
@@ -553,6 +593,7 @@ async def main():
         run_cycle(polymarket_cycle, POLY_INTERVAL, "Polymarket"),
         run_cycle(fomc_cycle, FOMC_INTERVAL, "FOMC"),
         run_cycle(microflow_cycle, MICROFLOW_INTERVAL, "Microflow"),
+        run_cycle(threecommas_cycle, THREECOMMAS_INTERVAL, "3Commas"),
     )
 
 

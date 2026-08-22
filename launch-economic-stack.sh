@@ -166,6 +166,11 @@ SVC_CMD[k9-microflow]="python -m uvicorn src.k9_microflow:app --host 0.0.0.0 --p
 SVC_DIR[k9-microflow]="$K9_DIR"
 SVC_PORT[k9-microflow]="9012"
 
+# 3Commas Signal Bridge — Gate.io trade dispatch :9013
+SVC_CMD[k9-3commas]="python -m uvicorn src.k9_3commas_bridge:app --host 0.0.0.0 --port 9013"
+SVC_DIR[k9-3commas]="$K9_DIR"
+SVC_PORT[k9-3commas]="9013"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -187,6 +192,7 @@ START_ORDER=(
   k9-fiscal
   k9-options
   k9-microflow
+  k9-3commas
   lovable-bridge
   k9-wallpaper-ws
 )

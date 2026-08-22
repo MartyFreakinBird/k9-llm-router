@@ -221,6 +221,15 @@ try:
         log.info("Microflow Engine: loaded (catalyst score + divergence)")
     except ImportError as e:
         log.warning(f"Microflow Engine: not available ({e})")
+
+    # 3Commas Signal Bridge (optional)
+    _threecommas_enabled = False
+    try:
+        from src.k9_3commas_bridge import dispatch_signal, generate_all_automated
+        _threecommas_enabled = True
+        log.info("3Commas Bridge: loaded (Gate.io signal dispatch with SUPPRESS_SHORT)")
+    except ImportError as e:
+        log.warning(f"3Commas Bridge: not available ({e})")
     _cb4_enabled = True
     log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
 except ImportError as e:
@@ -1091,6 +1100,61 @@ async def microflow_coverage():
         {"instrument": r[0], "metric_type": r[1], "count": r[2], "latest": str(r[3])}
         for r in stats
     ]}
+
+
+# ── 3Commas Signal Bridge Endpoints ─────────────────────────────────────────────
+@app.post("/3commas/signal")
+async def threecommas_signal(
+    action: str, instrument: str, source: str = "api",
+    confidence: float = 0.80, reason: str = ""
+):
+    """Dispatch a trading signal to 3Commas with all safety gates."""
+    if not _threecommas_enabled:
+        raise HTTPException(status_code=503, detail="3Commas bridge not available")
+    from src.k9_3commas_bridge import dispatch_signal
+    return dispatch_signal(action=action, instrument=instrument, source=source,
+                           confidence=confidence, reason=reason)
+
+
+@app.post("/3commas/auto")
+async def threecommas_auto():
+    """Run all automated signal generators (microflow, GEX, FOMC)."""
+    if not _threecommas_enabled:
+        raise HTTPException(status_code=503, detail="3Commas bridge not available")
+    from src.k9_3commas_bridge import generate_all_automated
+    return generate_all_automated()
+
+
+@app.get("/3commas/suppress")
+async def threecommas_suppress():
+    """Check which instruments have SUPPRESS_SHORT active."""
+    if not _threecommas_enabled:
+        raise HTTPException(status_code=503, detail="3Commas bridge not available")
+    from src.k9_3commas_bridge import _refresh_suppress_cache, _suppress_short_cache, _suppress_cache_ts
+    _refresh_suppress_cache()
+    from datetime import datetime, timezone
+    return {
+        "suppress_short_instruments": _suppress_short_cache,
+        "cached_at": datetime.fromtimestamp(_suppress_cache_ts, timezone.utc).isoformat() if _suppress_cache_ts else None,
+    }
+
+
+@app.get("/3commas/stats")
+async def threecommas_stats():
+    """Signal dispatch statistics."""
+    if not _threecommas_enabled:
+        raise HTTPException(status_code=503, detail="3Commas bridge not available")
+    from src.k9_3commas_bridge import _stats, _rate_limits, _rate_limit_remaining, _suppress_short_cache, _signal_log
+    from datetime import datetime, timezone
+    return {
+        "stats": dict(_stats),
+        "rate_limits": {
+            inst: {"remaining_seconds": _rate_limit_remaining(inst)}
+            for inst in _rate_limits
+        },
+        "suppress_short_active": _suppress_short_cache,
+        "total_logged": len(_signal_log),
+    }
 
 
 if __name__ == "__main__":

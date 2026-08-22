@@ -1,0 +1,91 @@
+{
+  "name": "K-9 3Commas Signal Dispatcher",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "minutes", "minutesInterval": 30 } ]
+        }
+      },
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9013/3commas/auto",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Auto Generate Signals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if any signals were delivered or blocked\nconst result = $json;\nconst total = result.total_generated || 0;\nconst delivered = result.delivered || 0;\nconst blocked = result.blocked || 0;\nconst signals = result.signals || [];\n\nlet summary = `📊 3Commas Signal Report\\n`;\nsignals.forEach(s => {\n  const gate = s.gates || {};\n  const status = gate.delivery || gate.suppress_short || gate.rate_limit || gate.confidence || 'unknown';\n  summary += `${s.action} ${s.instrument}: ${status}\\n`;\n});\n\nif (blocked > 0) {\n  summary += `\\n🚫 ${blocked} signal(s) blocked by SUPPRESS_SHORT`;\n}\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    total,\n    delivered,\n    blocked,\n    signals,\n    summary,\n    is_alert: delivered > 0 || blocked > 0\n  }\n}];"
+      },
+      "name": "Parse Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.is_alert }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Has Activity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $json.timestamp, source: 'k9-3commas-n8n', type: 'trade_signal_report', ontology_tags: ['3commas', 'gateio', 'signal_report'], confidence: 0.85, payload: { total: $json.total, delivered: $json.delivered, blocked: $json.blocked, signals: $json.signals, summary: $json.summary }, trace_id: '', causation_id: '', signature: '' }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Route to Signal Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/n8n/webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: '3commas_report', data: $json }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Push to Wallpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 400]
+    }
+  ],
+  "connections": {
+    "Every 30 min": {
+      "main": [ [ { "node": "Auto Generate Signals", "type": "main", "index": 0 } ] ]
+    },
+    "Auto Generate Signals": { "main": [ [ { "node": "Parse Results", "type": "main", "index": 0 } ] ] },
+    "Parse Results": { "main": [ [ { "node": "Has Activity?", "type": "main", "index": 0 } ] ] },
+    "Has Activity?": {
+      "main": [
+        [ { "node": "Route to Signal Router", "type": "main", "index": 0 } ],
+        [ { "node": "Push to Wallpaper", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}
