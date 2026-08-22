@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install minimal dependencies
+COPY serverless-requirements.txt .
+RUN pip install --no-cache-dir -r serverless-requirements.txt
+
+# Copy source
+COPY src/signal_generator.py ./src/
+COPY src/k9_microflow.py ./src/
+COPY src/k9_3commas_bridge.py ./src/
+
+# Default: run as cron-style one-shot
+# Override with: docker run -e ... image python -m src.signal_generator --server --port 9013
+CMD ["python", "-m", "src.signal_generator", "--run"]

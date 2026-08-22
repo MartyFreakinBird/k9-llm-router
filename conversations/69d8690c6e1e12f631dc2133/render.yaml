@@ -1,0 +1,36 @@
+# Render.com deployment configuration for K-9 Serverless Signal Generator
+# Deploy: render.com > New > Blueprint > select repo with this render.yaml
+
+services:
+  # Cron job — automated signal generation every 30 minutes
+  - type: cron
+    name: k9-signal-generator
+    schedule: "*/30 * * * *"  # every 30 min
+    runtime: python
+    buildCommand: pip install httpx yfinance
+    startCommand: python -m src.signal_generator --run
+    envVars:
+      - key: 3COMMAS_SECRET_SECRET
+        sync: false  # set manually in Render dashboard
+      - key: 3COMMAS_BOT_UUID
+        value: ee41599e-95dd-4b6e-8374-d0968cbff2de
+      - key: 3COMMAS_WEBHOOK_URL
+        value: https://app.3commas.io/trade_signal/trading_view
+      - key: 3COMMAS_CONFIDENCE_THRESHOLD
+        value: "0.65"
+
+  # Web service — lightweight API for manual signals + score checking
+  - type: web
+    name: k9-signal-api
+    runtime: python
+    plan: free  # $0/month
+    buildCommand: pip install fastapi uvicorn httpx yfinance
+    startCommand: python -m src.signal_generator --server --port ${PORT:-9013}
+    healthCheckPath: /health
+    envVars:
+      - key: 3COMMAS_SECRET_SECRET
+        sync: false  # set manually in Render dashboard
+      - key: 3COMMAS_BOT_UUID
+        value: ee41599e-95dd-4b6e-8374-d0968cbff2de
+      - key: 3COMMAS_WEBHOOK_URL
+        value: https://app.3commas.io/trade_signal/trading_view

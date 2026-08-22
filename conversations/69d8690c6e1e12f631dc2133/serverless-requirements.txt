@@ -1,0 +1,7 @@
+# Minimal requirements for serverless deployment
+# Install: pip install -r serverless-requirements.txt
+
+httpx>=0.24.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+yfinance>=0.2.18
