@@ -10,13 +10,13 @@ services:
     buildCommand: pip install httpx yfinance
     startCommand: python -m src.signal_generator --run
     envVars:
-      - key: THREECOMMAS-SECRET-SECRET
+      - key: THREECOMMASSECRET
         sync: false  # set manually in Render dashboard
-      - key: THREECOMMAS-BOT-UUID
+      - key: THREECOMMASBOTUUID
         value: ee41599e-95dd-4b6e-8374-d0968cbff2de
-      - key: THREECOMMAS-WEBHOOK-URL
+      - key: THREECOMMASWEBHOOKURL
         value: https://app.3commas.io/trade_signal/trading_view
-      - key: THREECOMMAS-CONFIDENCE-THRESHOLD
+      - key: THREECOMMASCONFIDENCETHRESHOLD
         value: "0.65"
 
   # Web service — lightweight API for manual signals + score checking
@@ -28,9 +28,9 @@ services:
     startCommand: python -m src.signal_generator --server --port ${PORT:-9013}
     healthCheckPath: /health
     envVars:
-      - key: THREECOMMAS-SECRET-SECRET
+      - key: THREECOMMASSECRET
         sync: false  # set manually in Render dashboard
-      - key: THREECOMMAS-BOT-UUID
+      - key: THREECOMMASBOTUUID
         value: ee41599e-95dd-4b6e-8374-d0968cbff2de
-      - key: THREECOMMAS-WEBHOOK-URL
+      - key: THREECOMMASWEBHOOKURL
         value: https://app.3commas.io/trade_signal/trading_view

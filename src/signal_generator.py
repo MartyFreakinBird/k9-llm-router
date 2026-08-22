@@ -47,15 +47,15 @@ log = logging.getLogger("k9.serverless")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-THREECOMMAS_SECRET = os.getenv("THREECOMMAS-SECRET-SECRET", "")
-THREECOMMAS_BOT_UUID = os.getenv("THREECOMMAS-BOT-UUID", "ee41599e-95dd-4b6e-8374-d0968cbff2de")
-THREECOMMAS_WEBHOOK_URL = os.getenv("THREECOMMAS-WEBHOOK-URL", "https://app.3commas.io/trade_signal/trading_view")
+THREECOMMAS_SECRET = os.getenv("THREECOMMASSECRET", "")
+THREECOMMAS_BOT_UUID = os.getenv("THREECOMMASBOTUUID", "ee41599e-95dd-4b6e-8374-d0968cbff2de")
+THREECOMMAS_WEBHOOK_URL = os.getenv("THREECOMMASWEBHOOKURL", "https://app.3commas.io/trade_signal/trading_view")
 
 # Optional: homelab fallback for richer data (if reachable)
 HOMELAB_URL = os.getenv("K9_HOMELAB_URL", "")  # e.g. http://your-homelab:9012
 
-MAX_LAG = int(os.getenv("THREECOMMAS-MAX-LAG", "300"))
-CONFIDENCE_THRESHOLD = float(os.getenv("THREECOMMAS-CONFIDENCE-THRESHOLD", "0.65"))
+MAX_LAG = int(os.getenv("THREECOMMASMAXLAG", "300"))
+CONFIDENCE_THRESHOLD = float(os.getenv("THREECOMMASCONFIDENCETHRESHOLD", "0.65"))
 
 # Catalyst score weights (same as k9_microflow.py)
 METRIC_WEIGHTS = {
@@ -343,7 +343,7 @@ def send_3commas_signal(action: str, instrument: str, trigger_price: float | Non
         payload.update(extra)
 
     if not THREECOMMAS_SECRET:
-        return {"success": False, "error": "THREECOMMAS-SECRET-SECRET not set"}
+        return {"success": False, "error": "THREECOMMASSECRET not set"}
 
     try:
         with httpx.Client(timeout=15) as c:
@@ -478,7 +478,7 @@ def run_cron():
 
     # Exit 0 for success, 1 if secret missing
     if not THREECOMMAS_SECRET:
-        log.warning("⚠ THREECOMMAS-SECRET-SECRET not set — signals not delivered")
+        log.warning("⚠ THREECOMMASSECRET not set — signals not delivered")
         sys.exit(1)
 
     # Print JSON summary for logging
