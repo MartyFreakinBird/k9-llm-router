@@ -1,0 +1,124 @@
+{
+  "name": "K-9 Microflow Catalyst Monitor",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [ { "field": "hours", "hoursInterval": 1 } ]
+        }
+      },
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9012/microflow/ingest",
+        "options": { "timeout": 30000 }
+      },
+      "name": "Trigger Ingestion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9012/microflow/catalyst/all",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Get Catalyst Scores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:9012/microflow/divergence",
+        "options": { "timeout": 15000 }
+      },
+      "name": "Get Divergence Flags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build microflow summary\nconst catalysts = $('Get Catalyst Scores').first().json;\nconst divergences = $('Get Divergence Flags').first().json;\n\nconst scores = catalysts?.scores || [];\nconst flags = divergences?.flags || [];\n\n// Find suppress_short flags\nconst suppressShorts = flags.filter(f => f.divergence_signal === 'SUPPRESS_SHORT');\nconst macroDominants = flags.filter(f => f.divergence_signal === 'MACRO_DOMINANT');\n\n// Top catalyst scores\nconst topCatalysts = scores.sort((a,b) => b.catalyst_score - a.catalyst_score).slice(0, 5);\n\nlet alertLevel = 'NORMAL';\nlet alertColor = '🟢';\nif (suppressShorts.length > 0) { alertLevel = 'SUPPRESS_SHORT'; alertColor = '🔴'; }\nelse if (macroDominants.length > 0) { alertLevel = 'MACRO_DOMINANT'; alertColor = '🟡'; }\n\nlet summary = `${alertColor} Microflow Monitor\\n`;\nscores.forEach(s => {\n  const flag = flags.find(f => f.instrument === s.instrument);\n  const signal = flag ? flag.divergence_signal : 'NEUTRAL';\n  summary += `${s.instrument}: catalyst=${s.catalyst_score?.toFixed(0)} [${signal}]\\n`;\n});\nif (suppressShorts.length > 0) {\n  summary += `\\n⚠ SUPPRESS_SHORT active for: ${suppressShorts.map(s => s.instrument).join(', ')}`;\n  summary += `\\n   No short signals for these instruments`;\n}\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    top_catalysts: topCatalysts,\n    all_scores: scores,\n    divergence_flags: flags,\n    suppress_short_instruments: suppressShorts.map(s => s.instrument),\n    macro_dominant_instruments: macroDominants.map(s => s.instrument),\n    alert_level: alertLevel,\n    summary,\n    is_alert: suppressShorts.length > 0\n  }\n}];"
+      },
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.is_alert }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:9004/route",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $json.timestamp, source: 'k9-microflow-n8n', type: 'micro_macro_divergence', ontology_tags: ['microflow', 'catalyst', 'divergence', 'suppress_short'], confidence: 0.85, payload: { suppress_short_instruments: $json.suppress_short_instruments, top_catalysts: $json.top_catalysts, summary: $json.summary }, trace_id: '', causation_id: '', signature: '' }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Route Suppress Signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8765/n8n/webhook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'microflow_update', data: $json }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "name": "Push to Wallpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Every 1 hour": {
+      "main": [
+        [ { "node": "Trigger Ingestion", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Trigger Ingestion": {
+      "main": [
+        [
+          { "node": "Get Catalyst Scores", "type": "main", "index": 0 },
+          { "node": "Get Divergence Flags", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Catalyst Scores": { "main": [ [ { "node": "Build Summary", "type": "main", "index": 0 } ] ] },
+    "Get Divergence Flags": { "main": [ [ { "node": "Build Summary", "type": "main", "index": 0 } ] ] },
+    "Build Summary": { "main": [ [ { "node": "Alert?", "type": "main", "index": 0 } ] ] },
+    "Alert?": {
+      "main": [
+        [ { "node": "Route Suppress Signal", "type": "main", "index": 0 } ],
+        [ { "node": "Push to Wallpaper", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}
