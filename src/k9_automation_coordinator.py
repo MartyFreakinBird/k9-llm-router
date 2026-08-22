@@ -55,6 +55,7 @@ SENTIMENT_ENGINE = os.getenv("SENTIMENT_ENGINE_URL", "http://localhost:9006")
 GEX_ENGINE = os.getenv("GEX_ENGINE_URL", "http://localhost:9008")
 POLYMARKET_ADAPTER = os.getenv("POLYMARKET_ADAPTER_URL", "http://localhost:9007")
 FISCAL_DOMINANCE_URL = os.getenv("FISCAL_DOMINANCE_URL", "http://localhost:9010")
+MICROFLOW_URL = os.getenv("MICROFLOW_URL", "http://localhost:9012")
 
 # Intervals (seconds)
 OSINT_INTERVAL = int(os.getenv("AUTOMATION_OSINT_INTERVAL", "600"))      # 10 min
@@ -62,6 +63,7 @@ GEX_INTERVAL = int(os.getenv("AUTOMATION_GEX_INTERVAL", "300"))         # 5 min
 HEALTH_INTERVAL = int(os.getenv("AUTOMATION_HEALTH_INTERVAL", "120"))   # 2 min
 POLY_INTERVAL = int(os.getenv("AUTOMATION_POLY_INTERVAL", "900"))       # 15 min
 FOMC_INTERVAL = int(os.getenv("AUTOMATION_FOMC_INTERVAL", "1800"))     # 30 min
+MICROFLOW_INTERVAL = int(os.getenv("AUTOMATION_MICROFLOW_INTERVAL", "3600"))  # 1 hour
 
 # Sentiment thresholds
 SENTIMENT_SHIFT_THRESHOLD = 0.25  # |Δ sentiment| to trigger signal
@@ -466,6 +468,51 @@ async def fomc_cycle():
         log.warning(f"FOMC cycle error: {e}")
 
 
+# ── 6. Microflow Catalyst Monitor ─────────────────────────────────────────────
+
+async def microflow_cycle():
+    """Ingest microflow data and compute catalyst scores + divergence flags."""
+    log.info("Microflow cycle starting...")
+
+    try:
+        # Trigger ingestion
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{MICROFLOW_URL}/microflow/ingest")
+            ingest = resp.json() if resp.status_code == 200 else {}
+
+        log.info(f"  Ingested: {ingest.get('total_records', 0)} records, "
+                 f"{ingest.get('errors', 0)} errors")
+
+        # Get divergence flags
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(f"{MICROFLOW_URL}/microflow/divergence")
+            div = resp.json() if resp.status_code == 200 else {}
+
+        suppress = div.get("suppress_short_instruments", [])
+        flags = div.get("flags", [])
+
+        # Log catalyst scores
+        for f in flags[:5]:
+            log.info(f"  {f['instrument']:5s} catalyst={f['catalyst_score']:.0f} "
+                     f"signal={f['divergence_signal']}")
+
+        if suppress:
+            log.warning(f"  -> SUPPRESS_SHORT active for: {', '.join(suppress)}")
+
+            # Push to wallpaper
+            await push_to_wallpaper({
+                "type": "microflow_divergence",
+                "data": {
+                    "suppress_short": suppress,
+                    "flags": flags,
+                    "alert_level": div.get("alert_level"),
+                }
+            })
+
+    except Exception as e:
+        log.warning(f"Microflow cycle error: {e}")
+
+
 # ── Main Loop ────────────────────────────────────────────────────────────────
 
 async def run_cycle(coro, interval: int, name: str):
@@ -481,7 +528,7 @@ async def run_cycle(coro, interval: int, name: str):
 async def main():
     log.info("═══════════════════════════════════════════")
     log.info("  K-9 Phase 5 Automation Coordinator")
-    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min | FOMC: 30min")
+    log.info("  OSINT: 10min | GEX: 5min | Health: 2min | Poly: 15min | FOMC: 30min | Micro: 1h")
     log.info("═══════════════════════════════════════════")
 
     # Stagger initial runs
@@ -495,6 +542,8 @@ async def main():
     await polymarket_cycle()
     await asyncio.sleep(5)
     await fomc_cycle()
+    await asyncio.sleep(5)
+    await microflow_cycle()
 
     # Start all loops
     await asyncio.gather(
@@ -503,6 +552,7 @@ async def main():
         run_cycle(health_cycle, HEALTH_INTERVAL, "Health"),
         run_cycle(polymarket_cycle, POLY_INTERVAL, "Polymarket"),
         run_cycle(fomc_cycle, FOMC_INTERVAL, "FOMC"),
+        run_cycle(microflow_cycle, MICROFLOW_INTERVAL, "Microflow"),
     )
 
 

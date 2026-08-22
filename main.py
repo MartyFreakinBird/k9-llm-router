@@ -212,6 +212,15 @@ try:
         log.info("FOMC Fiscal Modifier: loaded (fiscal fragility cascade)")
     except ImportError as e:
         log.warning(f"FOMC Fiscal Modifier: not available ({e})")
+
+    # Microflow Ingestion Engine (optional)
+    _microflow_enabled = False
+    try:
+        from src.k9_microflow import ingest_all, compute_all_scores, compute_divergence, compute_catalyst_score
+        _microflow_enabled = True
+        log.info("Microflow Engine: loaded (catalyst score + divergence)")
+    except ImportError as e:
+        log.warning(f"Microflow Engine: not available ({e})")
     _cb4_enabled = True
     log.info("CB-4 module loaded: jpy_repatriation_model + quant_signal_bridge")
 except ImportError as e:
@@ -1020,6 +1029,69 @@ async def quant_stats():
         "signal_gate": "confidence >= 0.40 → aeg_signal_router :9004 → Orbitron",
         "false_signal_gate": "rebalancing/crisis_flight distinguished from repatriation",
     }
+
+# ── Microflow Catalyst Endpoints ──────────────────────────────────────────────
+@app.get("/microflow/catalyst/all")
+async def microflow_all():
+    """All catalyst scores with EMA smoothing."""
+    if not _microflow_enabled:
+        raise HTTPException(status_code=503, detail="Microflow engine not available")
+    from src.k9_microflow import compute_all_scores
+    return {"scores": compute_all_scores()}
+
+
+@app.get("/microflow/catalyst/{instrument}")
+async def microflow_catalyst(instrument: str):
+    """Catalyst score for a specific instrument."""
+    if not _microflow_enabled:
+        raise HTTPException(status_code=503, detail="Microflow engine not available")
+    from src.k9_microflow import compute_catalyst_score
+    return compute_catalyst_score(instrument.upper())
+
+
+@app.get("/microflow/divergence")
+async def microflow_divergence():
+    """Micro vs macro divergence flags. SUPPRESS_SHORT when micro dominates."""
+    if not _microflow_enabled:
+        raise HTTPException(status_code=503, detail="Microflow engine not available")
+    from src.k9_microflow import compute_divergence
+    flags = compute_divergence()
+    suppress = [f for f in flags if f["divergence_signal"] == "SUPPRESS_SHORT"]
+    return {
+        "flags": flags,
+        "suppress_short_instruments": [f["instrument"] for f in suppress],
+        "alert_level": "SUPPRESS_SHORT" if suppress else "NORMAL",
+    }
+
+
+@app.post("/microflow/ingest")
+async def microflow_ingest():
+    """Manual trigger microflow data ingestion."""
+    if not _microflow_enabled:
+        raise HTTPException(status_code=503, detail="Microflow engine not available")
+    from src.k9_microflow import ingest_all
+    return ingest_all()
+
+
+@app.get("/microflow/coverage")
+async def microflow_coverage():
+    """Data coverage stats for microflow."""
+    if not _microflow_enabled:
+        raise HTTPException(status_code=503, detail="Microflow engine not available")
+    from src.k9_microflow import get_db
+    db = get_db()
+    try:
+        stats = db.execute("""
+            SELECT instrument, metric_type, COUNT(*) as count, MAX(timestamp) as latest
+            FROM Fact_Microflow GROUP BY instrument, metric_type ORDER BY instrument
+        """).fetchall()
+    except Exception:
+        stats = []
+    return {"total_metrics": len(stats), "details": [
+        {"instrument": r[0], "metric_type": r[1], "count": r[2], "latest": str(r[3])}
+        for r in stats
+    ]}
+
 
 if __name__ == "__main__":
     import socket

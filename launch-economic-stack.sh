@@ -161,6 +161,11 @@ SVC_CMD[k9-options]="python -m uvicorn src.k9_options_ingestion:app --host 0.0.0
 SVC_DIR[k9-options]="$K9_DIR"
 SVC_PORT[k9-options]="9011"
 
+# Microflow Ingestion — Catalyst Score + Divergence :9012
+SVC_CMD[k9-microflow]="python -m uvicorn src.k9_microflow:app --host 0.0.0.0 --port 9012"
+SVC_DIR[k9-microflow]="$K9_DIR"
+SVC_PORT[k9-microflow]="9012"
+
 # Canonical start order
 START_ORDER=(
   k9-paymaster
@@ -181,6 +186,7 @@ START_ORDER=(
   k9-auto
   k9-fiscal
   k9-options
+  k9-microflow
   lovable-bridge
   k9-wallpaper-ws
 )
