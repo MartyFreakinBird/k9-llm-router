@@ -557,7 +557,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="K-9 Serverless Signal Generator")
     parser.add_argument("--run", action="store_true", help="Run signal generation once (cron mode)")
     parser.add_argument("--server", action="store_true", help="Run as FastAPI server")
-    parser.add_argument("--port", type=int, default=9013, help="Server port (default 9013)")
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "9013")), help="Server port (default 9013)")
     args = parser.parse_args()
 
     if args.server:

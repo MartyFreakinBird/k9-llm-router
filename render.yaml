@@ -1,17 +1,27 @@
-# Render.com deployment configuration for K-9 Serverless Signal Generator
-# Deploy: render.com > New > Blueprint > select repo with this render.yaml
+# Render.com deployment for K-9 Serverless Signal Generator
+# Manual setup (not Blueprint — Blueprint isn't available for all accounts):
+#
+# Cron Job:
+#   Build:  pip install -r serverless-requirements.txt
+#   Start:  python -m src.signal_generator --run
+#   Schedule: */30 * * * *
+#
+# Web Service (optional, for manual signals):
+#   Build:  pip install -r serverless-requirements.txt
+#   Start:  python -m src.signal_generator --server --port $PORT
+#   Health: /health
 
 services:
   # Cron job — automated signal generation every 30 minutes
   - type: cron
     name: k9-signal-generator
-    schedule: "*/30 * * * *"  # every 30 min
+    schedule: "*/30 * * * *"
     runtime: python
-    buildCommand: pip install httpx yfinance
+    buildCommand: pip install -r serverless-requirements.txt
     startCommand: python -m src.signal_generator --run
     envVars:
       - key: THREECOMMASSECRET
-        sync: false  # set manually in Render dashboard
+        sync: false
       - key: THREECOMMASBOTUUID
         value: ee41599e-95dd-4b6e-8374-d0968cbff2de
       - key: THREECOMMASWEBHOOKURL
@@ -23,13 +33,13 @@ services:
   - type: web
     name: k9-signal-api
     runtime: python
-    plan: free  # $0/month
-    buildCommand: pip install fastapi uvicorn httpx yfinance
-    startCommand: python -m src.signal_generator --server --port ${PORT:-9013}
+    plan: free
+    buildCommand: pip install -r serverless-requirements.txt
+    startCommand: python -m src.signal_generator --server --port $PORT
     healthCheckPath: /health
     envVars:
       - key: THREECOMMASSECRET
-        sync: false  # set manually in Render dashboard
+        sync: false
       - key: THREECOMMASBOTUUID
         value: ee41599e-95dd-4b6e-8374-d0968cbff2de
       - key: THREECOMMASWEBHOOKURL
