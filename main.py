@@ -292,15 +292,18 @@ def build_model_registry(mode: str) -> dict[str, ModelBackend]:
 
     if mode in ("cloud", "hybrid") and ANTHROPIC_KEY:
         # Gemini agent — HTTP passthrough to :8770 (Sprint 10)
-        ModelBackend(
-            name="k9-gemini-agent",
-            provider="gemini",
-            model_id="gemini-2.5-computer-use-preview",
-            base_url=os.getenv("K9_GEMINI_URL", "http://localhost:8770"),
-            priority=8,               # above Claude; Paymaster-gated in the agent itself
-            max_tokens=4096,
-            context_window=1_000_000,
-        ),
+        # Only register when K9_GEMINI_URL is set (avoids ghost backend in fallback chain)
+        gemini_url = os.getenv("K9_GEMINI_URL", "")
+        if gemini_url:
+            registry["k9-gemini-agent"] = ModelBackend(
+                name="k9-gemini-agent",
+                provider="gemini",
+                model_id="gemini-2.5-computer-use-preview",
+                base_url=gemini_url,
+                priority=8,               # above Claude; Paymaster-gated in the agent itself
+                max_tokens=4096,
+                context_window=1_000_000,
+            )
 
         # Cloud Anthropic — fallback (higher priority number = lower preference)
         registry["glm5_cloud"] = ModelBackend(
@@ -516,7 +519,16 @@ async def check_backend_health(backend: ModelBackend) -> bool:
                 r = await c.get(f"{backend.base_url}/api/tags")
                 backend._healthy = r.status_code == 200
             else:
-                backend._healthy = bool(ANTHROPIC_KEY or OPENAI_KEY)
+                # For cloud backends: try a lightweight probe when base_url is set,
+                # fall back to key presence check
+                if backend.base_url and backend.base_url.startswith("http"):
+                    try:
+                        r = await c.get(backend.base_url, timeout=2.0)
+                        backend._healthy = r.status_code < 500
+                    except Exception:
+                        backend._healthy = bool(ANTHROPIC_KEY or OPENAI_KEY)
+                else:
+                    backend._healthy = bool(ANTHROPIC_KEY or OPENAI_KEY)
         backend._last_check = time.time()
         return backend._healthy
     except Exception:
@@ -560,6 +572,13 @@ class LLMRouter:
     async def route(self, req: RouterRequest) -> RouterResponse:
         """Route a request to the correct model."""
         t0 = time.time()
+
+        # ── Request-size guard (DoS mitigation) ─────────────────────────────
+        total_chars = sum(len(str(m.get("content", ""))) for m in req.messages)
+        if len(req.messages) > 200 or total_chars > 200_000:
+            raise HTTPException(status_code=413, detail="Request too large")
+        if req.max_tokens > 32768:
+            raise HTTPException(status_code=413, detail="max_tokens exceeds limit")
 
         # ── CB-2: Extract prompt for cache/guardrail checks ────────────────────
         _prompt = " ".join(
@@ -772,8 +791,18 @@ app = FastAPI(
     description="Sprint 3 — routes inference to local Ollama/VLLM or cloud fallback",
     lifespan=lifespan,
 )
+# CORS — configurable via ALLOWED_ORIGINS env var (comma-separated).
+# Defaults to localhost dev origin; set explicitly in production.
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8744"
+).split(",") if o.strip()]
+
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
@@ -854,9 +883,18 @@ async def swarm_peers():
 @app.post("/swarm/message")
 async def swarm_message(payload: dict):
     """Accept FIPA-lite ACL messages from the swarm."""
-    action = payload.get("content", {}).get("action")
+    # Validate payload structure before processing
+    if not isinstance(payload, dict) or "content" not in payload:
+        raise HTTPException(status_code=400, detail="Invalid payload: missing 'content'")
+    if not isinstance(payload["content"], dict) or "action" not in payload["content"]:
+        raise HTTPException(status_code=400, detail="Invalid payload: missing 'action' in content")
+
+    action = payload["content"].get("action")
     if action == "route":
-        req = RouterRequest(**payload["content"].get("request", {}))
+        request_data = payload["content"].get("request")
+        if not request_data or not isinstance(request_data, dict):
+            raise HTTPException(status_code=400, detail="Invalid route request: missing request data")
+        req = RouterRequest(**request_data)
         result = await router_instance.route(req)
         return {"ok": True, "result": result.dict()}
     return {"ok": True, "ack": payload.get("msg_id", "unknown")}
