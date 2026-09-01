@@ -93,8 +93,25 @@ async def paymaster_gate(
         if not approved:
             log.warning("Paymaster queued for review: %s %.4f", task_type, estimated_cost)
         return approved
+    except httpx.ConnectError as e:
+        log.warning(
+            "Paymaster connection refused at %s — failing open (approved). "
+            "Check K9_PAYMASTER_URL=%s. Error: %s",
+            K9_PAYMASTER_URL, K9_PAYMASTER_URL, e,
+        )
+        return True  # fail open (non-blocking) — paymaster offline
+    except httpx.TimeoutException as e:
+        log.warning(
+            "Paymaster timed out after 3s at %s — failing open (approved). "
+            "Paymaster may be overloaded. Error: %s",
+            K9_PAYMASTER_URL, e,
+        )
+        return True
     except Exception as e:
-        log.warning("Paymaster unreachable (%s) — defaulting to approve", e)
+        log.warning(
+            "Paymaster request failed unexpectedly — failing open (approved). "
+            "Error type=%s, detail=%s", type(e).__name__, e,
+        )
         return True  # fail open (non-blocking) — operator controls via K9_PAYMASTER_URL
 
 # ── Gemini API helpers ────────────────────────────────────────────────────────

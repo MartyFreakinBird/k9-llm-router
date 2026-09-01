@@ -180,6 +180,43 @@ python main.py
 
 ---
 
+## Production settings
+
+### CORS (required)
+
+The router no longer accepts requests from any origin. Set `ALLOWED_ORIGINS` in
+your production environment to a comma-separated list of allowed frontend URLs:
+
+```bash
+# .env or Render/Vercel environment
+ALLOWED_ORIGINS=https://orbitron-integrator.lovable.app,https://ai-yield-whisperer.lovable.app
+```
+
+Defaults to `http://localhost:3000,http://localhost:5173,http://localhost:8744`
+for local development.
+
+### Gemini agent passthrough (optional)
+
+The Gemini backend (`k9-gemini-agent`) is only registered when `K9_GEMINI_URL`
+is set. Without it, the fallback chain skips Gemini and goes straight to cloud
+Anthropic:
+
+```bash
+# .env — only set if k9-gemini-agent is running on :8770
+K9_GEMINI_URL=http://localhost:8770
+```
+
+### Request limits
+
+The `/route` endpoint rejects payloads that exceed:
+- 200 messages per request
+- 200,000 characters of total content
+- 32,768 max_tokens
+
+These are hard limits to prevent DoS via oversized prompts.
+
+---
+
 ## Architecture invariants
 
 - **Lovable = ingress + persistence + UI only.** Never executes trades.
