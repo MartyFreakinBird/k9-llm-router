@@ -51,6 +51,18 @@ AEG_SIGNAL_URL = os.getenv("AEG_SIGNAL_URL", "http://localhost:9004")
 LLM_ROUTER_URL = os.getenv("K9_JEPA_ENDPOINT", "http://localhost:8765/route")
 DISPATCHER_TIMEOUT = float(os.getenv("DISPATCHER_TIMEOUT", "15.0"))
 
+# ── Target service map ────────────────────────────────────────────────────────
+# Maps (task_class, risk_level) → (egress service, method, path).
+# Keys MUST match EGRESS_ALLOWLIST in security_reinforcement.py — the security
+# gate validates dispatches against that allowlist, so a mismatch here means
+# every dispatch gets REJECTED (this was the CB-6 dispatcher bug).
+DISPATCH_SERVICE_MAP = {
+    ("compliance", RiskLevel.READ_ONLY):  ("tx-adapter:compliance", "POST",     "/compliance/check"),
+    ("analytics",  RiskLevel.READ_ONLY):  ("text-to-sql",           "INTERNAL", "*"),
+    ("forensic",   RiskLevel.READ_ONLY):  ("tx-adapter:balance",    "GET",      "/balance/"),
+    ("execution",  RiskLevel.IDEMPOTENT): ("aeg-signal-router",     "POST",     "/batch"),
+}
+
 
 class DispatchResult(str, Enum):
     EXECUTED = "executed"
@@ -105,14 +117,27 @@ class ExecutionDispatcher:
         start = time.monotonic()
         task_class = handover.task_class
         risk = handover.risk_level
+
+        # ── Resolve target service (unmapped combos → NO_OP, nothing gated) ────
+        service = DISPATCH_SERVICE_MAP.get((task_class, risk))
+        if service is None:
+            self.noop_count += 1
+            return ExecutionOutcome(
+                dispatch_result=DispatchResult.NO_OP,
+                service_called="none",
+                error=f"no dispatcher for task_class={task_class} risk={risk.value}",
+            )
+        service_name, method, path = service
         self.dispatch_count += 1
 
         # ── Security Gate: check before every dispatch ──────────────────────────
+        # Uses the REAL allowlist service name (not task_class) so the egress
+        # allowlist can actually validate the target.
         sec = get_security_gate()
         allowed, sec_reason = sec.check(
-            service_name=task_class,
-            method="POST" if task_class != "forensic" else "GET",
-            path="/" + task_class,
+            service_name=service_name,
+            method=method,
+            path=path,
             task_class=task_class,
             confidence=handover.confidence,
             question=question,
@@ -123,7 +148,7 @@ class ExecutionDispatcher:
             logger.warning(f"[DISPATCHER] SECURITY GATE BLOCKED: {sec_reason}")
             return ExecutionOutcome(
                 dispatch_result=DispatchResult.REJECTED,
-                service_called=task_class,
+                service_called=service_name,
                 error=f"security_gate: {sec_reason}",
             )
 

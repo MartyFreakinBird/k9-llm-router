@@ -157,6 +157,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       K9_PAYMASTER_URL: "http://k9-paymaster:9002"
       K9_GEMINI_URL: "http://k9-gemini-agent:8770"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:8004,http://localhost:8005}
       ORBITRON_AUTH_TOKEN: ${ORBITRON_AUTH_TOKEN:-}
     depends_on:
       - k9-paymaster
