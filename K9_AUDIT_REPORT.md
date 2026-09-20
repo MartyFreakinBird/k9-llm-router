@@ -116,3 +116,21 @@ ai-yield-whisperer added 4 new tables (Apr 2026):
 | 🟡 | Wire 7 new Orbitron fns to k9-action-executor | orbitron-integrator | Sprint 7 |
 | 🟢 | Set K9_*_DIR env vars on WSL2 | local | env config |
 
+
+---
+
+## RESOLUTION 2026-09-20 — Duplicate entrypoint removed
+
+The stale nested copy `k9-llm-router/k9-llm-router/` (last touched 2026-07-06, containing the
+pre-patch unsafe CORS, broken Gemini registration, silent paymaster handling, and missing DoS
+guards) has been removed from the repo. The root `main.py` (patched 2026-09-01) is the single
+canonical entrypoint.
+
+Deployment sanity check confirming root file is what production launches:
+- `Dockerfile`: `CMD ["python", "main.py"]`, build context `.` → root main.py
+- `render.yaml`: `startCommand: python -m src.signal_generator` → root src package
+- `docker-compose.yml`: all build contexts are root-relative (`.` / `k9_gemini_agent`)
+
+Unique July-era files (k9_orchestrator.py, k9_paymaster.py, k9_task_queue.py, k9_worker.py,
+k9-swarm-agent.py, k9_mcp_manager.py, networks.yaml, n8n workflows, 3 test files) remain
+recoverable from git history. Test suite: 130/130 passing after removal.
