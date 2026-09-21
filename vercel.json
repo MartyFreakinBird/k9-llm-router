@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "outputDirectory": "k9-llm-router/wallpaper",
+  "outputDirectory": "wallpaper",
   "framework": null,
   "rewrites": [
     {
