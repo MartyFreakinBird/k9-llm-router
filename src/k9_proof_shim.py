@@ -331,8 +331,22 @@ def build_witness(
     blast_metric  = float_to_blast_radius_metric(jepa.blast_radius)
 
     # ── Derive min_amount_out from JEPA impact ────────────────────────────────
-    # This is what the circuit verifies (Invariant B)
-    # min_amount_out = amount_in - (amount_in * impact_bps / 10000)
+    # This is what the circuit verifies (Invariant B).
+    # The circuit computes the deduction in u128 with TRUNCATING division
+    # (integer semantics, 2026-09-28 fix) — the Python `//` floor matches it
+    # exactly. Mirror the circuit's range asserts so an out-of-range intent
+    # fails here, loudly, instead of at proving time.
+    # min_amount_out = amount_in - (amount_in * impact_bps // 10000)
+    MAX_AMOUNT_IN_CEILING = 10**30   # must match MAX_AMOUNT_IN in main.nr
+    MAX_IMPACT_BPS        = 10_000   # must match MAX_IMPACT_BPS in main.nr
+    if intent.amount_in > MAX_AMOUNT_IN_CEILING:
+        raise ValueError(
+            f"[proof-shim] amount_in {intent.amount_in} exceeds circuit ceiling "
+            f"{MAX_AMOUNT_IN_CEILING} — refusing to build witness")
+    if impact_bps > MAX_IMPACT_BPS:
+        raise ValueError(
+            f"[proof-shim] impact_bps {impact_bps} exceeds {MAX_IMPACT_BPS} — "
+            "refusing to build witness")
     min_amount_out = intent.amount_in - (intent.amount_in * impact_bps // 10_000)
 
     # Override intent.min_amount_out with JEPA-derived value

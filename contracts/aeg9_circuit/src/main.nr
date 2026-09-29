@@ -72,6 +72,8 @@ global MAX_DRAWDOWN_BPS:      Field = 150;  // 1.5% — AEG-7 genesis
 global MIN_ALIGNMENT_SCORE:   Field = 80;   // 0.80 governance grade
 global MIN_BLAST_RADIUS:      Field = 75;   // 0.75 pool health floor
 global BPS_DENOMINATOR:       Field = 10000;
+global MAX_AMOUNT_IN:         u128 = 1000000000000000000000000000000; // 1e30 scaled 1e18 — ceiling with u128 multiply headroom
+global MAX_IMPACT_BPS:        u128 = 10000;  // 100% — a larger "price impact" is nonsense, reject
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. HELPER: Reconstruct params hash commitment
@@ -172,8 +174,32 @@ fn main(
     // This is the core anti-hallucination check: the AI cannot lie about
     // expected slippage to get an intent approved that it knows will exceed limits.
     // ─────────────────────────────────────────────────────────────────────────
-    let expected_min_out = intent.amount_in
-        - (intent.amount_in * predicted_price_impact_bps / BPS_DENOMINATOR);
+    // Field '/' is multiplication by the modular inverse mod p: exact equality
+    // only held when amount_in * bps happened to divide evenly, which rejects
+    // every honest floored witness in production (AEG-9 fix, 2026-09-28).
+    // Compute the deduction in u128 with truncating division instead.
+    // amount_in / min_amount_out stay Field in the signature, so the public
+    // ABI and input ordering are unchanged — on-chain this is a verifier
+    // repoint, not an interface rewrite.
+    //
+    // Range checks, cast-then-verify: Noir's Field `as u128` truncates
+    // mod 2^128, so a near-p Field could silently wrap into a small integer.
+    // The back-cast equality assert proves the cast was faithful BEFORE the
+    // ceiling is trusted; the ceiling then guarantees the multiply has
+    // headroom: amount_in <= 1e30, bps <= 1e4 → product <= 1e34,
+    // far below 2^128 (~3.4e38).
+    let amount_in_u128: u128  = intent.amount_in as u128;
+    let impact_bps_u128: u128 = predicted_price_impact_bps as u128;
+    assert(amount_in_u128 as Field == intent.amount_in,
+        "Invariant B: amount_in does not fit u128 — refusing");
+    assert(impact_bps_u128 as Field == predicted_price_impact_bps,
+        "Invariant B: impact bps does not fit u128 — refusing");
+    assert(amount_in_u128 <= MAX_AMOUNT_IN,
+        "Invariant B: amount_in exceeds ceiling");
+    assert(impact_bps_u128 <= MAX_IMPACT_BPS,
+        "Invariant B: price impact exceeds 100 percent");
+    let deduction_u128: u128  = (amount_in_u128 * impact_bps_u128) / 10000;
+    let expected_min_out: Field = (amount_in_u128 - deduction_u128) as Field;
 
     assert(
         intent.min_amount_out == expected_min_out,
